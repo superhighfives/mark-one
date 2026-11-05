@@ -1,6 +1,7 @@
 #!/bin/sh
-# Download the stock E-M5 v2.3 firmware and the container unpacker, check
-# their hashes, and unpack the firmware into unpacked/.
+# Install the Python dependencies, download the stock E-M5 v2.3 firmware and
+# the container unpacker, check their hashes, and unpack the firmware into
+# unpacked/.
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -21,6 +22,8 @@ check() {
   }
 }
 
+uv sync --quiet
+
 mkdir -p fw tools unpacked
 
 if [ ! -f "$FW" ]; then
@@ -34,7 +37,7 @@ if [ ! -f "$OLYFW" ]; then
 fi
 check "$OLYFW" "$OLYFW_SHA"
 
-(cd unpacked && python3 -I ../tools/olyfw.py "../$FW" --dump >/dev/null)
+(cd unpacked && uv run ../tools/olyfw.py "../$FW" --dump >/dev/null)
 ln -sf OLY_E_097_2300_0000_0000.BIN.blk00000000.OE.0100.bin unpacked/main.bin
 check unpacked/main.bin 4edb88f3b552ef2fb9066ce7d1ca8bf5b44494f4c21865ac02dcac39e833fcf9
 

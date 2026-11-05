@@ -1,8 +1,8 @@
 """Patch the E-M5 v2.3 firmware and repack it.
 
 Usage:
-  python3 -I scripts/build.py fw/OLY_E_097_2300_0000_0000.BIN patched/E0972300.BIN [patch ...]
-  python3 -I scripts/build.py --roundtrip fw/OLY_E_097_2300_0000_0000.BIN
+  uv run scripts/build.py fw/OLY_E_097_2300_0000_0000.BIN patched/E0972300.BIN [patch ...]
+  uv run scripts/build.py --roundtrip fw/OLY_E_097_2300_0000_0000.BIN
 
 Patches are defined in PATCHES below as (runtime address, expected bytes, new bytes),
 applied to the decoded main block. Each expected value is checked first, so a

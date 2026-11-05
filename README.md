@@ -6,9 +6,9 @@ Status: one candidate patch, `hdmi-liveview`, built and checked offline but not 
 
 ## Running it
 
-You need Python 3, `curl` and `xz`. `scripts/findbase.py` also needs `numpy`.
+You need [uv](https://docs.astral.sh/uv/), `curl` and `xz`. uv installs Python and the one dependency, `numpy`, for you.
 
-Fetch and unpack the stock v2.3 firmware. The firmware is Olympus's, so it isn't in this repo; the script downloads it and checks its hash.
+Install the dependencies, then fetch and unpack the stock v2.3 firmware. The firmware is Olympus's, so it isn't in this repo; the script downloads it and checks its hash.
 
 ```sh
 scripts/setup.sh
@@ -17,13 +17,13 @@ scripts/setup.sh
 Build the patched firmware. The script checks every byte it replaces, so it won't patch anything other than stock v2.3.
 
 ```sh
-python3 -I scripts/build.py fw/OLY_E_097_2300_0000_0000.BIN patched/hdmi-liveview/E0972300.BIN hdmi-liveview
+uv run scripts/build.py fw/OLY_E_097_2300_0000_0000.BIN patched/hdmi-liveview/E0972300.BIN hdmi-liveview
 ```
 
 Check that repacking the unmodified firmware reproduces the original file:
 
 ```sh
-python3 -I scripts/build.py --roundtrip fw/OLY_E_097_2300_0000_0000.BIN
+uv run scripts/build.py --roundtrip fw/OLY_E_097_2300_0000_0000.BIN
 ```
 
 To flash, copy the `.BIN` into a `DCOLYMP` folder on the SD card, hold OK while turning the camera on, and wait for the light. Restore by flashing the stock file the same way, or with Olympus's updater. `NOTES.md` has the full test plan.
@@ -48,10 +48,10 @@ Then disassemble the main code block and label it:
 mkdir -p disasm
 toolchain/install/bin/mn10300-elf-objdump -D -b binary -m am33-2 \
   --adjust-vma=0x7E421020 unpacked/main.bin > disasm/main.raw.s
-python3 -I scripts/annotate.py unpacked/main.bin disasm/main.raw.s disasm/main.s
+uv run scripts/annotate.py unpacked/main.bin disasm/main.raw.s disasm/main.s
 ```
 
-`disasm/main.s` marks every string a piece of code refers to and labels each function that something calls. The other scripts help you find your way around:
+`disasm/main.s` marks every string a piece of code refers to and labels each function that something calls. The other scripts help you find your way around, and all run with `uv run scripts/<name>.py`:
 
 - `xref.py` finds a string and everything that points at it.
 - `findimm.py` finds where a 32-bit value appears.
