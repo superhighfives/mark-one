@@ -1,0 +1,15 @@
+# Olympus firmware and anything derived from it. scripts/setup.sh fetches
+# and unpacks it; the commands in README.md rebuild the rest.
+fw/
+unpacked/
+disasm/
+patched/
+
+# Downloaded by scripts/setup.sh (xulfr/om-emu, no license).
+tools/
+
+# Built from GNU binutils source.
+toolchain/
+
+__pycache__/
+.DS_Store
