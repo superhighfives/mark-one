@@ -157,9 +157,78 @@ updater).
 - xulfr/om-emu: emulator, container format and flashing notes.
 - mu-43 "Modified firmware, looking for users" thread: active community.
 
+## USB path
+
+Goal: a vendor command (proposed number 0x9484, the live view command
+later Olympus bodies use) that returns the current live view frame while
+the camera stays in shooting mode with USB connected.
+
+### Command lists and registration
+
+- Advertised command lists at 0x7f128916.., picked by connection mode in
+  0x7f0e0773: modes 0/5 -> 29 commands (standard + 0x9116-0x9125, firmware
+  update), 1 -> 18 (standard), 2/3 -> 11 (printing), 4 -> 20 (MTP,
+  0x9801-0x9805), 6 -> 33 (standard + 0x91xx + 0x902c-0x902f). No 0x94xx
+  remote control or live view commands exist.
+- Handlers are registered per mode at runtime: a setup function clears the
+  list (0x7f0d9b38), then calls `register` (0x7f0d9ab7) per command with
+  d0 = command, d1 = data direction (0 none, 1 camera to computer,
+  2 computer to camera), a1 = flag, a0 = handler. The list is a linked list
+  (no fixed size); registering an existing number replaces it. Example setup
+  functions: 0x7f0d4a5b, 0x7f0d4bd2; the Olympus 0x91xx block is registered
+  around 0x7f0d49a4.
+- Handler shape (see 0x9801's handler at 0x7f0d6221): a0 = request
+  (parameters at +16, +20, ...), a1 = response. Get a buffer from
+  0x7f0d9be7, send with 0x7f0d9c37(a0 = pointer, d0 = chunk length,
+  d1 = total length), free with 0x7f0d9c10, then write the response code
+  (0x2001 OK, 0x2002 error) as a u16 at (a1) and 0 at (12,a1).
+- The send function streams: the first call sets the total length and
+  later calls send further chunks from any pointer, so a frame buffer can be
+  sent in place.
+
+### Staying in shooting mode with USB connected
+
+- SUB_APPCHG -> app start mapping (0x7edc74f9, jump table 0x7eeea934):
+  PC_CAM_SHOOTING (0x08000008) starts the ordinary shooting app
+  (MNG_START_CAM_SHOOTING), PC_CAM_PLAY starts playback. The transition
+  table allows PC_CAM_SHOOTING only while USB is connected. Nothing requests
+  it (request 24), so it's a ready-made but unused "shoot with USB attached"
+  path.
+- Unknown: whether the USB session (TPC task, `TPC_ON`) keeps running once
+  the PC app hands over to shooting.
+
+### Frame source candidates
+
+- `CapThr_ThroughImage` "PSP JPEG": live view is encoded to JPEG in real
+  time for the multi-preview grid (`setupMultiSetting`, `_isActivePspJpeg`,
+  `allocPspJpegBufferHandle`). Hardware JPEG of live frames exists.
+- Movie debug commands print "Video Buffer Address:%X DataSize:%d width:%d
+  height:%d" for `M_VIDEOBASE`, `M_VIDEOBASE2`, `M_VIDEOEXTBASE`,
+  `M_HDMIVIDEOBASE1-3`, which gives raw YC buffer locations and sizes.
+- Raw frames are viable over USB 2.0: a 640x480 4:2:2 frame is about 600 KB,
+  so roughly 30-50 frames per second at typical PTP throughput.
+
+### Code space
+
+The handler needs on the order of 100 bytes of new code. Options: the
+E-M10 project's `load-padding` approach (padding between sections is not
+copied to RAM unless the section table is extended), or overwriting code
+that can't run on this body (UART-only debug commands, for example).
+
+### Mac side
+
+ImageCaptureCore's `requestSendPTPCommand` (ICCameraDevice) can send any PTP
+command, so a small app can poll 0x9484 and publish frames through a
+CoreMediaIO camera extension.
+
 ## Next
 
 1. Run the test plan on a camera running stock 2.3.
 2. If HDMI stays dark: trace GUI message 110 handling in the shooting GUI app.
 3. If it works but shows overlays: find the INFO display mode for HDMI.
-4. USB route: requests 24/25 (PC shooting) are dormant; trace their handlers.
+4. USB: trace the PSP JPEG path in `CapThr_ThroughImage` (where the JPEG
+   lands, how big it is, what turns it on) and the movie debug buffer dump.
+5. USB: find what happens to the USB session if a PC-mode handler requests
+   PC_CAM_SHOOTING (request 24) after connecting.
+6. USB: pick the code space for the handler and write it.
+7. Mac: small ImageCaptureCore test app that sends a custom PTP command.
