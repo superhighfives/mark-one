@@ -17,6 +17,17 @@ BASE = 0x7E421020          # runtime address of main block byte 0
 STOCK_SHA256 = 'cb158dbdd8092856e8060354b008369f7d33dff32a1204e966ef0d5bce85e535'
 MAIN_SHA256 = '4edb88f3b552ef2fb9066ce7d1ca8bf5b44494f4c21865ac02dcac39e833fcf9'
 
+
+def stock(length, sha256):
+    """Olympus's code a patch replaces, known by its length and hash."""
+    return (length, sha256)
+
+
+def matches(old, got):
+    if isinstance(old, tuple):
+        return len(got) == old[0] and hashlib.sha256(got).hexdigest() == old[1]
+    return got == bytes.fromhex(old)
+
 PATCHES = {
     # Shooting mode treats HDMI like analog video: pick it as the display
     # target and hand it to the GUI as output type 4 (doHdmiConnectChange,
@@ -32,6 +43,21 @@ PATCHES = {
         (0x7EF00268, '87e3dc7e', 'eb95dc7e'),
         # ShootingCommon event 0x01050005 (HDMI disconnected): same handler
         (0x7EF00278, '9de3dc7e', 'eb95dc7e'),
+    ],
+    # PTP command 0x9484 in MTP mode: send back `length` bytes from
+    # `address` (params 1 and 2). Takes over the 0x9805 slot.
+    'usb-peek': [
+        # MTP setup: register 0x9484 instead of 0x9805 (GetObjectPropList)
+        (0x7F0D4BBC, '05980000', '84940000'),
+        # ...with the new handler instead of 0x7f0d6434
+        (0x7F0D4BC6, '34640d7f', 'e3aaaa7e'),
+        # advertise 0x9484 instead of 0x9805 in the MTP command list
+        (0x7F128976, '0598', '8494'),
+        # handler (asm/peek.s), over the `sdk api changeOutLine` debug
+        # command, which only the serial console reaches
+        (0x7EAAAAE3,
+         stock(38, 'c280b2976acfc16406702001b83ae513610c16f741424b74bbd8fd8f7aaa388d'),
+         'cff0f8feec470cf80810f80c14f1e88c8ddd43f16200f0185c0c2c0120f07000f8100cdff024'),
     ],
 }
 
@@ -65,11 +91,11 @@ def build(fw, names):
     for name in names:
         for addr, old, new in PATCHES[name]:
             o = addr - BASE
-            old_b, new_b = bytes.fromhex(old), bytes.fromhex(new)
-            got = bytes(main[o:o + len(old_b)])
-            assert got == old_b, f'{name} @ {addr:#x}: expected {old}, found {got.hex()}'
+            new_b = bytes.fromhex(new)
+            got = bytes(main[o:o + (old[0] if isinstance(old, tuple) else len(old) // 2)])
+            assert matches(old, got), f'{name} @ {addr:#x}: not the expected stock code'
             main[o:o + len(new_b)] = new_b
-            print(f'  {name}: {addr:#010x} {old} -> {new}')
+            print(f'  {name}: {addr:#010x} {got.hex()} -> {new}')
     packed = pack_block(fw, off, hd, bytes(main))
     out[off:off + len(packed)] = packed
     return bytes(out), bytes(main)

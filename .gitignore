@@ -14,3 +14,8 @@ toolchain/
 __pycache__/
 .DS_Store
 .venv/
+
+# Assembler output; rebuild with the commands in NOTES.md.
+asm/*.o
+asm/*.elf
+asm/*.bin

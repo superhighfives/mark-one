@@ -215,11 +215,60 @@ E-M10 project's `load-padding` approach (padding between sections is not
 copied to RAM unless the section table is extended), or overwriting code
 that can't run on this body (UART-only debug commands, for example).
 
+### Patch: usb-peek (untested)
+
+Command 0x9484 in MTP mode returns `length` bytes from `address`
+(parameters 1 and 2). It takes over the 0x9805 registration in the MTP
+setup function and the 0x9805 entry in the advertised list, so no new
+registration call is needed:
+
+| Address | Bytes | Change |
+|---|---|---|
+| 0x7f0d4bbc | 05980000 -> 84940000 | register 0x9484 instead of 0x9805 |
+| 0x7f0d4bc6 | 34640d7f -> e3aaaa7e | handler pointer -> 0x7eaaaae3 |
+| 0x7f128976 | 0598 -> 8494 | advertised list: 0x9805 -> 0x9484 |
+| 0x7eaaaae3 | 38 bytes | handler from `asm/peek.s` |
+
+The handler overwrites the start of the `sdk api changeOutLine` debug
+command (0x7eaaaae3-0x7eaaab8e, 171 bytes), referenced only from the `sdk api`
+command table at 0x7ecda9ec, which the serial console uses. It mirrors the
+stock 0x9801 handler: send with 0x7f0d9c37, reply 0x2001.
+
+Build the handler:
+
+```sh
+T=toolchain/install/bin
+$T/mn10300-elf-as -o asm/peek.o asm/peek.s
+$T/mn10300-elf-ld -Ttext=0x7eaaaae3 --defsym tpc_send_data=0x7f0d9c37 -e peek -o asm/peek.elf asm/peek.o
+$T/mn10300-elf-objcopy -O binary asm/peek.elf asm/peek.bin
+```
+
+Absolute call targets must come from the linker (`--defsym`); a `.set`
+constant gets encoded as a raw displacement.
+
+Unknowns: the largest length the send function accepts in one call, and
+what happens on a read from unmapped memory. Start with small reads of
+known RAM (for example 0x602adef8, 4 bytes).
+
+### Live view buffers
+
+- Movie debug code (0x7e7a2505) reports display video buffers of 1024x768,
+  1,572,864 bytes each (2 bytes per pixel, YCbCr 4:2:2), triple buffered:
+  table at 0x7e932b84 = M_VIDEOBASE 0xbd742b00, M_VIDEOBASE2 0xbd8c2b00,
+  M_VIDEOEXTBASE 0xbd5c2b00. Current index at 0x605b5054, next-index table
+  at 0x7e932b78; 0x7e7a0b34 returns a buffer not in use by the display.
+- 0x602adef8 holds the address of the video buffer the display is showing.
+  Set by 0x7e7860c5 (reprograms the display, used by movie playback through
+  0x7e77e808) and by display setup 0x7e785c5e. Whether live view goes through
+  this layer is not confirmed; peeking 0x602adef8 and the buffers while
+  shooting will answer it.
+
 ### Mac side
 
-ImageCaptureCore's `requestSendPTPCommand` (ICCameraDevice) can send any PTP
-command, so a small app can poll 0x9484 and publish frames through a
-CoreMediaIO camera extension.
+`scripts/ptp.py` speaks raw PTP over libusb (`info`, `peek`). For the real
+webcam, ImageCaptureCore's `requestSendPTPCommand` (ICCameraDevice) can send
+any PTP command, so a small app can poll 0x9484 and publish frames through
+a CoreMediaIO camera extension.
 
 ## Next
 
@@ -230,5 +279,6 @@ CoreMediaIO camera extension.
    lands, how big it is, what turns it on) and the movie debug buffer dump.
 5. USB: find what happens to the USB session if a PC-mode handler requests
    PC_CAM_SHOOTING (request 24) after connecting.
-6. USB: pick the code space for the handler and write it.
-7. Mac: small ImageCaptureCore test app that sends a custom PTP command.
+6. USB: flash usb-peek, run `ptp.py info` and small peeks, then read
+   0x602adef8 and the video buffers while the camera is in shooting mode.
+7. USB: keep the USB session alive in shooting mode (PC_CAM_SHOOTING).
