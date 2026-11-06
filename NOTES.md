@@ -263,6 +263,18 @@ known RAM (for example 0x602adef8, 4 bytes).
   this layer is not confirmed; peeking 0x602adef8 and the buffers while
   shooting will answer it.
 
+- HDMI has its own triple buffer at 1920x1080, 4,147,200 bytes each
+  (2 bytes per pixel, YCbCr 4:2:2): M_HDMIVIDEOBASE1 0xbba06a00,
+  M_HDMIVIDEOBASE2 0xbbdfb200, M_HDMIVIDEOBASE3 0xbc1efa00 (movie debug
+  dump at 0x7e7a2aad). These are the best-quality frames to aim for: full
+  1080p, the same image the HDMI port sends. They are probably only filled
+  while HDMI output is active, so with the hdmi-liveview patch they may be
+  readable over USB with no cable in the capture card at all.
+- Bandwidth: a 1080p 4:2:2 frame is about 4 MB, so USB 2.0 (roughly 30-40
+  MB per second in practice) gives under 10 frames per second raw. Smooth
+  1080p over USB needs the camera's hardware JPEG encoder; raw frames are
+  fine for confirming the image and for stills.
+
 ### Mac side
 
 `scripts/ptp.py` speaks raw PTP over libusb (`info`, `peek`). For the real
@@ -271,6 +283,11 @@ any PTP command, so a small app can poll 0x9484 and publish frames through
 a CoreMediaIO camera extension.
 
 ## Next
+
+The goal is image quality: the camera's lens and color, not a cheap webcam
+image. HDMI through the Elgato gives 1080p video with the least new code.
+USB is the cable-free route, aiming at the 1080p HDMI buffers.
+
 
 1. Run the test plan on a camera running stock 2.3.
 2. If HDMI stays dark: trace GUI message 110 handling in the shooting GUI app.
