@@ -36,7 +36,8 @@ OPEN_SESSION = 0x1002
 CLOSE_SESSION = 0x1003
 GET_DEVICE_INFO = 0x1001
 PEEK, POKE, RUN = 0x9484, 0x9485, 0x9486
-CHUNK = 0x10000
+PEEK_CHUNK = 0x180000   # 36 MB/s measured; 64 KB chunks manage 20
+POKE_CHUNK = 0x10000
 OK = 0x2001
 
 
@@ -168,7 +169,7 @@ def peek(cam, address, length, out):
     start = uncached(address)
     data = b''
     while len(data) < length:
-        n = min(CHUNK, length - len(data))
+        n = min(PEEK_CHUNK, length - len(data))
         code, _, chunk = cam.transact(PEEK, (start + len(data), n), timeout=20000)
         if code != OK:
             sys.exit(f'peek failed at {start + len(data):#010x}: {code:#06x}')
@@ -186,8 +187,8 @@ def poke(cam, address, data):
     if len(data) % 2 or address % 2:
         sys.exit('Address and length must be even.')
     start = uncached(address)
-    for off in range(0, len(data), CHUNK):
-        code, _, _ = cam.transact(POKE, (start + off,), data_out=data[off:off + CHUNK], timeout=20000)
+    for off in range(0, len(data), POKE_CHUNK):
+        code, _, _ = cam.transact(POKE, (start + off,), data_out=data[off:off + POKE_CHUNK], timeout=20000)
         if code != OK:
             sys.exit(f'poke failed at {start + off:#010x}: {code:#06x}')
     print(f'wrote {len(data)} bytes at {address:#010x}')

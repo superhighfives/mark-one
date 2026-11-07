@@ -221,7 +221,27 @@ E-M10 project's `load-padding` approach (padding between sections is not
 copied to RAM unless the section table is extended), or overwriting code
 that can't run on this body (UART-only debug commands, for example).
 
-### Patch: usb-tools (untested)
+### Patch: usb-tools (working)
+
+Flashed 2026-11-06. Results on the camera:
+
+- `info` lists 0x9484-0x9486. A string read through the uncached mirror
+  (0xbf127c8c) matches main.bin at 0x7f127c8c, which confirms the mirror is
+  0x40000000 above the cached view.
+- Reads run at 36.5 MB/s with 1.5 MB transfers (20 MB/s with 64 KB): 23
+  full 1024x768 panel buffers or 8.8 raw 1080p frames per second. A single
+  transfer of 1.5 MB works.
+- poke and run work: a 7-byte function written at 0x7eaaab74 (the unused
+  end of the handler space) and run with d0 = 2, d1 = 3 returned d0 = 5.
+- With USB connected (PC mode, live view off), all three panel buffers still
+  hold the last live view frames: 568x480 of picture plus a black band to
+  640, at the top left of the 1024x768 buffer, Y Cb Y Cr byte order
+  (`scripts/yuv2png.py` converts them). The rest of each buffer is never
+  written. So the panel buffers are low resolution, about 568x480. The
+  1080p HDMI buffers hold untouched memory until HDMI output runs.
+- 0x602adef8 reads 0 in PC mode; the current buffer index (0x605b5054) is 2.
+
+### Patch: usb-tools
 
 Three commands in MTP mode, from `asm/usb.s`:
 
@@ -298,8 +318,7 @@ $T/mn10300-elf-objcopy -O binary asm/usb.elf asm/usb.bin
 Absolute call targets must come from the linker (`--defsym`); a `.set`
 constant gets encoded as a raw displacement.
 
-Unknowns: the largest single transfer (`ptp.py` uses 64 KB chunks), and
-what happens on a read from unmapped memory. Start with small reads of
+Unknowns: what happens on a read from unmapped memory. Start with small reads of
 known memory: `info`, then `peek 0x602adef8 4`, then a string in the code.
 
 ### Live view buffers
