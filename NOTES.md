@@ -267,6 +267,11 @@ the picture size and streams 800x450 at about 28 frames per second.
 Panel sizes come from per-panel functions in the display driver (for
 example 0x7e780e16 reports 90x15, 800x600, 640x480), called directly from
 0x7e77e9c9 and 0x7e7898be, so changing them means changing code.
+0x7e782d7f is an identical copy. Patching both in RAM to report 1024x768
+(poke 0x7e780e22 `0004f0712c0003f8`, 0x7e782d8a `2c0004f0712c0003`) and
+switching the output LCD -> EVF hangs the display task: `changeOutLine`
+never returns and the USB task blocks with it. A battery pull recovers. The
+display hardware setup can't take a size beyond the panel's.
 
 ### Frame source candidates
 
