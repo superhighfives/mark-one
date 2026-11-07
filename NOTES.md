@@ -365,8 +365,41 @@ running and the clip on the card empty ("picture error" in playback).
 Not yet checked: whether the file system still reserves the clip's space,
 and whether the 29-minute limit still stops recording.
 
-Next: the recording time limit, and a macOS camera extension fed by this
-stream.
+## Mark One (macOS camera)
+
+`mac/MarkOne` (XcodeGen: `xcodegen generate`, then build the MarkOne and
+markone-feed schemes; set DEVELOPMENT_TEAM in `Local.xcconfig`):
+
+- Mark One.app installs a Core Media IO camera extension
+  (com.superhighfives.markone.camera). The app must run from /Applications;
+  the user approves the extension in System Settings > General > Login
+  Items & Extensions > Camera Extensions.
+- The extension publishes the "Mark One" camera with a source stream
+  (what apps see) and a sink stream. Frames from the sink go straight to
+  the source; without frames for 0.5 s it shows a dark gray placeholder.
+  Format: 1920x1080 420f (full range NV12), 30 frames per second.
+- `markone-feed` finds the device by its fixed UID, opens the sink with
+  CMIOStreamCopyBufferQueue and enqueues each NV12 frame from stdin:
+  `uv run scripts/stream.py --raw | markone-feed`. Works in QuickTime.
+
+## Starting a recording from the computer (not working yet)
+
+- OlyApiShootingController::ctrlRelease (controller from 0x7ead145d,
+  vtable slot 256; `asm/release.s`) refuses while recording ("API
+  sequence" 0x602b1ff4 must be 0 or 1; recording sets 0x10). From idle it
+  returns 0 for any releaseGo with takeMovie = 1 and key_movie = 11, with
+  or without key_1st/key_2nd, but no recording starts. It seems to set up
+  remote release rather than press a key.
+- Posting event 0x01000022 (movie key; 0x01000023 is probably its
+  release) to the mode manager's queue with `asm/post.s` does nothing in
+  PC shooting. The mode manager's movie key handler
+  (startCtrlReleaseSubAppModuleRelease, around 0x7edcc128) reads the key
+  from 0x605f0c4c rather than the message, and keys reach events through
+  a "direct mode" mapping (0x7edcf0d7). Next: trace how the key task
+  delivers the movie key.
+
+Next: start recording from the computer, the recording time limit, and
+moving the streamer into the app (needed for the App Store).
 
 ### Frame source candidates
 

@@ -1,0 +1,53 @@
+name: MarkOne
+options:
+  bundleIdPrefix: com.superhighfives
+  deploymentTarget:
+    macOS: "14.0"
+configFiles:
+  Debug: Local.xcconfig
+  Release: Local.xcconfig
+settings:
+  base:
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "0.1"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.0"
+    ENABLE_HARDENED_RUNTIME: YES
+targets:
+  MarkOne:
+    type: application
+    platform: macOS
+    sources: [App]
+    settings:
+      base:
+        PRODUCT_NAME: Mark One
+        PRODUCT_BUNDLE_IDENTIFIER: com.superhighfives.markone
+        CODE_SIGN_ENTITLEMENTS: App/MarkOne.entitlements
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Mark One
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.video
+        INFOPLIST_KEY_NSHumanReadableCopyright: ""
+    dependencies:
+      - target: MarkOneCamera
+        embed: true
+  MarkOneCamera:
+    type: system-extension
+    platform: macOS
+    sources: [Extension]
+    settings:
+      base:
+        PRODUCT_NAME: com.superhighfives.markone.camera
+        PRODUCT_BUNDLE_IDENTIFIER: com.superhighfives.markone.camera
+        CODE_SIGN_ENTITLEMENTS: Extension/MarkOneCamera.entitlements
+        INFOPLIST_FILE: Extension/Info.plist
+        SKIP_INSTALL: YES
+  markone-feed:
+    type: tool
+    platform: macOS
+    sources: [Feed]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.superhighfives.markone.feed
+        CREATE_INFOPLIST_SECTION_IN_BINARY: YES
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_NSCameraUsageDescription: Sends the camera's video to the Mark One virtual camera.
