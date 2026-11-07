@@ -49,26 +49,45 @@ final class Pipeline: ObservableObject {
             let sink = try CameraSink()
             let decoder = FrameDecoder()
             var shown = 0
+            var last: CVPixelBuffer?
+            var decoded = false
             decoder.onFrame = { buffer in
                 sink.send(buffer)
+                last = buffer
+                decoded = true
                 shown += 1
             }
             let streamer = Streamer(camera: camera)
             var since = Date()
+            var received = 0, failuresBefore = 0
+            let capture = UserDefaults.standard.bool(forKey: "SaveCapture") ? Capture() : nil
             report("Press record on the camera.")
             while !stopRequested.value {
                 let frames = try streamer.poll()
-                for frame in frames { decoder.decode(frame) }
+                received += frames.count
+                for frame in frames {
+                    let before = decoder.failures
+                    decoded = false
+                    decoder.decode(frame)
+                    capture?.add(frame, failed: decoder.failures != before)
+                    // While the decoder waits for a keyframe, repeat the
+                    // last picture so apps see a short freeze, not a gap.
+                    if !decoded, let last { sink.send(last) }
+                }
                 if frames.isEmpty { Thread.sleep(forTimeInterval: 0.003) }
                 let elapsed = Date().timeIntervalSince(since)
                 if elapsed >= 2 {
                     let rate = Double(shown) / elapsed
                     let live = streamer.streaming
+                    let detail = String(format: "%.0f received, %d failed to decode", Double(received) / elapsed,
+                                        decoder.failures - failuresBefore)
                     Task { @MainActor in
                         self.framesPerSecond = rate
-                        self.status = live ? "Streaming to the Mark One camera." : "Press record on the camera."
+                        self.status = live ? "Streaming to the Mark One camera (\(detail))." : "Press record on the camera."
                     }
                     shown = 0
+                    received = 0
+                    failuresBefore = decoder.failures
                     since = Date()
                 }
             }
@@ -87,5 +106,32 @@ final class Flag: @unchecked Sendable {
     var value: Bool {
         get { lock.withLock { stored } }
         set { lock.withLock { stored = newValue } }
+    }
+}
+
+/// Saves the first 1800 frames (one minute) to the Downloads folder, with a list of
+/// the frames the decoder rejected, for looking into decoding failures. Turn it
+/// on with `defaults write com.superhighfives.markone SaveCapture -bool YES`.
+final class Capture {
+    private let stream: FileHandle?
+    private var log = ""
+    private var count = 0
+    private let folder = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
+
+    init() {
+        let url = folder.appendingPathComponent("markone-capture.h264")
+        FileManager.default.createFile(atPath: url.path, contents: nil)
+        stream = try? FileHandle(forWritingTo: url)
+    }
+
+    func add(_ frame: Data, failed: Bool) {
+        guard count < 1800, let stream else { return }
+        stream.write(frame)
+        log += "\(count) \(frame.count)\(failed ? " failed" : "")\n"
+        count += 1
+        if count == 1800 {
+            try? stream.close()
+            try? log.write(to: folder.appendingPathComponent("markone-capture.txt"), atomically: true, encoding: .utf8)
+        }
     }
 }

@@ -179,15 +179,16 @@ final class Streamer {
                 }
             }
         }
+        // Without a size, the frame ends at the next delimiter, which can't
+        // appear inside a frame. If the frame there doesn't follow this one,
+        // the encoder hasn't written it yet and what's there is left over
+        // from an earlier lap; searching further would find old frames.
         let data = try read(start, min(Streamer.scan, Int(Streamer.ringHigh - start)))
-        var at = 5
-        while let range = data.range(of: FrameHeader.aud, in: (data.startIndex + at)..<data.endIndex) {
-            let offset = range.lowerBound - data.startIndex
-            let next = start + UInt32(offset)
-            if let after = newHeader(next, data.subdata(in: offset..<min(data.count, offset + Streamer.head))), after.follows(header) {
-                return (start, data.prefix(offset), header)
-            }
-            at = offset + 5
+        guard let range = data.range(of: FrameHeader.aud, in: (data.startIndex + 5)..<data.endIndex) else { return nil }
+        let offset = range.lowerBound - data.startIndex
+        let next = start + UInt32(offset)
+        if let after = newHeader(next, data.subdata(in: offset..<min(data.count, offset + Streamer.head))), after.follows(header) {
+            return (start, data.prefix(offset), header)
         }
         return nil
     }

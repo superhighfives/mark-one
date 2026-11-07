@@ -135,13 +135,17 @@ def take(cam, starts, before, hints, sent):
             after = new_header(nxt, head or read(cam, nxt, HEAD))
             if after and after.follows(header):
                 return start, data[:hint], header
+    # Without a size, the frame ends at the next delimiter, which can't
+    # appear inside a frame. If the frame there doesn't follow this one, the
+    # encoder hasn't written it yet and what's there is left over from an
+    # earlier lap; searching further would find old frames.
     data = read(cam, start, min(SCAN, RING_HI - start))
-    at = 5
-    while (at := data.find(AUD, at)) >= 0:
-        after = new_header(start + at, data[at:at + HEAD])
-        if after and after.follows(header):
-            return start, data[:at], header
-        at += 5
+    at = data.find(AUD, 5)
+    if at < 0:
+        return None
+    after = new_header(start + at, data[at:at + HEAD])
+    if after and after.follows(header):
+        return start, data[:at], header
     return None
 
 

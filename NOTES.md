@@ -11,15 +11,6 @@ targets firmware 2.3, so update the camera to 2.3 before flashing anything.
   at 20 Mbps), when the QuickTime writer may split or stop the file.
 - Card space: after a long streamed recording, check that the card's
   free space didn't shrink.
-- Mark One.app's Start button (the in-app pipeline): connects through
-  ImageCaptureCore, sets up the camera, streams once recording starts.
-- VideoToolbox's software decoder (hardware disabled in the decoder
-  specification) decodes most of a captured stream: 90-95% of frames in
-  recent captures, but a failure breaks the session until it's recreated
-  at the next IDR, and failures cluster in some groups of frames. ffmpeg
-  reports no errors on the same captures. Decode a movie the camera wrote
-  to the card (card writes not skipped) the same way: if it decodes
-  fully, the captures have flaws the streamer should catch.
 
 ## Stock behavior (dead ends without firmware changes)
 
@@ -411,7 +402,7 @@ markone-feed schemes; set DEVELOPMENT_TEAM in `Local.xcconfig`):
 - `markone-feed` finds the device by its fixed UID, opens the sink with
   CMIOStreamCopyBufferQueue and enqueues each NV12 frame from stdin:
   `uv run scripts/stream.py --raw | markone-feed`. Works in QuickTime.
-- In-app pipeline (untested; no Python, as the App Store needs): Start in
+- In-app pipeline (works; no Python, as the App Store needs): Start in
   Mark One.app finds the camera with ImageCaptureCore (sandbox-friendly,
   shares the camera with ptpcamerad instead of claiming the interface),
   sends the usb-tools commands with requestSendPTPCommand (`Camera.swift`),
@@ -419,8 +410,39 @@ markone-feed schemes; set DEVELOPMENT_TEAM in `Local.xcconfig`):
   follows the stream like `stream.py` (`Streamer.swift`), decodes with
   VideoToolbox's software decoder, recreating the session at the next
   keyframe after a failure (`FrameDecoder.swift`), and sends frames to the
-  extension's sink (`CameraSink.swift`). Unknowns: ImageCaptureCore's
-  throughput for raw commands and whether it accepts the vendor commands.
+  extension's sink (`CameraSink.swift`). ImageCaptureCore passes the
+  vendor commands through and keeps up: all 30 frames a second arrive.
+- `defaults write com.superhighfives.markone SaveCapture -bool YES` makes
+  Start save the first minute of the stream to
+  `~/Downloads/markone-capture.h264`, with `markone-capture.txt` listing
+  each frame's size and whether the decoder rejected it.
+
+VideoToolbox's software decoder rejects about 1% of the camera's frames
+(error -8969, bad data): 16 of 1800 in a one-minute capture, always the
+same frames when the capture is replayed. After a failure the session
+rejects everything until it's recreated at the next keyframe, so each
+failure loses up to 14 frames (the app repeats the last picture
+meanwhile). libavcodec decodes those frames without error, even with
+`-err_detect aggressive+careful`, and the pictures look like their
+neighbors. The rejected frames have ordinary slice headers (identical to
+neighbors apart from frame_num), no forbidden byte sequences, motion
+vectors in the normal range, and are ordinary P frames using the common
+PPS; giving the decoder all four PPSs up front doesn't help. x264 streams
+with the same features, even at QP 2, decode fine. So it's a VideoToolbox
+limitation with something in this encoder's slice data.
+
+OpenH264 2.7 (BSD license) decodes every frame without error but not
+exactly: it matches libavcodec on Baseline streams, and differs on High
+profile ones (x264 test streams and the camera's), so it doesn't fully
+support High profile. libavcodec is the decoder that gets this stream
+right.
+
+The stream follower used to search past the first access unit delimiter
+after a frame for one whose header followed. When a large frame left the
+next one unwritten, that search found frames left over from an earlier
+lap of the ring, glued several together and lost track for a second.
+Delimiters can't appear inside a frame, so now only the first one counts:
+if its frame doesn't follow, the follower waits and reads again.
 
 ## Starting a recording from the computer (not working yet)
 
