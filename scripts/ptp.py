@@ -124,14 +124,26 @@ class Camera:
             code, _, _ = self.transact(OPEN_SESSION, (1,))
         except usb.core.USBTimeoutError:
             # A transfer cut off halfway (a killed script, for example)
-            # leaves the camera mid-command. A USB reset clears it without
-            # leaving shooting mode.
-            self.dev.reset()
-            time.sleep(1)
-            self.__init__()
+            # leaves the camera mid-command. Read and drop whatever it still
+            # wants to send, then try again. Don't reset the device: in
+            # shooting mode the camera drops off USB and doesn't come back
+            # until the cable is replugged.
+            self.drain()
             code, _, _ = self.transact(OPEN_SESSION, (1,))
         if code not in (OK, 0x201E):  # 0x201E: session already open
             sys.exit(f'OpenSession failed: {code:#06x}')
+
+    def drain(self):
+        for ep in (self.inp, self.out):
+            try:
+                self.dev.clear_halt(ep)
+            except usb.core.USBError:
+                pass
+        while True:
+            try:
+                self.inp.read(512 * 1024, 300)
+            except usb.core.USBError:
+                return
 
     def close(self):
         self.transact(CLOSE_SESSION)

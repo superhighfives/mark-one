@@ -17,6 +17,7 @@ band below, which is trimmed.
 """
 import argparse
 import io
+import signal
 import sys
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -128,16 +129,41 @@ def main():
                 self.end_headers()
                 self.wfile.write(PAGE)
                 return
+            nonlocal streaming
+            streaming = True
             self.send_response(200)
             self.send_header('Content-Type', 'multipart/x-mixed-replace; boundary=frame')
             self.end_headers()
             try:
-                while True:
+                while not stopping:
                     jpg = frames.jpeg()
                     self.wfile.write(b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + jpg + b'\r\n')
             except (BrokenPipeError, ConnectionResetError):
                 pass
+            if stopping:
+                finish()
 
+    # Stopping in the middle of a USB transfer leaves the camera mid-command,
+    # and the reset that clears it can drop the camera off USB while it
+    # shoots. So on Ctrl-C or kill, finish the current frame, close the
+    # session, then exit.
+    stopping = False
+
+    def finish():
+        frames.cam.close()
+        print('closed the camera session')
+        sys.exit(0)
+
+    def stop(*_):
+        nonlocal stopping
+        if streaming:
+            stopping = True
+        else:
+            finish()
+
+    streaming = False
+    signal.signal(signal.SIGINT, stop)
+    signal.signal(signal.SIGTERM, stop)
     print(f'open http://localhost:{args.port}')
     HTTPServer(('127.0.0.1', args.port), Handler).serve_forever()
 
