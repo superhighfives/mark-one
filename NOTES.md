@@ -11,6 +11,13 @@ targets firmware 2.3, so update the camera to 2.3 before flashing anything.
   at 20 Mbps), when the QuickTime writer may split or stop the file.
 - Card space: after a long streamed recording, check that the card's
   free space didn't shrink.
+- VideoToolbox's software decoder (hardware disabled in the decoder
+  specification) decodes most of a captured stream: 90-95% of frames in
+  recent captures, but a failure breaks the session until it's recreated
+  at the next IDR, and failures cluster in some groups of frames. ffmpeg
+  reports no errors on the same captures. Decode a movie the camera wrote
+  to the card (card writes not skipped) the same way: if it decodes
+  fully, the captures have flaws the streamer should catch.
 
 ## Stock behavior (dead ends without firmware changes)
 
