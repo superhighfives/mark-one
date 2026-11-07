@@ -7,12 +7,13 @@ Set the camera's USB mode to MTP (Custom menu, USB Mode), connect it, then:
   uv run scripts/ptp.py peek 0xbd742b00 1572864 -o frame.yuv
 
 `peek` needs the usb-peek patch (command 0x9484). macOS's ptpcamerad grabs
-cameras as soon as they connect; if the device is busy, run
-`killall ptpcamerad` and try again.
+cameras as soon as they connect; the script stops it and takes the camera.
 """
 import argparse
 import struct
+import subprocess
 import sys
+import time
 
 import libusb_package
 import usb.core
@@ -29,18 +30,49 @@ PEEK = 0x9484
 OK = 0x2001
 
 
+def claim(dev, intf):
+    """Claim the PTP interface, taking it from macOS's camera service if needed.
+
+    ptpcamerad claims every PTP camera as soon as it connects, and launchd
+    restarts it within a fraction of a second of being stopped. Stop it, then
+    retry the claim until it lands in the gap before the restart.
+    """
+    try:
+        usb.util.claim_interface(dev, intf)
+        return
+    except usb.core.USBError:
+        pass
+    subprocess.run(['killall', '-9', 'ptpcamerad'], capture_output=True)
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline:
+        try:
+            usb.util.claim_interface(dev, intf)
+            return
+        except usb.core.USBError:
+            time.sleep(0.005)
+    sys.exit('Could not claim the camera. Quit Photos and Image Capture and try again.')
+
+
 class Camera:
     def __init__(self):
         dev = usb.core.find(idVendor=OLYMPUS_VENDOR, backend=libusb_package.get_libusb1_backend())
         if dev is None:
             sys.exit('No Olympus camera found. Is it on, connected, and set to MTP?')
-        if dev.is_kernel_driver_active(0):
-            dev.detach_kernel_driver(0)
-        dev.set_configuration()
+        # Linux needs the kernel driver detached. macOS only allows that as
+        # root, and claiming the interface works there without it.
+        try:
+            if dev.is_kernel_driver_active(0):
+                dev.detach_kernel_driver(0)
+        except (usb.core.USBError, NotImplementedError):
+            pass
+        try:
+            dev.set_configuration()
+        except usb.core.USBError:
+            pass  # already configured
         intf = dev.get_active_configuration()[(0, 0)]
         if intf.bInterfaceClass != PTP_CLASS:
             sys.exit(f'Interface class is {intf.bInterfaceClass}, not PTP. Set USB Mode to MTP.')
-        usb.util.claim_interface(dev, intf)
+        claim(dev, intf)
 
         def ep(direction, kind):
             return usb.util.find_descriptor(
