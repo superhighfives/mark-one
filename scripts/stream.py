@@ -153,6 +153,10 @@ def main():
                 progressed = True
             if progressed:
                 out.flush()
+            elif newest < last - 30:
+                # A new recording restarts the frame numbers.
+                print(f'new recording at frame {newest}', file=sys.stderr)
+                last, started, prev = newest - 2, False, None
             elif newest - last > 30:
                 # The next frame never showed up, or we fell a second
                 # behind: start again from the next keyframe.
