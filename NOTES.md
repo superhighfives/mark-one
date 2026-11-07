@@ -247,6 +247,16 @@ mode with USB connected, photo and movie mode, 0xa0000000-0xbe000000:
   1,792-byte halves); the bytes are bit-packed (period 16, byte 15 nearly
   constant), so it looks like packed sensor data rather than YCbCr. Not
   decoded.
+  Decoding: it is close to Panasonic's raw compression (dcraw
+  `panasonic_load_raw`): 16-byte blocks of 14 pixels, two 12-bit start
+  values and 8-bit steps with 2-bit shift codes. Reading each block from
+  its top bit down gives a 1568x700 Bayer-like image (rows skipped) with
+  clear same-color correlation (0.35 of noise level at distance 2, 0.2
+  vertically), but the even pixels drift within each 14-pixel block
+  (337 to 980), so some detail of the format differs. Other bit orders
+  remove the drift but lose vertical coherence. Not finished: at best it
+  gives about 1568x700 of unprocessed sensor data, which needs white
+  balance, demosaicing and color correction on the computer.
 - Four small buffers of 52,224 bytes from 0xbd091840.
 - 0xa0090000, 1.3 MB: repeats every 256-384 bytes; not an image.
 - Nothing else of frame size changes. No 1080p image exists in live view
