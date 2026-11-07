@@ -20,6 +20,7 @@ macOS's ptpcamerad grabs cameras as soon as they connect; the script stops
 it and takes the camera.
 """
 import argparse
+import hashlib
 import os
 import struct
 import subprocess
@@ -245,28 +246,46 @@ def call(cam, function, args):
     return params
 
 
-# The movie writers' calls to fileif_fwrite (0x7e69f3bb): QT_FILE at
-# 0x7e7a75b2 and MOV_FILE at 0x7e7c04ca. Each is `call fwrite,[],24` followed
-# by a check that the returned count equals the requested size (in d1).
-CARD_WRITES = {
-    0x7E7A75B2: ('dd097eefff001883', '84cbcbcbcbcbcb83'),
-    0x7E7C04CA: ('ddf1eeedff001882', '84cbcbcbcbcbcb82'),
+# Changes to the running firmware for streaming, as {address: (stock bytes,
+# patched bytes)}. Only in memory; a restart undoes them. Stock code longer
+# than 8 bytes is given as (length, sha256).
+RUNTIME_PATCHES = {
+    # Movie recording skips writing video to the card. The movie writers
+    # call fileif_fwrite (0x7e69f3bb) from QT_FILE at 0x7e7a75b2 and
+    # MOV_FILE at 0x7e7c04ca, each `call fwrite,[],24` followed by a check
+    # that the returned count equals the requested size (in d1). Replace
+    # each call with `mov d1,d0` (report the full size as written) and nops.
+    'card writes': {
+        0x7E7A75B2: ('dd097eefff001883', '84cbcbcbcbcbcb83'),
+        0x7E7C04CA: ('ddf1eeedff001882', '84cbcbcbcbcbcb82'),
+    },
+    # Recording time limit. 0x7e7bbe71 works out how long a movie can run:
+    # the smaller of the format's maximum (1740 s for MOV Full HD and HD,
+    # 0x7e7bbf89: `mov 1740,a3`) and what the card's free space allows.
+    # Raise the maximum to 32767 s (about 9 hours) and use it for both the
+    # limit and the card figure, since the card isn't written.
+    'time limit': {
+        0x7E7BBF88: ('0427cc06', '0427ff7f'),
+        0x7E7BBFBC: ((12, '5c7993277f758597d2e77926f35759decab9140c60a08c80b6b1b227a5f73d6e'), 'f1dc8283cbcbcbcbcbcbcb5c'),
+    },
 }
 
 
-def skip_card_writes(cam):
-    """Make movie recording skip writing video to the card.
-
-    Replaces each fwrite call with `mov d1,d0` (report the full size as
-    written) and nops. Recording and the live stream carry on; the clip on
-    the card is left empty. Only in memory: a restart undoes it.
-    """
-    for address, (stock, patched) in CARD_WRITES.items():
-        current = cam.transact(PEEK, (uncached(address), 8))[2].hex()
-        if current == stock:
-            poke(cam, address, bytes.fromhex(patched), quiet=True)
-        elif current != patched:
-            sys.exit(f'unexpected code at {address:#010x}: {current}')
+def apply_runtime_patches(cam):
+    """Apply RUNTIME_PATCHES, checking each spot still holds the stock bytes."""
+    for name, patches in RUNTIME_PATCHES.items():
+        for address, (stock, patched) in patches.items():
+            start = address & ~1
+            length = stock[0] if isinstance(stock, tuple) else len(stock) // 2
+            current = cam.transact(PEEK, (uncached(start), length))[2].hex()
+            if isinstance(stock, tuple):
+                matches = hashlib.sha256(bytes.fromhex(current)).hexdigest() == stock[1]
+            else:
+                matches = current == stock
+            if matches:
+                poke(cam, address, bytes.fromhex(patched), quiet=True)
+            elif current != patched:
+                sys.exit(f'{name}: unexpected code at {address:#010x}: {current}')
 
 
 def shoot(cam):
@@ -277,11 +296,11 @@ def shoot(cam):
     PC_CAM_SHOOTING mode change. Only PC sub-state 0x6004 handles them, and an
     MTP connection uses 0x6005, so point 0x6005 at 0x6004's event list (a
     superset of its own) and then post the event the way the serial console's
-    `nfPcCbk 50 1` does. Also stops movie recording from writing the card
-    (see skip_card_writes). A restart undoes all of it.
+    `nfPcCbk 50 1` does. Also applies RUNTIME_PATCHES: movies don't write
+    the card and have no 29-minute limit. A restart undoes all of it.
     """
     install_helpers(cam)
-    skip_card_writes(cam)
+    apply_runtime_patches(cam)
     write32(cam, 0x7EEF375C, 0x7EEF30EC)    # sub-state 0x6005: event list...
     write32(cam, 0x7EEF3760, 8)             # ...and its length
     pc = read32(cam, 0x605F0D3C)            # PC mode object

@@ -398,8 +398,23 @@ markone-feed schemes; set DEVELOPMENT_TEAM in `Local.xcconfig`):
   a "direct mode" mapping (0x7edcf0d7). Next: trace how the key task
   delivers the movie key.
 
-Next: start recording from the computer, the recording time limit, and
-moving the streamer into the app (needed for the App Store).
+## Recording time limit (patch ready, untested)
+
+0x7e7bbe71 works out how long a movie may run and logs "MAX Time" (what
+the card's free space allows, d3) and "Limte Time" (d2, the limit),
+stored in frames at +32 and +40 of the recorder's state. The format
+maximum is 1740 s for MOV Full HD and HD (`mov 1740,a3` at 0x7e7bbf89),
+7200 s for SD, and the limit is the smaller of that and the card figure.
+`ptp.py shoot` now raises the maximum to 32767 s and uses it for both
+values (RUNTIME_PATCHES 'time limit'). Untested; also unknown is what the
+QuickTime writer does at 4 GB ("[QT] AVSCA_INF_DIV_FILESIZE" and
+"REC_FILESIZE" are only logged at 0x7e7a85ee/0x7e7a85fc), which the
+muxer would reach after about 27 minutes at 20 Mbps even with card
+writes skipped.
+
+Next: test the time limit (record past 30 minutes), start recording from
+the computer, and move the streamer into the app (needed for the App
+Store).
 
 ### Frame source candidates
 
