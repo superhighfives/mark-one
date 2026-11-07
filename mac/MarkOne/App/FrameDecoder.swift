@@ -7,6 +7,7 @@
 // holding frames back. Output is full-range NV12 in IOSurface-backed
 // pixel buffers, the camera extension's format.
 
+import Accelerate
 import CoreVideo
 import Foundation
 
@@ -83,16 +84,19 @@ final class FrameDecoder {
             (luma + row * lumaStride).update(from: ySource + row * y, count: width)
         }
 
-        let chroma = CVPixelBufferGetBaseAddressOfPlane(buffer, 1)!.assumingMemoryBound(to: UInt8.self)
-        let chromaStride = CVPixelBufferGetBytesPerRowOfPlane(buffer, 1)
-        let (u, uSource, v, vSource) = (Int(frame.linesize.1), frame.data.1!, Int(frame.linesize.2), frame.data.2!)
-        for row in 0..<(height + 1) / 2 {
-            let out = chroma + row * chromaStride
-            let cb = uSource + row * u, cr = vSource + row * v
-            for column in 0..<(width + 1) / 2 {
-                out[2 * column] = cb[column]
-                out[2 * column + 1] = cr[column]
-            }
+        // Interleave Cb and Cr into the NV12 chroma plane.
+        let chroma = CVPixelBufferGetBaseAddressOfPlane(buffer, 1)!
+        var planes = [vImage_Buffer(data: frame.data.1, height: vImagePixelCount((height + 1) / 2),
+                                    width: vImagePixelCount((width + 1) / 2), rowBytes: Int(frame.linesize.1)),
+                      vImage_Buffer(data: frame.data.2, height: vImagePixelCount((height + 1) / 2),
+                                    width: vImagePixelCount((width + 1) / 2), rowBytes: Int(frame.linesize.2))]
+        planes.withUnsafeMutableBufferPointer { planes in
+            var sourcePlanes: [UnsafePointer<vImage_Buffer>?] = [UnsafePointer(planes.baseAddress!),
+                                                                 UnsafePointer(planes.baseAddress! + 1)]
+            var destinations: [UnsafeMutableRawPointer?] = [chroma, chroma + 1]
+            vImageConvert_PlanarToChunky8(&sourcePlanes, &destinations, 2, 2,
+                                          vImagePixelCount((width + 1) / 2), vImagePixelCount((height + 1) / 2),
+                                          CVPixelBufferGetBytesPerRowOfPlane(buffer, 1), vImage_Flags(kvImageNoFlags))
         }
         return buffer
     }
