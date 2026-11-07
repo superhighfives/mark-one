@@ -5,6 +5,7 @@ description = "Firmware research for using an original Olympus OM-D E-M5 as a Ma
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "av>=19.0.2",
     "libusb-package>=1.0.30.0",
     "numpy>=2",
     "pillow>=13.0.0",

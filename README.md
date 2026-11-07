@@ -42,8 +42,10 @@ uv run scripts/ptp.py shoot                 # switch to live view, USB stays con
 uv run scripts/ptp.py output evf            # 800x600 viewfinder image instead of 568x480
 uv run scripts/live.py                      # live view in the browser at http://localhost:8000
 uv run scripts/live.py --movie              # 1080p while the camera records a movie
-uv run scripts/stream.py | ffplay -fflags nobuffer -flags low_delay -f h264 -   # 1080p at 30 fps while recording
+uv run scripts/stream.py --raw | mac/viewer/viewer   # 1080p at 30 fps while recording, lowest delay
 ```
+
+Build the viewer once with `swiftc -O -o mac/viewer/viewer mac/viewer/main.swift` (needs Xcode or the command line tools).
 
 ## Reading the code
 

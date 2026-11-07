@@ -19,3 +19,6 @@ __pycache__/
 asm/*.o
 asm/*.elf
 asm/*.bin
+
+# Built from mac/; see the build line at the top of each source file.
+mac/viewer/viewer

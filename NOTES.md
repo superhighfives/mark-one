@@ -336,6 +336,22 @@ H.264 stream (`scripts/stream.py`):
   Two 20-second captures decode with no errors.
 - Result: 1920x1080 at 29.97 frames per second, decodable by ffmpeg.
 
+Display latency (measured by filming a millisecond clock on the Mac's
+screen): frames reach the Mac about 200 ms after the scene, including the
+screen's own refresh. The ffmpeg command line (ffmpeg, ffplay) then holds
+back about 20 frames before output, even with low_delay, one thread and no
+probing, which made ffplay about a second behind. Decoding one frame at a
+time with PyAV (libavcodec) returns each frame immediately, in about
+1.5 ms. Apple's hardware decoder (VideoToolbox, also through
+AVSampleBufferDisplayLayer) fails on every frame of this stream; it is
+High profile with CAVLC and custom scaling matrices, which may be why.
+`stream.py --raw` decodes with PyAV and writes NV12; `mac/viewer` shows
+each frame as it arrives.
+
+`stream.py` also rewrites the SPS to add bitstream restriction fields (no
+reordering, one-frame buffer); the camera's SPS leaves them out, so
+decoders may otherwise assume they need a 16-frame buffer.
+
 Next: stop the recorder from writing the card (recording stops at 29
 minutes or 4 GB), and a macOS camera extension fed by this stream.
 
