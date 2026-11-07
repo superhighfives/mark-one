@@ -4,6 +4,14 @@ Research notes for getting live video from an original Olympus OM-D E-M5
 into macOS as a webcam by patching the camera firmware. Everything here
 targets firmware 2.3, so update the camera to 2.3 before flashing anything.
 
+## To test when the camera is on
+
+- Time limit: run `ptp.py shoot`, record and stream past 30 minutes.
+  Watch for the recording stopping, or a hiccup around 27 minutes (4 GB
+  at 20 Mbps), when the QuickTime writer may split or stop the file.
+- Card space: after a long streamed recording, check that the card's
+  free space didn't shrink.
+
 ## Stock behavior (dead ends without firmware changes)
 
 - HDMI: manual p.74, "You cannot shoot pictures or movies when the HDMI cable
