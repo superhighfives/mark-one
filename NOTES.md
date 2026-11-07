@@ -221,40 +221,86 @@ E-M10 project's `load-padding` approach (padding between sections is not
 copied to RAM unless the section table is extended), or overwriting code
 that can't run on this body (UART-only debug commands, for example).
 
-### Patch: usb-peek (untested)
+### Patch: usb-tools (untested)
 
-Command 0x9484 in MTP mode returns `length` bytes from `address`
-(parameters 1 and 2). It takes over the 0x9805 registration in the MTP
-setup function and the 0x9805 entry in the advertised list, so no new
-registration call is needed:
+Three commands in MTP mode, from `asm/usb.s`:
+
+- 0x9484 peek: param 1 = address, param 2 = length; sends `length` bytes.
+- 0x9485 poke: param 1 = address; writes the data the computer sends.
+- 0x9486 run: param 1 = function, params 2-5 = d0, d1, a0, a1; calls the
+  function with `calls` and returns d0 and a0 as response parameters.
+
+Together they let new code go into RAM and run without reflashing, and a
+restart wipes it. They take over the 0x9801, 0x9802 and 0x9805
+registrations in the MTP setup function (only Windows MTP browsing uses
+them) and their entries in the advertised list:
 
 | Address | Bytes | Change |
 |---|---|---|
 | 0x7f0d4bbc | 05980000 -> 84940000 | register 0x9484 instead of 0x9805 |
-| 0x7f0d4bc6 | 34640d7f -> e3aaaa7e | handler pointer -> 0x7eaaaae3 |
-| 0x7f128976 | 0598 -> 8494 | advertised list: 0x9805 -> 0x9484 |
-| 0x7eaaaae3 | 38 bytes | handler from `asm/peek.s` |
+| 0x7f0d4bc6 | 34640d7f -> e3aaaa7e | handler -> peek |
+| 0x7f0d4b7d | 01980000 -> 85940000 | register 0x9485 instead of 0x9801 |
+| 0x7f0d4b82 | 01 -> 02 | direction: computer to camera |
+| 0x7f0d4b87 | 21620d7f -> 1cabaa7e | handler -> poke |
+| 0x7f0d4b92 | 02980000 -> 86940000 | register 0x9486 instead of 0x9802 |
+| 0x7f0d4b97 | 01 -> 00 | direction: no data |
+| 0x7f0d4b9c | b4620d7f -> 46abaa7e | handler -> run |
+| 0x7f128970 | 01980298 -> 85948694 | advertised list |
+| 0x7f128976 | 0598 -> 8494 | advertised list |
+| 0x7eaaaae3 | 145 bytes | handlers from `asm/usb.s` |
 
-The handler overwrites the start of the `sdk api changeOutLine` debug
-command (0x7eaaaae3-0x7eaaab8e, 171 bytes), referenced only from the `sdk api`
-command table at 0x7ecda9ec, which the serial console uses. It mirrors the
-stock 0x9801 handler: send with 0x7f0d9c37, reply 0x2001.
+The handlers overwrite the `sdk api changeOutLine` debug command
+(0x7eaaaae3-0x7eaaab8e, 171 bytes), referenced only from the `sdk api`
+command table at 0x7ecda9ec, which the serial console uses.
 
-Build the handler:
+USB transfer functions (from the 0x1016 SetDevicePropValue handler at
+0x7f0df9bb and the TPC code around them):
+
+- 0x7f0d9c37 send: a0 = pointer, d0 = chunk, d1 = total. Callers use
+  `call ...,[d2,d3,a2,a3],24`.
+- 0x7f0d9cfa receive start: reads the data container header, returns
+  d0 = data length (0 on error). `call ...,[d2,a2],16`.
+- 0x7f0d9d70 receive: a0 = pointer, d0 = length; returns d0 = 1 on success.
+  `call ...,[d2,d3,a2],20`.
+- Response: code (u16) at (a1), parameter count at (12,a1), parameters
+  from (16,a1) (see the 0x1006 GetNumObjects handler at 0x7f0decc2).
+
+Address rule: the transfer driver (0x7f0da626, and 0x7f0e4a19 which logs
+"[USB]DATA Cache Address") refuses odd addresses and addresses with bit 30
+set. 0x40000000-0x7fffffff is the cached view of RAM;
+0x80000000-0xbfffffff is presumably the uncached mirror of the same
+memory, 0x40000000 higher (the firmware's own globals appear at both
+0x60xxxxxx and 0xa0xxxxxx). So peek 0x602adef8 as 0xa02adef8; `ptp.py` does
+this translation. The video buffers (0xbd..., 0xbb..., 0xbc...) are already
+uncached. peek answers 0x201d for a refused address instead of hanging;
+poke can't refuse, because the data has already been sent, so `ptp.py`
+checks first. Confirming the mirror: peek a string in the code at
+0xbexxxxxx and compare it with main.bin at 0x7exxxxxx.
+
+`run` calls the target with `calls`, so it must build its own frame
+(start with `movm`/`add`, end with `ret`), like a command handler.
+Firmware functions reached with `call addr,[regs],N` don't, and calling
+them directly corrupts the stack; wrap them in uploaded code instead.
+Uploaded code should go into code that never runs (more debug commands),
+written through the uncached mirror, so no stale cache lines exist for it.
+
+Build the handlers:
 
 ```sh
 T=toolchain/install/bin
-$T/mn10300-elf-as -o asm/peek.o asm/peek.s
-$T/mn10300-elf-ld -Ttext=0x7eaaaae3 --defsym tpc_send_data=0x7f0d9c37 -e peek -o asm/peek.elf asm/peek.o
-$T/mn10300-elf-objcopy -O binary asm/peek.elf asm/peek.bin
+$T/mn10300-elf-as -o asm/usb.o asm/usb.s
+$T/mn10300-elf-ld -Ttext=0x7eaaaae3 --defsym tpc_send_data=0x7f0d9c37 \
+  --defsym tpc_recv_start=0x7f0d9cfa --defsym tpc_recv_data=0x7f0d9d70 \
+  -e peek -o asm/usb.elf asm/usb.o
+$T/mn10300-elf-objcopy -O binary asm/usb.elf asm/usb.bin
 ```
 
 Absolute call targets must come from the linker (`--defsym`); a `.set`
 constant gets encoded as a raw displacement.
 
-Unknowns: the largest length the send function accepts in one call, and
+Unknowns: the largest single transfer (`ptp.py` uses 64 KB chunks), and
 what happens on a read from unmapped memory. Start with small reads of
-known RAM (for example 0x602adef8, 4 bytes).
+known memory: `info`, then `peek 0x602adef8 4`, then a string in the code.
 
 ### Live view buffers
 
@@ -302,6 +348,6 @@ USB is the cable-free route, aiming at the 1080p HDMI buffers.
    lands, how big it is, what turns it on) and the movie debug buffer dump.
 5. USB: find what happens to the USB session if a PC-mode handler requests
    PC_CAM_SHOOTING (request 24) after connecting.
-6. USB: flash usb-peek, run `ptp.py info` and small peeks, then read
+6. USB: flash usb-tools, run `ptp.py info` and small peeks, then read
    0x602adef8 and the video buffers while the camera is in shooting mode.
 7. USB: keep the USB session alive in shooting mode (PC_CAM_SHOOTING).

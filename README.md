@@ -2,7 +2,7 @@
 
 Research and firmware patches for using an original Olympus OM-D E-M5 (Mark I, 2012) as a webcam on a Mac. Stock firmware refuses to shoot while an HDMI cable is plugged in, and its USB connection only transfers files, so the plan is to change that in the firmware.
 
-Status: two candidate patches, built and checked offline but not yet tried on a camera. `hdmi-liveview` lets the camera show live view over HDMI while shooting. `usb-peek` adds a USB command that reads camera memory, the first step toward a USB webcam. Flashing modified firmware can brick a camera. Read the risks in `NOTES.md` first.
+Status: the camera is on stock 2.3 (installed from the SD card) and `scripts/ptp.py` talks to it over USB. Two candidate patches are built and checked offline but not yet tried on a camera. `hdmi-liveview` lets the camera show live view over HDMI while shooting. `usb-tools` adds USB commands that read and write camera memory and run code, so most experiments can happen over USB without reflashing. Flashing modified firmware can brick a camera. Read the risks in `NOTES.md` first.
 
 ## Running it
 
@@ -18,7 +18,7 @@ Build the patched firmware with any combination of patches. The script checks ev
 
 ```sh
 uv run scripts/build.py fw/OLY_E_097_2300_0000_0000.BIN patched/hdmi-liveview/E0972300.BIN hdmi-liveview
-uv run scripts/build.py fw/OLY_E_097_2300_0000_0000.BIN patched/usb-peek/E0972300.BIN usb-peek
+uv run scripts/build.py fw/OLY_E_097_2300_0000_0000.BIN patched/usb-tools/E0972300.BIN usb-tools
 ```
 
 Check that repacking the unmodified firmware reproduces the original file:
@@ -27,15 +27,17 @@ Check that repacking the unmodified firmware reproduces the original file:
 uv run scripts/build.py --roundtrip fw/OLY_E_097_2300_0000_0000.BIN
 ```
 
-To flash, copy the `.BIN` into a `DCOLYMP` folder on the SD card, hold OK while turning the camera on, and wait for the light. Restore by flashing the stock file the same way, or with Olympus's updater. `NOTES.md` has the full test plan.
+To flash, copy the `.BIN` into a `DCOLYMP` folder on the SD card, unplug USB, hold OK while turning the camera on, and let go when the light flashes. The light never signals the end: wait about 5 minutes, take the battery out and back in, and check the version under Settings > Firmware. Restore by flashing the stock file the same way, or with Olympus's updater. `NOTES.md` has the full test plan.
 
 ## Talking to the camera over USB
 
-`scripts/ptp.py` sends raw PTP commands. Set the camera's USB Mode to MTP and connect it. If macOS has already claimed the camera, run `killall ptpcamerad` first.
+`scripts/ptp.py` sends raw PTP commands. Set the camera's USB Mode to MTP and connect it. macOS's camera service, `ptpcamerad`, claims every camera as it connects; the script stops it and takes the camera.
 
 ```sh
 uv run scripts/ptp.py info                  # model, firmware and supported commands
-uv run scripts/ptp.py peek 0x602adef8 4     # read camera memory (needs usb-peek)
+uv run scripts/ptp.py peek 0x602adef8 4     # read camera memory (needs usb-tools)
+uv run scripts/ptp.py poke 0x7e400000 code.bin   # write camera memory
+uv run scripts/ptp.py run 0x7e400000 1 2    # call a function, print d0 and a0
 ```
 
 ## Reading the code
@@ -73,7 +75,7 @@ uv run scripts/annotate.py unpacked/main.bin disasm/main.raw.s disasm/main.s
 
 The firmware is a set of scrambled blocks with checksums. `olyfw.py`, from [xulfr/om-emu](https://github.com/xulfr/om-emu), descrambles them. `build.py` changes bytes in the decoded main block, scrambles it again, and fixes the checksum.
 
-The camera's shooting mode already sends live view to the analog video port: when that cable goes in, shooting mode switches the screen output. HDMI gets different treatment. Shooting mode's event table jumps to a separate playback-only mode instead, and the code that picks the screen never chooses HDMI, even though the display code has a routine that switches output to HDMI. The `hdmi-liveview` patch changes four values so shooting mode handles HDMI the way it handles analog video. `usb-peek` swaps an unused MTP command for a new one, `0x9484`, whose handler (`asm/peek.s`) sends back any range of memory. It replaces a debug command that only the internal serial console can reach. `NOTES.md` traces each step with addresses.
+The camera's shooting mode already sends live view to the analog video port: when that cable goes in, shooting mode switches the screen output. HDMI gets different treatment. Shooting mode's event table jumps to a separate playback-only mode instead, and the code that picks the screen never chooses HDMI, even though the display code has a routine that switches output to HDMI. The `hdmi-liveview` patch changes four values so shooting mode handles HDMI the way it handles analog video. `usb-tools` swaps three MTP commands that only Windows uses for new ones (`asm/usb.s`): `0x9484` reads memory, `0x9485` writes it, and `0x9486` calls a function. They replace a debug command that only the internal serial console can reach. With them, new code can be loaded into RAM and run over USB, and a restart undoes it. `NOTES.md` traces each step with addresses.
 
 Other projects that made this possible:
 

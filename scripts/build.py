@@ -44,20 +44,38 @@ PATCHES = {
         # ShootingCommon event 0x01050005 (HDMI disconnected): same handler
         (0x7EF00278, '9de3dc7e', 'eb95dc7e'),
     ],
-    # PTP command 0x9484 in MTP mode: send back `length` bytes from
-    # `address` (params 1 and 2). Takes over the 0x9805 slot.
-    'usb-peek': [
-        # MTP setup: register 0x9484 instead of 0x9805 (GetObjectPropList)
+    # PTP commands for exploring over USB, in MTP mode (asm/usb.s):
+    # 0x9484 peek (read memory), 0x9485 poke (write memory), 0x9486 run
+    # (call a function). They take over the 0x9805, 0x9801 and 0x9802
+    # slots, which only Windows MTP browsing uses.
+    'usb-tools': [
+        # register 0x9484 instead of 0x9805 (GetObjectPropList)...
         (0x7F0D4BBC, '05980000', '84940000'),
-        # ...with the new handler instead of 0x7f0d6434
+        # ...with the peek handler instead of 0x7f0d6434
         (0x7F0D4BC6, '34640d7f', 'e3aaaa7e'),
-        # advertise 0x9484 instead of 0x9805 in the MTP command list
+        # register 0x9485 instead of 0x9801 (GetObjectPropsSupported),
+        # receiving data (direction 2) instead of sending it (1), with the
+        # poke handler instead of 0x7f0d6221
+        (0x7F0D4B7D, '01980000', '85940000'),
+        (0x7F0D4B82, '01', '02'),
+        (0x7F0D4B87, '21620d7f', '1cabaa7e'),
+        # register 0x9486 instead of 0x9802 (GetObjectPropDesc), with no
+        # data (direction 0), with the run handler instead of 0x7f0d62b4
+        (0x7F0D4B92, '02980000', '86940000'),
+        (0x7F0D4B97, '01', '00'),
+        (0x7F0D4B9C, 'b4620d7f', '46abaa7e'),
+        # advertise them instead of 0x9801, 0x9802 and 0x9805
+        (0x7F128970, '01980298', '85948694'),
         (0x7F128976, '0598', '8494'),
-        # handler (asm/peek.s), over the `sdk api changeOutLine` debug
-        # command, which only the serial console reaches
+        # the handlers, over the `sdk api changeOutLine` debug command,
+        # which only the serial console reaches
         (0x7EAAAAE3,
-         stock(38, 'c280b2976acfc16406702001b83ae513610c16f741424b74bbd8fd8f7aaa388d'),
-         'cff0f8feec470cf80810f80c14f1e88c8ddd43f16200f0185c0c2c0120f07000f8100cdff024'),
+         stock(145, '2eb0856da4bc3497673849f88246f717ccc4e38f4daeab82133da2e5abe26898'),
+         'cff0f8feec470cf80810f80c14271d20fccc01000040f208c914af00c810f1e8'
+         '8c8ddd32f16200f0182701205c0cf1dcf07000f8100cdff024cff0f8feec470c'
+         'f80810270220ddd1f16200a010a000c8ddf1e8dd3af26200e014a001c9d02701'
+         '20cacbcff0f8feec470c92f82e10f80214f80618f82620f8221cf0f35d0c2e01'
+         '20f0798a02f8190cf81110f83114dff024'),
     ],
 }
 

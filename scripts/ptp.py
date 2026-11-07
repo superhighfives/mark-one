@@ -5,11 +5,20 @@ Set the camera's USB mode to MTP (Custom menu, USB Mode), connect it, then:
   uv run scripts/ptp.py info                      # model, firmware, commands
   uv run scripts/ptp.py peek 0x602adef8 4         # read camera memory
   uv run scripts/ptp.py peek 0xbd742b00 1572864 -o frame.yuv
+  uv run scripts/ptp.py poke 0x7e400000 code.bin  # write camera memory
+  uv run scripts/ptp.py run 0x7e400000 1 2        # call a function
 
-`peek` needs the usb-peek patch (command 0x9484). macOS's ptpcamerad grabs
-cameras as soon as they connect; the script stops it and takes the camera.
+`peek`, `poke` and `run` need the usb-tools patch (commands 0x9484-0x9486).
+USB transfers only reach the uncached view of RAM, so addresses in
+0x40000000-0x7fffffff are moved to their uncached mirror, 0x40000000 higher.
+`run` takes the address as given: code runs from the cached view, and the
+target must set up its own stack frame (see asm/usb.s).
+
+macOS's ptpcamerad grabs cameras as soon as they connect; the script stops
+it and takes the camera.
 """
 import argparse
+import os
 import struct
 import subprocess
 import sys
@@ -26,7 +35,8 @@ CMD, DATA, RESP = 1, 2, 3
 OPEN_SESSION = 0x1002
 CLOSE_SESSION = 0x1003
 GET_DEVICE_INFO = 0x1001
-PEEK = 0x9484
+PEEK, POKE, RUN = 0x9484, 0x9485, 0x9486
+CHUNK = 0x10000
 OK = 0x2001
 
 
@@ -85,18 +95,21 @@ class Camera:
         self.inp = ep(usb.util.ENDPOINT_IN, usb.util.ENDPOINT_TYPE_BULK)
         self.tid = 0
 
-    def transact(self, code, params=(), timeout=5000):
-        """Send a command, read any data phase, and return (response code, data)."""
+    def transact(self, code, params=(), data_out=None, timeout=5000):
+        """Run one command. Returns (response code, response params, data in)."""
         self.tid += 1
         header = struct.pack('<IHHI', 12 + 4 * len(params), CMD, code, self.tid)
         self.out.write(header + b''.join(struct.pack('<I', p) for p in params), timeout)
+        if data_out is not None:
+            self.out.write(struct.pack('<IHHI', 12 + len(data_out), DATA, code, self.tid) + data_out, timeout)
 
         data = b''
         while True:
             packet = bytes(self.inp.read(512 * 1024, timeout))
             length, kind, rcode, _ = struct.unpack_from('<IHHI', packet)
             if kind == RESP:
-                return rcode, data
+                n = (length - 12) // 4
+                return rcode, struct.unpack_from(f'<{n}I', packet, 12), data
             # A data container may span several reads.
             body = packet[12:]
             while len(body) < length - 12:
@@ -104,7 +117,7 @@ class Camera:
             data += body[:length - 12]
 
     def open(self):
-        code, _ = self.transact(OPEN_SESSION, (1,))
+        code, _, _ = self.transact(OPEN_SESSION, (1,))
         if code not in (OK, 0x201E):  # 0x201E: session already open
             sys.exit(f'OpenSession failed: {code:#06x}')
 
@@ -124,7 +137,7 @@ def ptp_u16_array(buf, off):
 
 
 def info(cam):
-    code, d = cam.transact(GET_DEVICE_INFO)
+    code, _, d = cam.transact(GET_DEVICE_INFO)
     off = 8
     _, off = ptp_string(d, off)            # vendor extension description
     off += 2                               # functional mode
@@ -138,15 +151,28 @@ def info(cam):
     version, off = ptp_string(d, off)
     print(f'{maker} {model}, firmware {version}')
     print('commands:', ' '.join(f'{o:04x}' for o in ops))
-    print('peek (0x9484):', 'available' if PEEK in ops else 'not available')
+    for name, op in (('peek', PEEK), ('poke', POKE), ('run', RUN)):
+        print(f'{name} ({op:#06x}):', 'available' if op in ops else 'not available')
+
+
+def uncached(address):
+    """The address USB transfers can reach for `address`."""
+    if 0x40000000 <= address < 0x80000000:
+        return address + 0x40000000
+    return address
 
 
 def peek(cam, address, length, out):
-    if length % 2:
-        sys.exit('Length must be even.')
-    code, data = cam.transact(PEEK, (address, length), timeout=20000)
-    if code != OK:
-        sys.exit(f'peek failed: {code:#06x}')
+    if length % 2 or address % 2:
+        sys.exit('Address and length must be even.')
+    start = uncached(address)
+    data = b''
+    while len(data) < length:
+        n = min(CHUNK, length - len(data))
+        code, _, chunk = cam.transact(PEEK, (start + len(data), n), timeout=20000)
+        if code != OK:
+            sys.exit(f'peek failed at {start + len(data):#010x}: {code:#06x}')
+        data += chunk
     if out:
         open(out, 'wb').write(data)
         print(f'wrote {len(data)} bytes to {out}')
@@ -154,6 +180,24 @@ def peek(cam, address, length, out):
         for i in range(0, len(data), 16):
             row = data[i:i + 16]
             print(f'{address + i:08x}  {row.hex(" ")}')
+
+
+def poke(cam, address, data):
+    if len(data) % 2 or address % 2:
+        sys.exit('Address and length must be even.')
+    start = uncached(address)
+    for off in range(0, len(data), CHUNK):
+        code, _, _ = cam.transact(POKE, (start + off,), data_out=data[off:off + CHUNK], timeout=20000)
+        if code != OK:
+            sys.exit(f'poke failed at {start + off:#010x}: {code:#06x}')
+    print(f'wrote {len(data)} bytes at {address:#010x}')
+
+
+def run(cam, function, args):
+    code, params, _ = cam.transact(RUN, (function, *args), timeout=20000)
+    if code != OK:
+        sys.exit(f'run failed: {code:#06x}')
+    print(f'd0 = {params[0]:#010x}  a0 = {params[1]:#010x}')
 
 
 def main():
@@ -164,6 +208,12 @@ def main():
     pk.add_argument('address', type=lambda s: int(s, 0))
     pk.add_argument('length', type=lambda s: int(s, 0))
     pk.add_argument('-o', '--out')
+    po = sub.add_parser('poke')
+    po.add_argument('address', type=lambda s: int(s, 0))
+    po.add_argument('data', help='a file, or hex bytes like 0102abcd')
+    ru = sub.add_parser('run')
+    ru.add_argument('function', type=lambda s: int(s, 0))
+    ru.add_argument('args', nargs='*', type=lambda s: int(s, 0), help='d0, d1, a0, a1')
     args = p.parse_args()
 
     cam = Camera()
@@ -171,8 +221,13 @@ def main():
     try:
         if args.cmd == 'info':
             info(cam)
-        else:
+        elif args.cmd == 'peek':
             peek(cam, args.address, args.length, args.out)
+        elif args.cmd == 'poke':
+            data = open(args.data, 'rb').read() if os.path.exists(args.data) else bytes.fromhex(args.data)
+            poke(cam, args.address, data)
+        else:
+            run(cam, args.function, args.args[:4])
     finally:
         cam.close()
 
