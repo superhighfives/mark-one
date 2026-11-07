@@ -11,6 +11,10 @@ targets firmware 2.3, so update the camera to 2.3 before flashing anything.
   at 20 Mbps), when the QuickTime writer may split or stop the file.
 - Card space: after a long streamed recording, check that the card's
   free space didn't shrink.
+- Power switch: in webcam mode the switch neither turns the camera off
+  nor back on. Check whether stock PC mode (MTP connected, no `shoot`)
+  ignores it too, then trace what reads the switch (key "Powr", 0x000c,
+  and "Lock", 0x000e, in the key table) and where PC mode drops it.
 
 ## Stock behavior (dead ends without firmware changes)
 

@@ -1,8 +1,67 @@
 # em5-webcam
 
-Research and firmware patches for using an original Olympus OM-D E-M5 (Mark I, 2012) as a webcam on a Mac. Stock firmware refuses to shoot while an HDMI cable is plugged in, and its USB connection only transfers files, so the plan is to change that in the firmware.
+Turns an original Olympus OM-D E-M5 (Mark I, 2012) into a Mac webcam over a single USB cable, with the camera's own lens, sensor and color. Out of the box the camera can't do this: it refuses to shoot while HDMI is plugged in, and its USB connection only transfers files. So this project changes its firmware, and a Mac app called Mark One turns the camera into a camera any video app can pick.
 
-Status: the `usb-tools` firmware runs on the camera. The Mac can switch it to live view with USB connected and stream the viewfinder image (800x450) at about 28 frames per second, or full 1080p at 30 frames per second, using the camera's own H.264 encoder, while it records a movie. `usb-tools` adds USB commands that read and write camera memory and run code, so most experiments happen over USB without reflashing. `hdmi-liveview`, which should let the camera show live view over HDMI while shooting, is built but not yet tried on a camera. Flashing modified firmware can brick a camera. Read the risks in `NOTES.md` first.
+## Where it stands
+
+Mark One works end to end. Plug in the camera (USB Mode set to MTP) and click Start, and Mark One:
+
+1. connects through ImageCaptureCore, which works inside the App Store sandbox
+2. switches the camera to live view with USB connected, so movies don't write to the card and have no time limit (that last part is still untested)
+3. presses the camera's REC button for you
+4. follows the camera's 1080p, 30 frames per second H.264 movie stream straight out of its memory
+5. decodes it with libavcodec
+6. publishes it as the "Mark One" camera through a Core Media IO camera extension, for FaceTime, Zoom, OBS, QuickTime and so on
+
+Stop, or quitting the app, stops the recording. Video reaches the Mac about 200 ms after it happens.
+
+All of this rests on one firmware change, `usb-tools`, which adds USB commands that read and write camera memory and run code. Everything else Mark One does lives in the camera's memory only, and switching the camera off undoes it. Flashing modified firmware can brick a camera, so read the risks in `NOTES.md` first.
+
+## What's left
+
+### Make webcam mode seamless
+
+The goal is software that feels like magic: plug in the camera, open a video call, and it works, with nothing to press on the camera or in Mark One.
+
+- **The power switch.** Once the camera is in webcam mode, the power switch does nothing: it won't turn the camera off, or back on. Find out why (the camera probably ignores the switch while USB is in a PC mode) and make switching off leave webcam mode cleanly.
+- **Start on demand.** The camera extension can tell when an app starts and stops using the Mark One camera. Mark One should start the camera then, and stop it when the last app lets go. That probably means a menu bar app, or a small helper that launches at login, instead of a window with a Start button.
+- **Webcam mode in the firmware.** Today Mark One rewrites camera memory every time it starts. A firmware build with webcam mode built in would be faster and sturdier: it would enter webcam mode by itself when Mark One connects, skip card writes and the time limit only in that mode, and handle the power switch properly.
+- **Install the firmware from Mark One.** Olympus's own updater installs firmware over USB, so the camera has a USB update path. Work out its protocol, then let Mark One check the camera's firmware and offer to install the webcam firmware, with no SD card. Olympus's firmware can't be shipped in the app, so Mark One would download the stock file from Olympus (as `scripts/setup.sh` does), patch it on the Mac, and send it to the camera. This needs care: a failed flash can brick the camera, and App Review will want to see a clear explanation.
+- **Power.** The E-M5 doesn't run from USB power, so long calls drain the battery. Look at a dummy battery with a power adapter, and show the battery level in Mark One.
+- **Picture controls.** Exposure, white balance, picture mode and focus from Mark One, through the same camera API the firmware's own menus use.
+
+### Test
+
+- **Recording limit.** Stream for more than 30 minutes and check that the time-limit patch holds. Also check what happens around 27 minutes, when the movie writer would reach 4 GB even though nothing goes to the card.
+- **Card space.** After a long session, check that the card's free space didn't shrink.
+
+### Before the App Store
+
+- Credit FFmpeg in the app, link to its source and include the LGPL 2.1 text. Mark One ships libavcodec as separate, unmodified dynamic libraries for this reason.
+- Remove the Downloads entitlement, which only the debug capture uses (the `SaveCapture` default), or put the capture behind a debug build.
+- A Release build, an app icon, screenshots and App Review notes that explain the firmware requirement.
+- Decide how people get the `usb-tools` firmware onto their camera until Mark One can install it itself.
+
+### Open questions
+
+- Why Apple's video decoders reject this stream. The hardware decoder rejects every frame and the software decoder about 1 in 100, while libavcodec decodes all of them. `NOTES.md` lists what has been ruled out.
+- `hdmi-liveview`, which should let the camera show live view over HDMI while shooting, is built but has never been tried on a camera. USB made it unnecessary for the webcam, but it would help anyone using a capture card.
+
+## Mark One
+
+`mac/MarkOne` holds the app, its camera extension and `markone-feed`, an older tool that pipes frames from `scripts/stream.py`. Build it with [XcodeGen](https://github.com/yonaskolb/XcodeGen):
+
+```sh
+scripts/build-libavcodec.sh          # once: FFmpeg's H.264 decoder, about a minute
+cd mac/MarkOne
+cp Local.xcconfig.example Local.xcconfig   # then set DEVELOPMENT_TEAM
+xcodegen generate
+xcodebuild -project MarkOne.xcodeproj -scheme MarkOne -configuration Debug \
+  -derivedDataPath build -allowProvisioningUpdates build
+cp -R "build/Build/Products/Debug/Mark One.app" /Applications/
+```
+
+The app has to run from `/Applications` to install its camera extension. Click Install camera once, approve the extension in System Settings > General > Login Items & Extensions > Camera Extensions, then click Start with the camera connected. Quit Mark One normally rather than force-quitting it. Force-quitting it mid-session can leave macOS's camera service stuck, and then the camera doesn't show up again until you unplug it.
 
 ## Running it
 
@@ -31,7 +90,7 @@ To flash, copy the `.BIN` into a `DCOLYMP` folder on the SD card, unplug USB, ho
 
 ## Talking to the camera over USB
 
-`scripts/ptp.py` sends raw PTP commands. Set the camera's USB Mode to MTP and connect it. macOS's camera service, `ptpcamerad`, claims every camera as it connects; the script stops it and takes the camera.
+The Python scripts came first and are still the quickest way to experiment. `scripts/ptp.py` sends raw PTP commands. Set the camera's USB Mode to MTP and connect it. macOS's camera service, `ptpcamerad`, claims every camera as it connects; the script stops it and takes the camera.
 
 ```sh
 uv run scripts/ptp.py info                  # model, firmware and supported commands
@@ -82,7 +141,9 @@ uv run scripts/annotate.py unpacked/main.bin disasm/main.raw.s disasm/main.s
 
 The firmware is a set of scrambled blocks with checksums. `olyfw.py`, from [xulfr/om-emu](https://github.com/xulfr/om-emu), descrambles them. `build.py` changes bytes in the decoded main block, scrambles it again, and fixes the checksum.
 
-The camera's shooting mode already sends live view to the analog video port: when that cable goes in, shooting mode switches the screen output. HDMI gets different treatment. Shooting mode's event table jumps to a separate playback-only mode instead, and the code that picks the screen never chooses HDMI, even though the display code has a routine that switches output to HDMI. The `hdmi-liveview` patch changes four values so shooting mode handles HDMI the way it handles analog video. `usb-tools` swaps three MTP commands that only Windows uses for new ones (`asm/usb.s`): `0x9484` reads memory, `0x9485` writes it, and `0x9486` calls a function. They replace a debug command that only the internal serial console can reach. With them, new code can be loaded into RAM and run over USB, and a restart undoes it. `NOTES.md` traces each step with addresses.
+The camera's shooting mode already sends live view to the analog video port: when that cable goes in, shooting mode switches the screen output. HDMI gets different treatment. Shooting mode's event table jumps to a separate playback-only mode instead, and the code that picks the screen never chooses HDMI, even though the display code has a routine that switches output to HDMI. The `hdmi-liveview` patch changes four values so shooting mode handles HDMI the way it handles analog video. `usb-tools` swaps three MTP commands that only Windows uses for new ones (`asm/usb.s`): `0x9484` reads memory, `0x9485` writes it, and `0x9486` calls a function. They replace a debug command that only the internal serial console can reach. With them, new code can be loaded into RAM and run over USB, and a restart undoes it.
+
+The camera's movie recorder encodes 1080p H.264 into a ring buffer in memory before writing it to the card. Mark One switches off the card writes and reads the frames out of that ring as they're encoded, checking each frame's header to tell a fresh frame from an old one. To press REC, it puts a key event on the firmware's key queue, the same message a real button press produces. `NOTES.md` traces each step with addresses.
 
 Other projects that made this possible:
 
