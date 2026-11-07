@@ -1,122 +1,99 @@
-// Decodes the camera's H.264 frames with VideoToolbox's software decoder.
+// Decodes the camera's H.264 frames with libavcodec.
 //
-// The hardware decoder rejects every frame of this camera's stream (error
-// -12909, bad data; see NOTES.md). The software decoder takes most frames,
-// but a failure breaks the session, so after one it waits for the next
-// keyframe (every 15 frames) and starts a new session.
+// VideoToolbox's software decoder rejects about 1% of this camera's frames
+// (and its hardware decoder all of them; see NOTES.md), while libavcodec
+// decodes every one. Each frame comes out as soon as it goes in: the
+// stream has no reordering, and low-delay mode stops libavcodec from
+// holding frames back. Output is full-range NV12 in IOSurface-backed
+// pixel buffers, the camera extension's format.
 
-import CoreMedia
 import CoreVideo
 import Foundation
-import VideoToolbox
 
 final class FrameDecoder {
-    private var session: VTDecompressionSession?
-    private var format: CMVideoFormatDescription?
-    private var parameterSets: (sps: [UInt8], pps: [UInt8])?
-    private var broken = true
+    private let context: UnsafeMutablePointer<AVCodecContext>
+    private let packet: UnsafeMutablePointer<AVPacket>
+    private let frame: UnsafeMutablePointer<AVFrame>
+    private var pool: CVPixelBufferPool?
+    private var poolSize = (0, 0)
     private(set) var failures = 0
     var onFrame: ((CVPixelBuffer) -> Void)?
 
+    init() {
+        let codec = avcodec_find_decoder(AV_CODEC_ID_H264)
+        let context = avcodec_alloc_context3(codec)!
+        context.pointee.flags |= Int32(AV_CODEC_FLAG_LOW_DELAY)
+        context.pointee.thread_count = 1                 // frame threads would add a frame of delay each
+        avcodec_open2(context, codec, nil)
+        self.context = context
+        packet = av_packet_alloc()
+        frame = av_frame_alloc()
+    }
+
+    deinit {
+        var context: UnsafeMutablePointer<AVCodecContext>? = context
+        avcodec_free_context(&context)
+        var packet: UnsafeMutablePointer<AVPacket>? = packet
+        av_packet_free(&packet)
+        var frame: UnsafeMutablePointer<AVFrame>? = frame
+        av_frame_free(&frame)
+    }
+
     /// Decodes one frame: Annex B NAL units, starting with an access unit delimiter.
-    func decode(_ frame: Data) {
-        var sps: [UInt8]?, pps: [UInt8]?
-        var units: [[UInt8]] = []
-        for unit in FrameDecoder.nalUnits([UInt8](frame)) {
-            switch unit[0] & 0x1F {
-            case 7: sps = unit
-            case 8: pps = unit; units.append(unit)       // the camera sends one with every frame
-            case 9: break                                // access unit delimiter
-            default: units.append(unit)
-            }
+    func decode(_ data: Data) {
+        guard av_new_packet(packet, Int32(data.count)) == 0 else { return }
+        data.copyBytes(to: packet.pointee.data, count: data.count)
+        let sent = avcodec_send_packet(context, packet)
+        av_packet_unref(packet)
+        if sent < 0 { failures += 1 }
+        while avcodec_receive_frame(context, frame) == 0 {
+            if frame.pointee.decode_error_flags != 0 { failures += 1 }
+            if let buffer = pixelBuffer(frame.pointee) { onFrame?(buffer) }
+            av_frame_unref(frame)
         }
-        let keyframe = units.contains { $0[0] & 0x1F == 5 }
-        if keyframe, let sps, let pps, broken || parameterSets?.sps != sps {
-            makeSession(sps: sps, pps: pps)
-        }
-        guard !broken, let session, let format, !units.isEmpty else { return }
-
-        // AVCC: each NAL unit with a 4-byte big-endian length.
-        var avcc = [UInt8]()
-        avcc.reserveCapacity(frame.count + 4 * units.count)
-        for unit in units {
-            withUnsafeBytes(of: UInt32(unit.count).bigEndian) { avcc.append(contentsOf: $0) }
-            avcc.append(contentsOf: unit)
-        }
-        var block: CMBlockBuffer?
-        CMBlockBufferCreateWithMemoryBlock(allocator: nil, memoryBlock: nil, blockLength: avcc.count, blockAllocator: nil,
-                                           customBlockSource: nil, offsetToData: 0, dataLength: avcc.count,
-                                           flags: kCMBlockBufferAssureMemoryNowFlag, blockBufferOut: &block)
-        guard let block, CMBlockBufferReplaceDataBytes(with: avcc, blockBuffer: block, offsetIntoDestination: 0,
-                                                       dataLength: avcc.count) == noErr else { return }
-        var sample: CMSampleBuffer?
-        var size = avcc.count
-        CMSampleBufferCreateReady(allocator: nil, dataBuffer: block, formatDescription: format, sampleCount: 1,
-                                  sampleTimingEntryCount: 0, sampleTimingArray: nil, sampleSizeEntryCount: 1,
-                                  sampleSizeArray: &size, sampleBufferOut: &sample)
-        guard let sample else { return }
-        let status = VTDecompressionSessionDecodeFrame(session, sampleBuffer: sample, flags: [], infoFlagsOut: nil) {
-            [weak self] status, _, image, _, _ in
-            guard let self else { return }
-            if status == noErr, let image {
-                self.onFrame?(image)
-            } else {
-                self.fail()
-            }
-        }
-        if status != noErr { fail() }
     }
 
-    private func fail() {
-        failures += 1
-        broken = true
-    }
+    /// Copies a planar 4:2:0 frame into an NV12 pixel buffer.
+    private func pixelBuffer(_ frame: AVFrame) -> CVPixelBuffer? {
+        let format = frame.format
+        guard format == AV_PIX_FMT_YUVJ420P.rawValue || format == AV_PIX_FMT_YUV420P.rawValue else { return nil }
+        let width = Int(frame.width), height = Int(frame.height)
+        if pool == nil || poolSize != (width, height) {
+            let attributes: [CFString: Any] = [
+                kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
+                kCVPixelBufferWidthKey: width,
+                kCVPixelBufferHeightKey: height,
+                kCVPixelBufferIOSurfacePropertiesKey: [:] as CFDictionary,
+            ]
+            pool = nil
+            CVPixelBufferPoolCreate(nil, nil, attributes as CFDictionary, &pool)
+            poolSize = (width, height)
+        }
+        var buffer: CVPixelBuffer?
+        guard let pool, CVPixelBufferPoolCreatePixelBuffer(nil, pool, &buffer) == kCVReturnSuccess, let buffer else {
+            return nil
+        }
+        CVPixelBufferLockBaseAddress(buffer, [])
+        defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
 
-    private func makeSession(sps: [UInt8], pps: [UInt8]) {
-        if let session { VTDecompressionSessionInvalidate(session) }
-        session = nil
-        var description: CMVideoFormatDescription?
-        sps.withUnsafeBufferPointer { s in
-            pps.withUnsafeBufferPointer { p in
-                _ = CMVideoFormatDescriptionCreateFromH264ParameterSets(
-                    allocator: nil, parameterSetCount: 2, parameterSetPointers: [s.baseAddress!, p.baseAddress!],
-                    parameterSetSizes: [sps.count, pps.count], nalUnitHeaderLength: 4, formatDescriptionOut: &description)
+        let luma = CVPixelBufferGetBaseAddressOfPlane(buffer, 0)!.assumingMemoryBound(to: UInt8.self)
+        let lumaStride = CVPixelBufferGetBytesPerRowOfPlane(buffer, 0)
+        let (y, ySource) = (Int(frame.linesize.0), frame.data.0!)
+        for row in 0..<height {
+            (luma + row * lumaStride).update(from: ySource + row * y, count: width)
+        }
+
+        let chroma = CVPixelBufferGetBaseAddressOfPlane(buffer, 1)!.assumingMemoryBound(to: UInt8.self)
+        let chromaStride = CVPixelBufferGetBytesPerRowOfPlane(buffer, 1)
+        let (u, uSource, v, vSource) = (Int(frame.linesize.1), frame.data.1!, Int(frame.linesize.2), frame.data.2!)
+        for row in 0..<(height + 1) / 2 {
+            let out = chroma + row * chromaStride
+            let cb = uSource + row * u, cr = vSource + row * v
+            for column in 0..<(width + 1) / 2 {
+                out[2 * column] = cb[column]
+                out[2 * column + 1] = cr[column]
             }
         }
-        guard let description else { return }
-        let specification: [CFString: Any] = [
-            kVTVideoDecoderSpecification_EnableHardwareAcceleratedVideoDecoder: false,
-        ]
-        let output: [CFString: Any] = [
-            kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
-            kCVPixelBufferIOSurfacePropertiesKey: [:] as CFDictionary,
-        ]
-        var created: VTDecompressionSession?
-        guard VTDecompressionSessionCreate(allocator: nil, formatDescription: description,
-                                           decoderSpecification: specification as CFDictionary,
-                                           imageBufferAttributes: output as CFDictionary, outputCallback: nil,
-                                           decompressionSessionOut: &created) == noErr else { return }
-        session = created
-        format = description
-        parameterSets = (sps, pps)
-        broken = false
-    }
-
-    /// Splits Annex B data into NAL units (without start codes).
-    static func nalUnits(_ data: [UInt8]) -> [[UInt8]] {
-        var starts: [Int] = []
-        var i = 0
-        while i + 3 < data.count {
-            if data[i] == 0, data[i + 1] == 0, data[i + 2] == 0, data[i + 3] == 1 {
-                starts.append(i + 4)
-                i += 4
-            } else {
-                i += 1
-            }
-        }
-        return starts.enumerated().compactMap { n, start in
-            let end = n + 1 < starts.count ? starts[n + 1] - 4 : data.count
-            return end > start ? Array(data[start..<end]) : nil
-        }
+        return buffer
     }
 }

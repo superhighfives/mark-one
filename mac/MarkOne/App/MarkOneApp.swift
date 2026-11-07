@@ -6,8 +6,9 @@ import SystemExtensions
 
 @main
 struct MarkOneApp: App {
+    @NSApplicationDelegateAdaptor private var delegate: AppDelegate
     @StateObject private var installer = ExtensionInstaller()
-    @StateObject private var pipeline = Pipeline()
+    @StateObject private var pipeline = Pipeline.shared
 
     var body: some Scene {
         WindowGroup {
@@ -16,6 +17,20 @@ struct MarkOneApp: App {
                 .fixedSize()
         }
         .windowResizability(.contentSize)
+    }
+}
+
+/// Closes the camera session before quitting. Quitting with it open can
+/// leave macOS's camera service stuck, so the camera doesn't show up again
+/// until it's unplugged.
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        let pipeline = Pipeline.shared
+        guard pipeline.running else { return .terminateNow }
+        pipeline.stop {
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
     }
 }
 

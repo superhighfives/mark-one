@@ -28,9 +28,20 @@ targets:
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.video
         INFOPLIST_KEY_NSHumanReadableCopyright: ""
         INFOPLIST_KEY_NSCameraUsageDescription: Mark One reads your E-M5's video and sends it to the Mark One camera.
+        # libavcodec, built by scripts/build-libavcodec.sh
+        SWIFT_OBJC_BRIDGING_HEADER: App/MarkOne-Bridging-Header.h
+        HEADER_SEARCH_PATHS: $(PROJECT_DIR)/Vendor/ffmpeg/include
+        LIBRARY_SEARCH_PATHS: $(PROJECT_DIR)/Vendor/ffmpeg/lib
+        LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
     dependencies:
       - target: MarkOneCamera
         embed: true
+      - framework: Vendor/ffmpeg/lib/libavcodec.63.dylib
+        embed: true
+        codeSign: true
+      - framework: Vendor/ffmpeg/lib/libavutil.61.dylib
+        embed: true
+        codeSign: true
   MarkOneCamera:
     type: system-extension
     platform: macOS

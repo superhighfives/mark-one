@@ -7,12 +7,15 @@ import Foundation
 
 @MainActor
 final class Pipeline: ObservableObject {
+    static let shared = Pipeline()
+
     @Published private(set) var running = false
     @Published private(set) var status = "Not started."
     @Published private(set) var framesPerSecond = 0.0
 
     private var thread: Thread?
     private let stopRequested = Flag()
+    private var onStopped: [() -> Void] = []
 
     func start() {
         guard !running else { return }
@@ -25,7 +28,11 @@ final class Pipeline: ObservableObject {
         self.thread = thread
     }
 
-    func stop() {
+    /// Stops streaming; `done` runs once the camera session is closed.
+    func stop(_ done: (() -> Void)? = nil) {
+        if let done {
+            if running { onStopped.append(done) } else { done() }
+        }
         stopRequested.value = true
     }
 
@@ -36,10 +43,13 @@ final class Pipeline: ObservableObject {
     private nonisolated func loop() {
         let camera = Camera()
         defer {
-            camera.disconnect()
-            Task { @MainActor in
-                self.running = false
-                self.framesPerSecond = 0
+            camera.disconnect {
+                Task { @MainActor in
+                    self.running = false
+                    self.framesPerSecond = 0
+                    self.onStopped.forEach { $0() }
+                    self.onStopped = []
+                }
             }
         }
         do {

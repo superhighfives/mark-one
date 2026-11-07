@@ -408,8 +408,7 @@ markone-feed schemes; set DEVELOPMENT_TEAM in `Local.xcconfig`):
   sends the usb-tools commands with requestSendPTPCommand (`Camera.swift`),
   applies the same firmware setup as `ptp.py shoot` (`Firmware.swift`),
   follows the stream like `stream.py` (`Streamer.swift`), decodes with
-  VideoToolbox's software decoder, recreating the session at the next
-  keyframe after a failure (`FrameDecoder.swift`), and sends frames to the
+  libavcodec (`FrameDecoder.swift`), and sends frames to the
   extension's sink (`CameraSink.swift`). ImageCaptureCore passes the
   vendor commands through and keeps up: all 30 frames a second arrive.
 - `defaults write com.superhighfives.markone SaveCapture -bool YES` makes
@@ -435,7 +434,13 @@ OpenH264 2.7 (BSD license) decodes every frame without error but not
 exactly: it matches libavcodec on Baseline streams, and differs on High
 profile ones (x264 test streams and the camera's), so it doesn't fully
 support High profile. libavcodec is the decoder that gets this stream
-right.
+right, so Mark One uses it. `scripts/build-libavcodec.sh` builds FFmpeg
+with only the H.264 decoder (LGPL 2.1, no GPL parts) as universal
+dynamic libraries in `mac/MarkOne/Vendor/ffmpeg`, which the app embeds.
+With low-delay mode and one thread, every frame of the one-minute capture
+comes out as soon as it goes in, in 4.5 ms including the NV12 copy, and
+matches PyAV's output exactly. Before App Store release: credit FFmpeg
+and link to the source in the app, and include the LGPL text.
 
 The stream follower used to search past the first access unit delimiter
 after a frame for one whose header followed. When a large frame left the

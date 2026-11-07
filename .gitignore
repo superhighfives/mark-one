@@ -25,3 +25,5 @@ mac/viewer/viewer
 mac/MarkOne/Local.xcconfig
 mac/MarkOne/MarkOne.xcodeproj/
 mac/MarkOne/build/
+/build/
+mac/MarkOne/Vendor/

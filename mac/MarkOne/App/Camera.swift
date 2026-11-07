@@ -48,11 +48,27 @@ final class Camera: NSObject, ICDeviceBrowserDelegate, ICCameraDeviceDelegate {
         if let openError { throw CameraError.session(openError) }
     }
 
-    func disconnect() {
+    /// Closes the session; `done` runs on the main thread once it's closed
+    /// (or after two seconds if the camera doesn't answer).
+    func disconnect(_ done: @escaping () -> Void = {}) {
         DispatchQueue.main.async {
-            self.device?.requestCloseSession()
-            self.browser.stop()
+            guard let device = self.device, device.hasOpenSession else {
+                self.browser.stop()
+                done()
+                return
+            }
+            self.closed = done
+            device.requestCloseSession()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { self.finishClose() }
         }
+    }
+
+    private var closed: (() -> Void)?
+
+    private func finishClose() {
+        browser.stop()
+        closed?()
+        closed = nil
     }
 
     /// Sends one PTP command and returns (response parameters, data from the camera).
@@ -124,7 +140,9 @@ final class Camera: NSObject, ICDeviceBrowserDelegate, ICCameraDeviceDelegate {
         opened.signal()
     }
 
-    func device(_ device: ICDevice, didCloseSessionWithError error: Error?) {}
+    func device(_ device: ICDevice, didCloseSessionWithError error: Error?) {
+        DispatchQueue.main.async { self.finishClose() }
+    }
     func didRemove(_ device: ICDevice) {}
 
     // Required by ICCameraDeviceDelegate; unused.
