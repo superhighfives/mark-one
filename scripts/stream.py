@@ -26,7 +26,7 @@ import ptp  # noqa: E402
 TABLE, ENTRIES, ENTRY = 0xA07E5180, 60, 0xF4
 IN_PROGRESS = 0xBF440
 RING_LO, RING_HI = 0xA52B1C00, 0xA5611380
-LAG = 6     # frames; 3 leaves a few damaged blocks, 8 none
+LAG = 6     # frames to stay behind the encoder; fewer gives damaged frames
 
 
 def frames(cam):
@@ -80,30 +80,45 @@ def main():
     # The table lists 60 frames but the ring only holds about 45, so the
     # oldest entries point at data already overwritten. Start just before
     # the newest keyframe (one every 15 frames) instead of at the oldest.
-    finished = frames(cam)
-    last = finished[-1][0] - 16 if finished else None
+    last, expected = None, None
     started, count, began = False, 0, time.time()
     try:
         while not stopping and not (args.seconds and time.time() - began > args.seconds):
             # A frame's size is set before all its data has landed in
-            # memory, so stay a few frames behind the newest (about 100 ms).
-            listed = frames(cam)
-            newest = listed[-1][0] if listed else 0
-            new = [f for f in listed if (last is None or f[0] > last) and f[0] <= newest - args.lag]
-            if not new:
-                time.sleep(0.01)
-                continue
-            for number, address, size in new:
+            # memory, so stay a few frames behind the newest. Take frames
+            # strictly in order: skipping one breaks the picture until the
+            # next keyframe.
+            listed = {f[0]: f for f in frames(cam)}
+            newest = max(listed) if listed else 0
+            if last is None:
+                last = newest - 16
+            progressed = False
+            while last + 1 in listed and last + 1 <= newest - args.lag:
+                number, address, size = listed[last + 1]
+                # Frames are written back to back. An entry whose address
+                # doesn't follow the previous frame is still being updated
+                # (its number changes before its address), so wait for it.
+                if expected and address not in (expected, RING_LO):
+                    break
+                expected = address + size
                 data = read(cam, address, size)
+                last = number
                 if not started:
                     if not is_keyframe(data):
-                        last = number
                         continue
                     started = True
                 out.write(data)
-                last = number
                 count += 1
-            out.flush()
+                progressed = True
+            if progressed:
+                out.flush()
+            elif newest - last > 30:
+                # The next frame never showed up, or we fell a second
+                # behind: start again from the next keyframe.
+                print(f'resync at frame {newest}', file=sys.stderr)
+                last, started, expected = newest - args.lag - 1, False, None
+            else:
+                time.sleep(0.005)
     except BrokenPipeError:
         pass
     finally:

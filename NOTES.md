@@ -323,8 +323,15 @@ H.264 stream (`scripts/stream.py`):
   PPS on keyframes, every 15 frames; about 75 KB per frame at 20 Mbps.
 - A frame's size is set before all of its data reaches memory: about 1 in
   10 frames read straight away changes afterwards, in 512-byte-aligned
-  chunks. Reading 3 frames behind leaves a few damaged macroblocks, 5
-  about one in 600 frames, 8 none. Default 6 (about 200 ms).
+  chunks. Staying 6 frames behind (about 200 ms) avoids it; 2-4 frames
+  still gives damaged frames.
+- Once every 60 frames (once per pass through the table) an entry's frame
+  number is updated before its address, so for a moment it points at the
+  frame from 60 frames earlier, which has been overwritten. Frames are
+  written back to back, so `stream.py` only accepts a frame that starts
+  where the previous one ended (or at the ring start) and waits
+  otherwise. It also takes frames strictly in order. With both, 20-second
+  captures decode with no errors.
 - Result: 1920x1080 at 29.97 frames per second, decodable by ffmpeg.
 
 Next: stop the recorder from writing the card (recording stops at 29
