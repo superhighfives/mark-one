@@ -7,6 +7,7 @@ Set the camera's USB mode to MTP (Custom menu, USB Mode), connect it, then:
   uv run scripts/ptp.py peek 0xbd742b00 1572864 -o frame.yuv
   uv run scripts/ptp.py poke 0x7e400000 code.bin  # write camera memory
   uv run scripts/ptp.py run 0x7e400000 1 2        # call a function
+  uv run scripts/ptp.py shoot                     # live view with USB connected
 
 `peek`, `poke` and `run` need the usb-tools patch (commands 0x9484-0x9486).
 USB transfers only reach the uncached view of RAM, so addresses in
@@ -183,7 +184,7 @@ def peek(cam, address, length, out):
             print(f'{address + i:08x}  {row.hex(" ")}')
 
 
-def poke(cam, address, data):
+def poke(cam, address, data, quiet=False):
     if len(data) % 2 or address % 2:
         sys.exit('Address and length must be even.')
     start = uncached(address)
@@ -191,7 +192,53 @@ def poke(cam, address, data):
         code, _, _ = cam.transact(POKE, (start + off,), data_out=data[off:off + POKE_CHUNK], timeout=20000)
         if code != OK:
             sys.exit(f'poke failed at {start + off:#010x}: {code:#06x}')
-    print(f'wrote {len(data)} bytes at {address:#010x}')
+    if not quiet:
+        print(f'wrote {len(data)} bytes at {address:#010x}')
+
+
+# Two helpers for reading and writing through the CPU cache, which USB
+# transfers can't reach. They go in the unused end of the usb-tools handler
+# space (0x7eaaab74-0x7eaaab8e) and are called with `run`, address in a0.
+READ32 = 0x7EAAAB74     # mov (a0),d0; rets
+WRITE32 = 0x7EAAAB7A    # mov d0,(a0); mov (a0),d0; rets
+HELPERS = bytes.fromhex('70f0fccbcbcb' '6070f0fccbcb')
+
+
+def install_helpers(cam):
+    poke(cam, READ32, HELPERS, quiet=True)
+
+
+def read32(cam, address):
+    return call(cam, READ32, (0, 0, address))[0]
+
+
+def write32(cam, address, value):
+    return call(cam, WRITE32, (value, 0, address))[0]
+
+
+def call(cam, function, args):
+    code, params, _ = cam.transact(RUN, (function, *args), timeout=20000)
+    if code != OK:
+        sys.exit(f'run failed: {code:#06x}')
+    return params
+
+
+def shoot(cam):
+    """Switch the camera from PC mode to shooting, keeping USB connected.
+
+    A computer asking for camera control sends PC mode the events
+    0x03000048-0x0300004b, which `startCameraControl` turns into the dormant
+    PC_CAM_SHOOTING mode change. Only PC sub-state 0x6004 handles them, and an
+    MTP connection uses 0x6005, so point 0x6005 at 0x6004's event list (a
+    superset of its own) and then post the event the way the serial console's
+    `nfPcCbk 50 1` does. A restart undoes the change.
+    """
+    install_helpers(cam)
+    write32(cam, 0x7EEF375C, 0x7EEF30EC)    # sub-state 0x6005: event list...
+    write32(cam, 0x7EEF3760, 8)             # ...and its length
+    pc = read32(cam, 0x605F0D3C)            # PC mode object
+    call(cam, 0x7EDD55BA, (2, 50, pc, 1))   # notification 50, value 1
+    print('requested shooting mode')
 
 
 def run(cam, function, args):
@@ -212,6 +259,7 @@ def main():
     po = sub.add_parser('poke')
     po.add_argument('address', type=lambda s: int(s, 0))
     po.add_argument('data', help='a file, or hex bytes like 0102abcd')
+    sub.add_parser('shoot', help='switch to shooting mode with USB connected')
     ru = sub.add_parser('run')
     ru.add_argument('function', type=lambda s: int(s, 0))
     ru.add_argument('args', nargs='*', type=lambda s: int(s, 0), help='d0, d1, a0, a1')
@@ -224,6 +272,8 @@ def main():
             info(cam)
         elif args.cmd == 'peek':
             peek(cam, args.address, args.length, args.out)
+        elif args.cmd == 'shoot':
+            shoot(cam)
         elif args.cmd == 'poke':
             data = open(args.data, 'rb').read() if os.path.exists(args.data) else bytes.fromhex(args.data)
             poke(cam, args.address, data)

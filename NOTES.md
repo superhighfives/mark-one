@@ -203,6 +203,37 @@ the camera stays in shooting mode with USB connected.
 - Unknown: whether the USB session (TPC task, `TPC_ON`) keeps running once
   the PC app hands over to shooting.
 
+### Shooting with USB connected (working, 2026-11-06)
+
+`ptp.py shoot` switches an MTP-connected camera to live view without
+dropping USB. No reflash: it only changes RAM, and a restart undoes it.
+
+- PC mode has sub-states 0x6000-0x600c, each with its own event list
+  (table of `{state, list, count}` at 0x7eef371c). Sub-state 0x6004's list
+  (0x7eef30ec, 8 entries) maps events 0x03000048/49 to `startCameraControl`
+  (0x7edd5c96), which requests 24 (PC_CAM_SHOOTING); 0x0300004a requests 25
+  (PC_CAM_PLAY) and 0x0300004b requests 23 (PC_RETURN).
+- `completedPcConnect` (0x7edd5bf9) enters 0x6004, or 0x6005 when the
+  connection type (0x605f0d14: 1 Storage, 2 MTP, 4 Print, from the USB
+  prompt) is 2. 0x6005's list (0x7eef316c, 3 entries) is a subset of
+  0x6004's without the camera control events.
+- The events come from notification group 2, id 50 (value 1 or 2 -> 0x48 or
+  0x49, 3 -> 0x4a, other -> 0x4b), translated by 0x7edd55ba (a `calls`
+  entry). The USB stack registers it as a callback (0x7edd5564). The serial
+  console command `nfPcCbk` (0x7edd568c) calls it with the PC mode object
+  at 0x605f0d3c, whose method +4 (0x7edda7f9) sends a 20-byte message to
+  queue 5, so calling it from the USB task is safe.
+- `shoot`: write 0x7eef30ec and 8 into 0x6005's table row (0x7eef375c,
+  0x7eef3760) through the cache, then run 0x7edd55ba with d0 = 2, d1 = 50,
+  a0 = *(0x605f0d3c), a1 = 1. The USB session stays up and the panel buffers
+  start updating.
+- Reading and writing cached variables needs code running on the camera:
+  `ptp.py` loads two tiny helpers at 0x7eaaab74 (read) and 0x7eaaab7a
+  (write).
+- `scripts/live.py` streams the panel buffer on screen (index at 0x605b5054,
+  address table at 0x7e932b84: 0xbd742b00, 0xbd8c2b00, 0xbd5c2b00) as motion
+  JPEG at 27 frames per second, 568x480.
+
 ### Frame source candidates
 
 - `CapThr_ThroughImage` "PSP JPEG": live view is encoded to JPEG in real
@@ -369,4 +400,5 @@ USB is the cable-free route, aiming at the 1080p HDMI buffers.
    PC_CAM_SHOOTING (request 24) after connecting.
 6. USB: flash usb-tools, run `ptp.py info` and small peeks, then read
    0x602adef8 and the video buffers while the camera is in shooting mode.
-7. USB: keep the USB session alive in shooting mode (PC_CAM_SHOOTING).
+7. USB: find a higher resolution live frame than the 568x480 panel buffer:
+   the HDMI 1080p buffers (with hdmi-liveview), or the movie pipeline.
