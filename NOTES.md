@@ -353,6 +353,19 @@ High profile with CAVLC and custom scaling matrices, which may be why.
 `stream.py --raw` decodes with PyAV and writes NV12; `mac/viewer` shows
 each frame as it arrives.
 
+Why VideoToolbox rejects the stream (error -12909, kVTVideoDecoderBadDataErr,
+on every frame including IDRs) is still open. Ruled out by rewriting a
+recorded clip and retesting with `ffmpeg -hwaccel videotoolbox` (the
+software decoder accepts every variant): level, cropping, full range,
+colour description, aspect ratio, fixed frame rate, AUDs, SEI, the whole
+VUI, the PPS ID (2, renumbered to 0 in the PPS and every slice header),
+the PPS scaling matrices (identical to the SPS 4x4 lists, so removable),
+and the SPS scaling matrices. x264 streams with the same features (High,
+CAVLC, custom matrices, no 8x8 transform, one reference, full range,
+keyframe every 15) decode fine. So it's something in the slice data.
+Frames end with a proper stop bit and no padding. The app needs a
+software H.264 decoder (libavcodec).
+
 `stream.py` also rewrites the SPS to add bitstream restriction fields (no
 reordering, one-frame buffer); the camera's SPS leaves them out, so
 decoders may otherwise assume they need a 16-frame buffer.
