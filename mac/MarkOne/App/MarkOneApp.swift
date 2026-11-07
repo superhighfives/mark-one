@@ -7,10 +7,11 @@ import SystemExtensions
 @main
 struct MarkOneApp: App {
     @StateObject private var installer = ExtensionInstaller()
+    @StateObject private var pipeline = Pipeline()
 
     var body: some Scene {
         WindowGroup {
-            ContentView(installer: installer)
+            ContentView(installer: installer, pipeline: pipeline)
                 .frame(width: 420)
                 .fixedSize()
         }
@@ -20,6 +21,7 @@ struct MarkOneApp: App {
 
 struct ContentView: View {
     @ObservedObject var installer: ExtensionInstaller
+    @ObservedObject var pipeline: Pipeline
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -34,6 +36,21 @@ struct ContentView: View {
                 Button("Remove camera") { installer.deactivate() }
             }
             Text(installer.status)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Divider()
+            HStack {
+                Button(pipeline.running ? "Stop" : "Start") {
+                    pipeline.running ? pipeline.stop() : pipeline.start()
+                }
+                if pipeline.framesPerSecond > 0 {
+                    Text(String(format: "%.0f frames per second", pipeline.framesPerSecond))
+                        .font(.callout.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Text(pipeline.status)
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

@@ -11,6 +11,8 @@ targets firmware 2.3, so update the camera to 2.3 before flashing anything.
   at 20 Mbps), when the QuickTime writer may split or stop the file.
 - Card space: after a long streamed recording, check that the card's
   free space didn't shrink.
+- Mark One.app's Start button (the in-app pipeline): connects through
+  ImageCaptureCore, sets up the camera, streams once recording starts.
 - VideoToolbox's software decoder (hardware disabled in the decoder
   specification) decodes most of a captured stream: 90-95% of frames in
   recent captures, but a failure breaks the session until it's recreated
@@ -409,6 +411,16 @@ markone-feed schemes; set DEVELOPMENT_TEAM in `Local.xcconfig`):
 - `markone-feed` finds the device by its fixed UID, opens the sink with
   CMIOStreamCopyBufferQueue and enqueues each NV12 frame from stdin:
   `uv run scripts/stream.py --raw | markone-feed`. Works in QuickTime.
+- In-app pipeline (untested; no Python, as the App Store needs): Start in
+  Mark One.app finds the camera with ImageCaptureCore (sandbox-friendly,
+  shares the camera with ptpcamerad instead of claiming the interface),
+  sends the usb-tools commands with requestSendPTPCommand (`Camera.swift`),
+  applies the same firmware setup as `ptp.py shoot` (`Firmware.swift`),
+  follows the stream like `stream.py` (`Streamer.swift`), decodes with
+  VideoToolbox's software decoder, recreating the session at the next
+  keyframe after a failure (`FrameDecoder.swift`), and sends frames to the
+  extension's sink (`CameraSink.swift`). Unknowns: ImageCaptureCore's
+  throughput for raw commands and whether it accepts the vendor commands.
 
 ## Starting a recording from the computer (not working yet)
 

@@ -27,6 +27,7 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: Mark One
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.video
         INFOPLIST_KEY_NSHumanReadableCopyright: ""
+        INFOPLIST_KEY_NSCameraUsageDescription: Mark One reads your E-M5's video and sends it to the Mark One camera.
     dependencies:
       - target: MarkOneCamera
         embed: true
