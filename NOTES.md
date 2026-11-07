@@ -234,6 +234,27 @@ dropping USB. No reflash: it only changes RAM, and a restart undoes it.
   address table at 0x7e932b84: 0xbd742b00, 0xbd8c2b00, 0xbd5c2b00) as motion
   JPEG at 27 frames per second, 568x480.
 
+### Looking for a higher resolution frame (2026-11-06)
+
+Memory diffing over USB (two snapshots, compare 64 KB blocks) in shooting
+mode with USB connected, photo and movie mode, 0xa0000000-0xbe000000:
+
+- Panel buffers 0xbd5c2b00/0xbd742b00/0xbd8c2b00: the 568x480 picture
+  (smaller and 16:9 in movie mode).
+- Movie buffers `m_aulYuvAddr` (set up at 0x7e7a050c): three slots of
+  3,526,656 bytes from 0xbc67a840, but only 1,254,400 bytes are written in
+  live view, in photo and movie mode alike. Rows are 3,584 bytes (two
+  1,792-byte halves); the bytes are bit-packed (period 16, byte 15 nearly
+  constant), so it looks like packed sensor data rather than YCbCr. Not
+  decoded.
+- Four small buffers of 52,224 bytes from 0xbd091840.
+- 0xa0090000, 1.3 MB: repeats every 256-384 bytes; not an image.
+- Nothing else of frame size changes. No 1080p image exists in live view
+  unless the HDMI output runs.
+- `CameraCommon::changeOutLine(0x08)` (API object at 0x602b243c, method +16,
+  0x7eaa6644) returns 0xf0000001 with no HDMI cable, and the HDMI buffers
+  stay untouched. `changeOutLine(0x01)` returns 0 (back to the panel).
+
 ### Frame source candidates
 
 - `CapThr_ThroughImage` "PSP JPEG": live view is encoded to JPEG in real

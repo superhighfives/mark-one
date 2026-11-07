@@ -119,7 +119,16 @@ class Camera:
             data += body[:length - 12]
 
     def open(self):
-        code, _, _ = self.transact(OPEN_SESSION, (1,))
+        try:
+            code, _, _ = self.transact(OPEN_SESSION, (1,))
+        except usb.core.USBTimeoutError:
+            # A transfer cut off halfway (a killed script, for example)
+            # leaves the camera mid-command. A USB reset clears it without
+            # leaving shooting mode.
+            self.dev.reset()
+            time.sleep(1)
+            self.__init__()
+            code, _, _ = self.transact(OPEN_SESSION, (1,))
         if code not in (OK, 0x201E):  # 0x201E: session already open
             sys.exit(f'OpenSession failed: {code:#06x}')
 
