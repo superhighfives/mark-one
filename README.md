@@ -2,7 +2,7 @@
 
 Research and firmware patches for using an original Olympus OM-D E-M5 (Mark I, 2012) as a webcam on a Mac. Stock firmware refuses to shoot while an HDMI cable is plugged in, and its USB connection only transfers files, so the plan is to change that in the firmware.
 
-Status: the `usb-tools` firmware runs on the camera. The Mac can switch it to live view with USB connected and stream the viewfinder image (800x450 in movie mode) at about 28 frames per second. `usb-tools` adds USB commands that read and write camera memory and run code, so most experiments happen over USB without reflashing. `hdmi-liveview`, which should let the camera show live view over HDMI while shooting, is built but not yet tried on a camera. Flashing modified firmware can brick a camera. Read the risks in `NOTES.md` first.
+Status: the `usb-tools` firmware runs on the camera. The Mac can switch it to live view with USB connected and stream the viewfinder image (800x450) at about 28 frames per second, or full 1080p frames at about 8 frames per second while the camera records a movie. `usb-tools` adds USB commands that read and write camera memory and run code, so most experiments happen over USB without reflashing. `hdmi-liveview`, which should let the camera show live view over HDMI while shooting, is built but not yet tried on a camera. Flashing modified firmware can brick a camera. Read the risks in `NOTES.md` first.
 
 ## Running it
 
@@ -41,6 +41,7 @@ uv run scripts/ptp.py run 0x7e400000 1 2    # call a function, print d0 and a0
 uv run scripts/ptp.py shoot                 # switch to live view, USB stays connected
 uv run scripts/ptp.py output evf            # 800x600 viewfinder image instead of 568x480
 uv run scripts/live.py                      # live view in the browser at http://localhost:8000
+uv run scripts/live.py --movie              # 1080p while the camera records a movie
 ```
 
 ## Reading the code

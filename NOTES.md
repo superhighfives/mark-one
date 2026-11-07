@@ -296,10 +296,23 @@ While the camera records a movie (MOV, Full HD), memory diffing finds:
   1920), then interleaved Cb Cr at +1920*1088. One frame starts at
   0xa6cd3600. Full color, sharp, the camera's own processing.
 
-Next: find the frame slot table and the index of the newest frame (read a
-frame at 3.1 MB is about 11 frames per second over USB), or read the H.264
-stream (about 3 MB/s at full frame rate). Recording also writes the card
-and stops at 29 minutes or 4 GB.
+Frame ring (found by watching memory near pointers to the frames):
+
+- 0xa07870a0: header `{1, 0xa52b1c00, 0x1400000, 0xa66b1c00, ...}`, which
+  looks like the H.264 stream ring: 20 MB from 0xa52b1c00 to 0xa66b1c00.
+- 0xa07870b8: 32 entries of 24 bytes, `{Y address, Y stride (1920), CbCr
+  address, CbCr stride, timestamp (90 kHz, +3003 per frame = 29.97 fps),
+  frame number}`. Frames are packed back to back, 3,133,440 bytes each
+  (1920x1088x1.5), 18 of them from 0xa6cd3600. The newest frame has the
+  highest frame number.
+- 0xa07873b8: a second ring of 16-byte entries `{address, timestamp,
+  0x1e00, number}` near 0xaa43xxxx, 25 per second: probably audio.
+
+`live.py --movie` reads the newest frame (two transfers, 2 MB + 1 MB) and
+streams it at about 8.4 frames per second at 1920x1080.
+
+Next: the H.264 stream for full frame rate, and stopping the recorder from
+writing the card (recording stops at 29 minutes or 4 GB).
 
 ### Frame source candidates
 

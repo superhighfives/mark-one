@@ -4,6 +4,10 @@ Needs the usb-tools firmware and the camera in shooting mode with USB
 connected (`uv run scripts/ptp.py shoot`). Then:
 
   uv run scripts/live.py            # open http://localhost:8000
+  uv run scripts/live.py --movie    # 1080p, while the camera records a movie
+
+With --movie, it reads the newest frame from the movie recorder's frame
+ring instead: 1920x1080 NV12, processed by the camera, about 3 MB each.
 
 Reads the screen's video buffer the display is showing, crops the picture
 from the top left of the 1024x768 Y Cb Y Cr buffer, and serves it as a
@@ -49,9 +53,23 @@ class Frames:
         self.cam.open()
         ptp.install_helpers(self.cam)
         self.count, self.since = 0, time.time()
-        self.size = None
 
     def jpeg(self):
+        out = io.BytesIO()
+        self.image().save(out, 'JPEG', quality=90)
+        self.count += 1
+        if time.time() - self.since >= 5:
+            print(f'{self.count / (time.time() - self.since):.1f} frames per second')
+            self.count, self.since = 0, time.time()
+        return out.getvalue()
+
+
+class ScreenFrames(Frames):
+    """The live view picture in the screen buffer the display is showing."""
+
+    size = None
+
+    def image(self):
         index = ptp.read32(self.cam, INDEX)
         address = BUFFERS[index % 3]
         if self.size is None:
@@ -62,14 +80,31 @@ class Frames:
         code, _, raw = self.cam.transact(ptp.PEEK, (address, STRIDE * height), timeout=5000)
         if code != ptp.OK:
             raise RuntimeError(f'peek failed: {code:#06x}')
-        rgb = convert(raw, 1024)[:, :width]
-        out = io.BytesIO()
-        Image.fromarray(rgb).save(out, 'JPEG', quality=90)
-        self.count += 1
-        if time.time() - self.since >= 5:
-            print(f'{self.count / (time.time() - self.since):.1f} frames per second')
-            self.count, self.since = 0, time.time()
-        return out.getvalue()
+        return Image.fromarray(convert(raw, 1024)[:, :width])
+
+
+# The movie recorder's frame ring: 32 entries of 24 bytes, each
+# {Y address, Y stride, CbCr address, CbCr stride, timestamp (90 kHz),
+# frame number}. Frames are NV12, 1920x1088 in memory, 1080 rows used.
+RING, RING_ENTRIES = 0xA07870B8, 32
+MOVIE_W, MOVIE_H = 1920, 1080
+
+
+class MovieFrames(Frames):
+    """The newest 1080p frame from the movie recorder (only while recording)."""
+
+    def image(self):
+        ring = np.frombuffer(self.cam.transact(ptp.PEEK, (RING, RING_ENTRIES * 24))[2], '<u4').reshape(-1, 6)
+        y_addr, y_stride, c_addr, _, _, number = ring[np.argmax(ring[:, 5])]
+        if not number or y_stride != MOVIE_W:
+            raise RuntimeError('no movie frames: is the camera recording?')
+        y = self.cam.transact(ptp.PEEK, (int(y_addr), MOVIE_W * MOVIE_H), timeout=5000)[2]
+        c = self.cam.transact(ptp.PEEK, (int(c_addr), MOVIE_W * MOVIE_H // 2), timeout=5000)[2]
+        cbcr = np.frombuffer(c, np.uint8).reshape(MOVIE_H // 2, MOVIE_W // 2, 2)
+        size = (MOVIE_W, MOVIE_H)
+        planes = [Image.frombuffer('L', size, y, 'raw', 'L', 0, 1)]
+        planes += [Image.fromarray(cbcr[..., i]).resize(size) for i in (0, 1)]
+        return Image.merge('YCbCr', planes)
 
 
 PAGE = b'<html><body style="margin:0;background:#111"><img src="/stream" style="width:100%"></body></html>'
@@ -78,8 +113,9 @@ PAGE = b'<html><body style="margin:0;background:#111"><img src="/stream" style="
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('--port', type=int, default=8000)
+    p.add_argument('--movie', action='store_true', help='1080p frames while recording')
     args = p.parse_args()
-    frames = Frames()
+    frames = MovieFrames() if args.movie else ScreenFrames()
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_):
