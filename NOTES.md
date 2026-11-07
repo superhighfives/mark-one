@@ -114,6 +114,12 @@ PLAYHDMI); HDMI disconnect -> 0x7edce39d.
   +20 getDisplayDeviceState, +40 getUsbState, +44 getCompositeState,
   +48 getHdmiState. The API object comes from 0x7eaa65f0.
 - Card updater: `DCOLYMP\E097????.BIN`, hold OK at power-on.
+- Confirmed on the E-M5 (1.5 to stock 2.3, 2026-11-06): the card updater
+  works. Release OK once the light starts flashing. The light kept flashing
+  for 25 minutes and never signaled the end; pulling the battery and powering
+  on normally showed 2.3. Start with no USB cable attached. OM Workspace
+  wants a kernel extension on current macOS (which needs reduced security),
+  so the card is the easier route.
 
 ## Patch: hdmi-liveview (untested)
 
