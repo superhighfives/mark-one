@@ -71,7 +71,12 @@ final class Pipeline: ObservableObject {
             var since = Date()
             var received = 0, failuresBefore = 0
             let capture = UserDefaults.standard.bool(forKey: "SaveCapture") ? Capture() : nil
-            report("Press record on the camera.")
+            report("Starting to record…")
+            try Firmware.setRecording(camera, true)
+            defer {
+                report("Stopping the recording…")
+                try? Firmware.setRecording(camera, false)
+            }
             while !stopRequested.value {
                 let frames = try streamer.poll()
                 received += frames.count
@@ -93,7 +98,7 @@ final class Pipeline: ObservableObject {
                                         decoder.failures - failuresBefore)
                     Task { @MainActor in
                         self.framesPerSecond = rate
-                        self.status = live ? "Streaming to the Mark One camera (\(detail))." : "Press record on the camera."
+                        self.status = live ? "Streaming to the Mark One camera (\(detail))." : "Waiting for video from the camera."
                     }
                     shown = 0
                     received = 0

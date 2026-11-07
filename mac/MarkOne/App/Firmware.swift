@@ -51,16 +51,49 @@ enum Firmware {
         try camera.run(write32, 8, 0, 0x7EEF_3760)
         let pcMode = try camera.run(read32, 0, 0, 0x605F_0D3C).0
         try camera.run(0x7EDD_55BA, 2, 50, pcMode, 1)      // notification 50: camera control
+        try camera.poke(keyStub, keyCode)
+    }
+
+    /// asm/key.s: puts a key event on the camera's key queue, as a button
+    /// press does. Placed over console-only code, after asm/post.s.
+    static let keyStub = UInt32(0x7EAB_0380)
+    static let keyCode = Data(hex: "f8fef8dd9818caff0020df0008cb")
+    /// The REC button ("Cut2" in the firmware's key table).
+    static let recordButton = UInt32(0x1209)
+    /// The shooting API's sequence state: 0x10 while a movie records.
+    static let sequence = UInt32(0x602B_1FF4)
+
+    static func isRecording(_ camera: Camera) throws -> Bool {
+        try camera.run(read32, 0, 0, sequence).0 == 0x10
+    }
+
+    /// Presses and releases the REC button, then waits up to three seconds
+    /// for recording to start or stop. Tries up to three times.
+    static func setRecording(_ camera: Camera, _ on: Bool) throws {
+        for _ in 0..<3 {
+            if try isRecording(camera) == on { return }
+            try camera.run(keyStub, 0x0200_0000 | recordButton)
+            Thread.sleep(forTimeInterval: 0.5)
+            try camera.run(keyStub, 0x0201_0000 | recordButton)
+            for _ in 0..<30 {
+                Thread.sleep(forTimeInterval: 0.1)
+                if try isRecording(camera) == on { return }
+            }
+        }
+        throw FirmwareError.recording(on)
     }
 }
 
 enum FirmwareError: LocalizedError {
-    case unexpected(String)
+    case unexpected(String), recording(Bool)
 
     var errorDescription: String? {
         switch self {
         case .unexpected(let name):
             "The camera's firmware isn't the one Mark One expects (\(name)). It needs E-M5 firmware 2.3 with the usb-tools patch."
+        case .recording(let on):
+            on ? "The camera didn't start recording. Check that it shows live view, then try again."
+               : "The camera didn't stop recording. Press its REC button to stop."
         }
     }
 }

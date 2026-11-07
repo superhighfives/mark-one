@@ -449,21 +449,41 @@ lap of the ring, glued several together and lost track for a second.
 Delimiters can't appear inside a frame, so now only the first one counts:
 if its frame doesn't follow, the follower waits and reads again.
 
-## Starting a recording from the computer (not working yet)
+## Starting a recording from the computer (works)
 
-- OlyApiShootingController::ctrlRelease (controller from 0x7ead145d,
-  vtable slot 256; `asm/release.s`) refuses while recording ("API
-  sequence" 0x602b1ff4 must be 0 or 1; recording sets 0x10). From idle it
-  returns 0 for any releaseGo with takeMovie = 1 and key_movie = 11, with
-  or without key_1st/key_2nd, but no recording starts. It seems to set up
-  remote release rather than press a key.
-- Posting event 0x01000022 (movie key; 0x01000023 is probably its
-  release) to the mode manager's queue with `asm/post.s` does nothing in
-  PC shooting. The mode manager's movie key handler
-  (startCtrlReleaseSubAppModuleRelease, around 0x7edcc128) reads the key
-  from 0x605f0c4c rather than the message, and keys reach events through
-  a "direct mode" mapping (0x7edcf0d7). Next: trace how the key task
-  delivers the movie key.
+Buttons reach the firmware as key events: 0x0200xxxx for a press,
+0x0201xxxx for a release, 0x0202xxxx while held, where xxxx is the
+hardware key code. The key table at 0x602a9d00 (copied from 0x7ea0c1c0)
+pairs each code with a 4-letter name; the custom-function buttons are
+Cut1 (0x000b), Cut2 (0x1209) and Cut3 (0x120a), and the REC button is
+Cut2, 0x1209. These hardware codes differ from the shooting API's key
+IDs (API_MOVIE_KEY = 11).
+
+The key dispatcher (0x7e5ec815) passes each event to 0x7e9df69d, which
+tracks keys held together (0x7e751c42), drops keys on the cancel list
+(0x7e751eeb, empty in PC shooting) and posts a 12-byte message to the
+key queue with 0x7e751c1b. `asm/key.s` calls 0x7e751c1b directly:
+pressing and releasing 0x1209 starts a recording with USB connected, and
+doing it again stops it. Mark One loads the stub at 0x7eab0380 (console
+usage text for `sdk api ctrlRelease`), presses REC when Start is clicked
+and again on Stop or quit. The shooting API's sequence state
+(0x602b1ff4) reads 0x10 while recording and 1 when idle, which tells
+whether the press worked.
+
+Dead ends: OlyApiShootingController::ctrlRelease (`asm/release.s`) sets
+up an automatic release for when a sub-screen closes; it refuses while
+recording and starts nothing from idle. Posting the mode manager's movie
+key event 0x01000022 (`asm/post.s`) does nothing in PC shooting.
+
+Build the stub:
+
+```sh
+T=toolchain/install/bin
+$T/mn10300-elf-as -o asm/key.o asm/key.s
+$T/mn10300-elf-ld -Ttext=0x7eab0380 --defsym key_post=0x7e751c1b \
+  -e key -o asm/key.elf asm/key.o
+$T/mn10300-elf-objcopy -O binary asm/key.elf asm/key.bin
+```
 
 ## Recording time limit (patch ready, untested)
 
@@ -479,9 +499,7 @@ QuickTime writer does at 4 GB ("[QT] AVSCA_INF_DIV_FILESIZE" and
 muxer would reach after about 27 minutes at 20 Mbps even with card
 writes skipped.
 
-Next: test the time limit (record past 30 minutes), start recording from
-the computer, and move the streamer into the app (needed for the App
-Store).
+Next: test the time limit (record past 30 minutes).
 
 ### Frame source candidates
 
