@@ -245,6 +245,30 @@ def call(cam, function, args):
     return params
 
 
+# The movie writers' calls to fileif_fwrite (0x7e69f3bb): QT_FILE at
+# 0x7e7a75b2 and MOV_FILE at 0x7e7c04ca. Each is `call fwrite,[],24` followed
+# by a check that the returned count equals the requested size (in d1).
+CARD_WRITES = {
+    0x7E7A75B2: ('dd097eefff001883', '84cbcbcbcbcbcb83'),
+    0x7E7C04CA: ('ddf1eeedff001882', '84cbcbcbcbcbcb82'),
+}
+
+
+def skip_card_writes(cam):
+    """Make movie recording skip writing video to the card.
+
+    Replaces each fwrite call with `mov d1,d0` (report the full size as
+    written) and nops. Recording and the live stream carry on; the clip on
+    the card is left empty. Only in memory: a restart undoes it.
+    """
+    for address, (stock, patched) in CARD_WRITES.items():
+        current = cam.transact(PEEK, (uncached(address), 8))[2].hex()
+        if current == stock:
+            poke(cam, address, bytes.fromhex(patched), quiet=True)
+        elif current != patched:
+            sys.exit(f'unexpected code at {address:#010x}: {current}')
+
+
 def shoot(cam):
     """Switch the camera from PC mode to shooting, keeping USB connected.
 
@@ -253,9 +277,11 @@ def shoot(cam):
     PC_CAM_SHOOTING mode change. Only PC sub-state 0x6004 handles them, and an
     MTP connection uses 0x6005, so point 0x6005 at 0x6004's event list (a
     superset of its own) and then post the event the way the serial console's
-    `nfPcCbk 50 1` does. A restart undoes the change.
+    `nfPcCbk 50 1` does. Also stops movie recording from writing the card
+    (see skip_card_writes). A restart undoes all of it.
     """
     install_helpers(cam)
+    skip_card_writes(cam)
     write32(cam, 0x7EEF375C, 0x7EEF30EC)    # sub-state 0x6005: event list...
     write32(cam, 0x7EEF3760, 8)             # ...and its length
     pc = read32(cam, 0x605F0D3C)            # PC mode object

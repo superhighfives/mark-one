@@ -357,8 +357,16 @@ each frame as it arrives.
 reordering, one-frame buffer); the camera's SPS leaves them out, so
 decoders may otherwise assume they need a 16-frame buffer.
 
-Next: stop the recorder from writing the card (recording stops at 29
-minutes or 4 GB), and a macOS camera extension fed by this stream.
+Card writes: the movie writers call fileif_fwrite (0x7e69f3bb) from
+QT_FILE (0x7e7a75b2) and MOV_FILE (0x7e7c04ca), then check the returned
+count against the size in d1. Replacing each call with `mov d1,d0` and
+nops (in RAM, `ptp.py shoot` does it) leaves recording and the stream
+running and the clip on the card empty ("picture error" in playback).
+Not yet checked: whether the file system still reserves the clip's space,
+and whether the 29-minute limit still stops recording.
+
+Next: the recording time limit, and a macOS camera extension fed by this
+stream.
 
 ### Frame source candidates
 
