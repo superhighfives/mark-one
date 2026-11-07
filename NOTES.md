@@ -311,8 +311,24 @@ Frame ring (found by watching memory near pointers to the frames):
 `live.py --movie` reads the newest frame (two transfers, 2 MB + 1 MB) and
 streams it at about 8.4 frames per second at 1920x1080.
 
-Next: the H.264 stream for full frame rate, and stopping the recorder from
-writing the card (recording stops at 29 minutes or 4 GB).
+H.264 stream (`scripts/stream.py`):
+
+- Frame descriptors: 60 entries, 244 bytes apart, from 0xa07e5180. Frame
+  number at +4, address at +8 (repeated at +12), timestamp (90 kHz) at -52,
+  size at -48. The frame being encoded has the placeholder size 0xbf440.
+- Video ring: 0xa52b1c00 to about 0xa5560000 (holds about 45 frames, so the
+  oldest descriptors point at overwritten data); audio follows from
+  0xa5611380 (descriptors from 0xa07e9188, 0x1e00 bytes each).
+- Frames are Annex B: access unit delimiter, then SPS (High profile) and
+  PPS on keyframes, every 15 frames; about 75 KB per frame at 20 Mbps.
+- A frame's size is set before all of its data reaches memory: about 1 in
+  10 frames read straight away changes afterwards, in 512-byte-aligned
+  chunks. Reading 3 frames behind leaves a few damaged macroblocks, 5
+  about one in 600 frames, 8 none. Default 6 (about 200 ms).
+- Result: 1920x1080 at 29.97 frames per second, decodable by ffmpeg.
+
+Next: stop the recorder from writing the card (recording stops at 29
+minutes or 4 GB), and a macOS camera extension fed by this stream.
 
 ### Frame source candidates
 
