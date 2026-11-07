@@ -321,19 +321,24 @@ H.264 stream (`scripts/stream.py`):
   0xa5611380 (descriptors from 0xa07e9188, 0x1e00 bytes each).
 - Frames are Annex B: access unit delimiter, then SPS (High profile) and
   PPS on keyframes, every 15 frames; about 75 KB per frame at 20 Mbps.
-- Descriptor entries lag the encoder. Once per pass through the table an
-  entry's frame number is updated before the rest of it, so for a while it
-  still describes the frame from 60 frames earlier (old address, size and
-  timestamp). And a finished frame's size can be corrected by up to a few
-  KB after it's listed. Reading frames as soon as they're listed gives
-  damaged frames; staying 6 frames behind avoids it but adds 200 ms.
-- What works (`next_frame` in `stream.py`): take frame n only when its
-  timestamp is 3003 ticks after frame n-1's and it starts where n-1 ended
-  (or at the ring start), and frame n+1 has started with the next
-  timestamp exactly at n's address + size (or at the ring start). The next
-  frame's entry gets its address when encoding starts, so 91 of 94 frames
-  pass as soon as n+1 starts: about one frame (33 ms) behind the encoder.
-  Two 20-second captures decode with no errors.
+- The descriptor table lags the encoder: about once every 60 frames an
+  entry is updated 300-430 ms late (its number changes first, so it still
+  describes the frame from 60 frames earlier), and a finished frame's size
+  can be corrected afterwards. Anything that waits for the table stalls
+  the picture, and anything that trusts it reads the wrong bytes.
+- So `stream.py` follows the stream itself and uses the table only as a
+  hint. Each frame's SEI picture timing (cpb_removal_delay, +2 per frame,
+  2..60) and slice frame_num (resets at each IDR, every 15 frames) must
+  follow the previous frame's. That pair repeats every 30 frames, about
+  one lap of the ring, so the streamer also remembers the first 1 KB of
+  every frame it has sent, by address: a frame that matches is left over
+  from an earlier lap. A frame ends where the next header that follows it
+  begins (table size tried first, then a search). The ring wraps to
+  0xa52b1c00 with 0x95000-0xc4000 bytes left below 0xa5611380 (not a fixed
+  threshold), so the ring start is tried as the next frame only within
+  1 MB of the top, and only with the table's size for the frame before.
+- Result: 20-second captures with no decode errors, frames 33 ms apart
+  (p95 about 63 ms), and one resync of up to a second right after start.
 - Result: 1920x1080 at 29.97 frames per second, decodable by ffmpeg.
 
 Display latency (measured by filming a millisecond clock on the Mac's

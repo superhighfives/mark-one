@@ -16,10 +16,14 @@ hardware decoder rejects this camera's stream (CAVLC with custom scaling
 matrices), so decoding happens in software, about 1.5 ms a frame.
 
 The movie recorder keeps a table of 60 frame descriptors, 244 bytes apart
-from 0xa07e5180. Each frame's number and address are at +4 and +8, and
-its timestamp (90 kHz) and size at -52 and -48. The frame being encoded has
-the placeholder size 0xbf440. Frames sit in a ring from 0xa52b1c00 and
-start with an access unit delimiter; keyframes carry the SPS and PPS.
+from 0xa07e5180: number and address at +4 and +8, timestamp (90 kHz) and
+size at -52 and -48, placeholder size 0xbf440 while a frame is encoded.
+Frames sit back to back in a ring from 0xa52b1c00, wrapping to its start.
+The table lags behind the encoder (up to 400 ms, once every 60 frames) and
+can describe a frame from an earlier lap, so it is only a hint here. Each
+frame is checked by content: its header must follow the previous frame's
+(picture timing and frame number), and it ends where a header that
+follows it begins.
 """
 import argparse
 import signal
@@ -35,26 +39,25 @@ import ptp  # noqa: E402
 TABLE, ENTRIES, ENTRY = 0xA07E5180, 60, 0xF4
 IN_PROGRESS = 0xBF440
 RING_LO, RING_HI = 0xA52B1C00, 0xA5611380
-SETTLE = 0.005  # seconds after the next frame starts before reading one
-FRAME_TICKS = 3003   # 90 kHz ticks per frame at 29.97 frames per second
+SCAN = 0x60000       # bytes to search for the end of a frame
+HEAD = 1024          # bytes of a frame that identify it
+WRAP_ROOM = 0x100000  # the encoder wraps with 0x95000-0xc4000 bytes left
 AUD = b'\x00\x00\x00\x01\x09'
 
 
-def frames(cam):
-    """Frames in the table as {number: (address, size, finished, timestamp)}.
-
-    Includes the frame being encoded, whose address is already set."""
+def sizes(cam):
+    """{address: size} of the finished frames the table lists (hints only),
+    oldest first."""
     start = TABLE - 52
     raw = cam.transact(ptp.PEEK, (start, ENTRIES * ENTRY + 52), timeout=5000)[2]
     words = np.frombuffer(raw, '<u4')
-    out = {}
+    found = []
     for k in range(ENTRIES):
         base = (52 + k * ENTRY) // 4
-        number, address = int(words[base + 1]), int(words[base + 2])
-        size, stamp = int(words[base - 12]), int(words[base - 13])
-        if number and RING_LO <= address < RING_HI and 0 < size <= IN_PROGRESS:
-            out[number] = (address, size, size != IN_PROGRESS, stamp)
-    return out
+        number, address, size = int(words[base + 1]), int(words[base + 2]), int(words[base - 12])
+        if number and RING_LO <= address < RING_HI and 0 < size < IN_PROGRESS:
+            found.append((number, address, size))
+    return {address: size for _, address, size in sorted(found)}
 
 
 def read(cam, address, size):
@@ -65,47 +68,81 @@ def read(cam, address, size):
     return data[address - start:address - start + size]
 
 
-def is_keyframe(data):
-    # Access unit delimiter (00 00 00 01 09 xx), then an SPS (NAL type 7).
-    return len(data) > 11 and data[10] & 0x1F == 7
+class Header:
+    """The fields of a frame's first bytes that tell consecutive frames apart."""
+
+    def __init__(self, data):
+        self.ok = data.startswith(AUD)
+        self.cpb = self.frame_num = self.idr = None
+        if not self.ok:
+            return
+        sei = data.find(b'\x00\x00\x00\x01\x06\x01\x09', 0, 1024)   # picture timing
+        if sei >= 0:
+            raw = data[sei + 7:sei + 16].replace(b'\x00\x00\x03', b'\x00\x00')
+            self.cpb = int.from_bytes(raw[:4], 'big')       # +2 a frame, 2..60
+        for start in range(5, min(len(data), 1024) - 5):
+            if data[start:start + 4] == b'\x00\x00\x00\x01' and data[start + 4] & 0x1F in (1, 5):
+                self.idr = data[start + 4] & 0x1F == 5
+                rbsp = data[start + 5:start + 16].replace(b'\x00\x00\x03', b'\x00\x00')
+                bits = ''.join(f'{b:08b}' for b in rbsp)
+                i = 0
+                for _ in range(3):                           # first_mb, slice_type, pps_id
+                    zeros = bits.index('1', i) - i
+                    i += 2 * zeros + 1
+                self.frame_num = int(bits[i:i + 4], 2)       # log2_max_frame_num = 4
+                break
+
+    def follows(self, before):
+        """Whether this frame comes right after `before` (not stale data)."""
+        if not (self.ok and before and before.cpb is not None and self.cpb is not None):
+            return False
+        if self.cpb != (2 if before.cpb >= 60 else before.cpb + 2):
+            return False
+        return self.frame_num == (0 if self.idr else (before.frame_num + 1) % 16)
 
 
-def next_frame(cam, listed, seen, number, prev, now, settle):
-    """(address, timestamp, bytes) of frame `number`, or None if not ready.
+def take(cam, starts, before, hints, sent):
+    """(address, bytes, header) of the next frame, or None if it isn't ready.
 
-    `prev` is (end address, timestamp) of the frame before it, or None.
+    The frame starts at one of `starts` (right after the previous frame, or
+    at the ring start when the encoder wrapped) and must follow `before`
+    (or, with no `before`, be a keyframe). It ends where the next frame's
+    header, which must follow it in turn, begins: the table's size is tried
+    first, then the data is searched. When the next frame wrapped to the
+    ring start, only the table's size says where this one ends.
 
-    Entries can lag behind the encoder. Once per pass through the table an
-    entry's number is updated before the rest of it, so for a while it
-    describes the frame from 60 frames earlier, and a finished frame's size
-    can still be corrected afterwards. A frame is only taken when its entry
-    and the next one agree with each other:
-
-    - its timestamp is one frame (3003 ticks at 90 kHz) after the previous
-      frame's, and it starts where the previous frame ended (or at the
-      ring start, after a wrap);
-    - the next frame has started, with the following timestamp, exactly
-      where this frame's size says it ends (or at the ring start).
-
-    Nearly every frame passes as soon as the next one starts, about one
-    frame (33 ms) behind the encoder.
+    Picture timing and frame number repeat every 30 frames, about one lap
+    of the ring, so they alone can't tell a new frame from the one left
+    there a lap earlier. `sent` holds the first bytes of each frame already
+    sent, by address; a frame that matches them is left over, not new.
     """
-    this, following = listed.get(number), listed.get(number + 1)
-    if not this or not following or now - seen[number + 1] < settle:
+    def new_header(address, head):
+        return Header(head) if sent.get(address) != head[:HEAD] else None
+
+    for start in starts:
+        header = new_header(start, read(cam, start, HEAD))
+        if header and (header.follows(before) if before else header.idr):
+            break
+    else:
         return None
-    address, size, finished, stamp = this
-    if prev:
-        end, prev_stamp = prev
-        if abs(stamp - prev_stamp - FRAME_TICKS) > 9 or address not in (end, RING_LO):
-            return None
-    if abs(following[3] - stamp - FRAME_TICKS) > 9:
-        return None
-    if following[0] != address + size and not (following[0] == RING_LO and finished):
-        return None
-    if not 0 < size < IN_PROGRESS:
-        return None
-    data = read(cam, address, size)
-    return (address, stamp, data) if data.startswith(AUD) else None
+    hint = hints.get(start)
+    if hint:
+        data = read(cam, start, hint + HEAD)
+        candidates = [(start + hint, data[hint:])]
+        if RING_HI - (start + hint) < WRAP_ROOM:
+            candidates.append((RING_LO, None))
+        for nxt, head in candidates:
+            after = new_header(nxt, head or read(cam, nxt, HEAD))
+            if after and after.follows(header):
+                return start, data[:hint], header
+    data = read(cam, start, min(SCAN, RING_HI - start))
+    at = 5
+    while (at := data.find(AUD, at)) >= 0:
+        after = new_header(start + at, data[at:at + HEAD])
+        if after and after.follows(header):
+            return start, data[:at], header
+        at += 5
+    return None
 
 
 def ue(value):
@@ -168,8 +205,6 @@ def main():
     p.add_argument('-o', '--out', help='write to a file instead of stdout')
     p.add_argument('--raw', action='store_true', help='write decoded NV12 frames instead of H.264')
     p.add_argument('--seconds', type=float, help='stop after this long')
-    p.add_argument('--settle', type=float, default=SETTLE,
-                   help='seconds to wait after the next frame starts (default %(default)s)')
     args = p.parse_args()
 
     out = open(args.out, 'wb') if args.out else sys.stdout.buffer
@@ -186,38 +221,29 @@ def main():
     signal.signal(signal.SIGINT, stop)
     signal.signal(signal.SIGTERM, stop)
 
-    # The table lists 60 frames but the ring only holds about 45, so the
-    # oldest entries point at data already overwritten. Start just before
-    # the newest keyframe (one every 15 frames) instead of at the oldest.
     decoder = None
     if args.raw:
         decoder = av.CodecContext.create('h264', 'r')
         decoder.flags |= av.codec.context.Flags.low_delay
         decoder.thread_count = 1
-    last, prev, seen = None, None, {}
-    started, count, began = False, 0, time.time()
+    header, end, count, began, last_frame = None, None, 0, time.time(), time.time()
+    sent = {}
     try:
         while not stopping and not (args.seconds and time.time() - began > args.seconds):
-            now = time.time()
-            listed = frames(cam)
-            for number in listed:
-                seen.setdefault(number, now)
-            newest = max(listed) if listed else 0
-            if last is None:
-                last = newest - 16
+            hints = sizes(cam)
+            if header is None:
+                # Start from a recent keyframe the table lists.
+                starts = list(hints)[-20:][::-1]
+            else:
+                starts = (end, RING_LO)
             progressed = False
-            while True:
-                frame = next_frame(cam, listed, seen, last + 1, prev, now, args.settle)
-                if frame is None:
-                    break
-                address, stamp, data = frame
-                last += 1
-                seen.pop(last - 120, None)
-                prev = (address + len(data), stamp)
-                if not started:
-                    if not is_keyframe(data):
-                        continue
-                    started = True
+            while (frame := take(cam, starts, header, hints, sent)):
+                address, data, header = frame
+                sent[address] = data[:HEAD]
+                if len(sent) > 200:
+                    sent.pop(next(iter(sent)))
+                end = address + len(data)
+                starts = (end, RING_LO)
                 data = patch_frame(data)
                 if decoder:
                     for picture in decoder.decode(av.Packet(data)):
@@ -228,15 +254,11 @@ def main():
                 progressed = True
             if progressed:
                 out.flush()
-            elif newest < last - 30:
-                # A new recording restarts the frame numbers.
-                print(f'new recording at frame {newest}', file=sys.stderr)
-                last, started, prev = newest - 2, False, None
-            elif newest - last > 30:
-                # The next frame never showed up, or we fell a second
-                # behind: start again from the next keyframe.
-                print(f'resync at frame {newest}', file=sys.stderr)
-                last, started, prev = newest - 2, False, None
+                last_frame = time.time()
+            elif header and time.time() - last_frame > 1:
+                # Nothing for a second: a new recording, or we lost track.
+                print('starting again from the next keyframe', file=sys.stderr)
+                header = None
             else:
                 time.sleep(0.003)
     except BrokenPipeError:
