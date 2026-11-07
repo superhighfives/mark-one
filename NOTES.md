@@ -283,6 +283,24 @@ switching the output LCD -> EVF hangs the display task: `changeOutLine`
 never returns and the USB task blocks with it. A battery pull recovers. The
 display hardware setup can't take a size beyond the panel's.
 
+### 1080p frames while recording a movie (2026-11-06)
+
+While the camera records a movie (MOV, Full HD), memory diffing finds:
+
+- The movie slots (0xbc67a840 + n * 3,526,656) fully used: packed sensor
+  data again, rows of about 2,688 bytes (about 2352x1312 pixels).
+- 0xa5610000-0xa6250000 and around 0xa52b0000, 0xaa2a0000: noisy data with
+  many 00 00 01 start codes: the H.264 stream.
+- From about 0xa66b0000 to 0xaa4d0000: a run of processed 1080p frames,
+  one every 0x300000 bytes, NV12: Y plane 1920x1088 (1080 used, stride
+  1920), then interleaved Cb Cr at +1920*1088. One frame starts at
+  0xa6cd3600. Full color, sharp, the camera's own processing.
+
+Next: find the frame slot table and the index of the newest frame (read a
+frame at 3.1 MB is about 11 frames per second over USB), or read the H.264
+stream (about 3 MB/s at full frame rate). Recording also writes the card
+and stops at 29 minutes or 4 GB.
+
 ### Frame source candidates
 
 - `CapThr_ThroughImage` "PSP JPEG": live view is encoded to JPEG in real
