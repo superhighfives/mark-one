@@ -2,7 +2,7 @@
 
 Research and firmware patches for using an original Olympus OM-D E-M5 (Mark I, 2012) as a webcam on a Mac. Stock firmware refuses to shoot while an HDMI cable is plugged in, and its USB connection only transfers files, so the plan is to change that in the firmware.
 
-Status: the `usb-tools` firmware runs on the camera. The Mac can switch it to live view with USB connected and stream the 568x480 screen image at 27 frames per second. Two candidate patches are built and checked offline but not yet tried on a camera. `hdmi-liveview` lets the camera show live view over HDMI while shooting. `usb-tools` adds USB commands that read and write camera memory and run code, so most experiments can happen over USB without reflashing. Flashing modified firmware can brick a camera. Read the risks in `NOTES.md` first.
+Status: the `usb-tools` firmware runs on the camera. The Mac can switch it to live view with USB connected and stream the 568x480 screen image at 27 frames per second. `usb-tools` adds USB commands that read and write camera memory and run code, so most experiments happen over USB without reflashing. `hdmi-liveview`, which should let the camera show live view over HDMI while shooting, is built but not yet tried on a camera. Flashing modified firmware can brick a camera. Read the risks in `NOTES.md` first.
 
 ## Running it
 
