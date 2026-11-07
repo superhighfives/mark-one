@@ -26,21 +26,26 @@ import ptp  # noqa: E402
 TABLE, ENTRIES, ENTRY = 0xA07E5180, 60, 0xF4
 IN_PROGRESS = 0xBF440
 RING_LO, RING_HI = 0xA52B1C00, 0xA5611380
-LAG = 6     # frames to stay behind the encoder; fewer gives damaged frames
+SETTLE = 0.005  # seconds after the next frame starts before reading one
+FRAME_TICKS = 3003   # 90 kHz ticks per frame at 29.97 frames per second
+AUD = b'\x00\x00\x00\x01\x09'
 
 
 def frames(cam):
-    """Finished frames in the table as (number, address, size), oldest first."""
+    """Frames in the table as {number: (address, size, finished, timestamp)}.
+
+    Includes the frame being encoded, whose address is already set."""
     start = TABLE - 52
     raw = cam.transact(ptp.PEEK, (start, ENTRIES * ENTRY + 52), timeout=5000)[2]
     words = np.frombuffer(raw, '<u4')
-    out = []
+    out = {}
     for k in range(ENTRIES):
         base = (52 + k * ENTRY) // 4
-        number, address, size = int(words[base + 1]), int(words[base + 2]), int(words[base - 12])
-        if number and size != IN_PROGRESS and RING_LO <= address < RING_HI and 0 < size < IN_PROGRESS:
-            out.append((number, address, size))
-    return sorted(out)
+        number, address = int(words[base + 1]), int(words[base + 2])
+        size, stamp = int(words[base - 12]), int(words[base - 13])
+        if number and RING_LO <= address < RING_HI and 0 < size <= IN_PROGRESS:
+            out[number] = (address, size, size != IN_PROGRESS, stamp)
+    return out
 
 
 def read(cam, address, size):
@@ -56,11 +61,50 @@ def is_keyframe(data):
     return len(data) > 11 and data[10] & 0x1F == 7
 
 
+def next_frame(cam, listed, seen, number, prev, now, settle):
+    """(address, timestamp, bytes) of frame `number`, or None if not ready.
+
+    `prev` is (end address, timestamp) of the frame before it, or None.
+
+    Entries can lag behind the encoder. Once per pass through the table an
+    entry's number is updated before the rest of it, so for a while it
+    describes the frame from 60 frames earlier, and a finished frame's size
+    can still be corrected afterwards. A frame is only taken when its entry
+    and the next one agree with each other:
+
+    - its timestamp is one frame (3003 ticks at 90 kHz) after the previous
+      frame's, and it starts where the previous frame ended (or at the
+      ring start, after a wrap);
+    - the next frame has started, with the following timestamp, exactly
+      where this frame's size says it ends (or at the ring start).
+
+    Nearly every frame passes as soon as the next one starts, about one
+    frame (33 ms) behind the encoder.
+    """
+    this, following = listed.get(number), listed.get(number + 1)
+    if not this or not following or now - seen[number + 1] < settle:
+        return None
+    address, size, finished, stamp = this
+    if prev:
+        end, prev_stamp = prev
+        if abs(stamp - prev_stamp - FRAME_TICKS) > 9 or address not in (end, RING_LO):
+            return None
+    if abs(following[3] - stamp - FRAME_TICKS) > 9:
+        return None
+    if following[0] != address + size and not (following[0] == RING_LO and finished):
+        return None
+    if not 0 < size < IN_PROGRESS:
+        return None
+    data = read(cam, address, size)
+    return (address, stamp, data) if data.startswith(AUD) else None
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('-o', '--out', help='write to a file instead of stdout')
     p.add_argument('--seconds', type=float, help='stop after this long')
-    p.add_argument('--lag', type=int, default=LAG, help='frames to stay behind the encoder (default %(default)s)')
+    p.add_argument('--settle', type=float, default=SETTLE,
+                   help='seconds to wait after the next frame starts (default %(default)s)')
     args = p.parse_args()
 
     out = open(args.out, 'wb') if args.out else sys.stdout.buffer
@@ -80,29 +124,26 @@ def main():
     # The table lists 60 frames but the ring only holds about 45, so the
     # oldest entries point at data already overwritten. Start just before
     # the newest keyframe (one every 15 frames) instead of at the oldest.
-    last, expected = None, None
+    last, prev, seen = None, None, {}
     started, count, began = False, 0, time.time()
     try:
         while not stopping and not (args.seconds and time.time() - began > args.seconds):
-            # A frame's size is set before all its data has landed in
-            # memory, so stay a few frames behind the newest. Take frames
-            # strictly in order: skipping one breaks the picture until the
-            # next keyframe.
-            listed = {f[0]: f for f in frames(cam)}
+            now = time.time()
+            listed = frames(cam)
+            for number in listed:
+                seen.setdefault(number, now)
             newest = max(listed) if listed else 0
             if last is None:
                 last = newest - 16
             progressed = False
-            while last + 1 in listed and last + 1 <= newest - args.lag:
-                number, address, size = listed[last + 1]
-                # Frames are written back to back. An entry whose address
-                # doesn't follow the previous frame is still being updated
-                # (its number changes before its address), so wait for it.
-                if expected and address not in (expected, RING_LO):
+            while True:
+                frame = next_frame(cam, listed, seen, last + 1, prev, now, args.settle)
+                if frame is None:
                     break
-                expected = address + size
-                data = read(cam, address, size)
-                last = number
+                address, stamp, data = frame
+                last += 1
+                seen.pop(last - 120, None)
+                prev = (address + len(data), stamp)
                 if not started:
                     if not is_keyframe(data):
                         continue
@@ -116,9 +157,9 @@ def main():
                 # The next frame never showed up, or we fell a second
                 # behind: start again from the next keyframe.
                 print(f'resync at frame {newest}', file=sys.stderr)
-                last, started, expected = newest - args.lag - 1, False, None
+                last, started, prev = newest - 2, False, None
             else:
-                time.sleep(0.005)
+                time.sleep(0.003)
     except BrokenPipeError:
         pass
     finally:

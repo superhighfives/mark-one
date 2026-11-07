@@ -321,17 +321,19 @@ H.264 stream (`scripts/stream.py`):
   0xa5611380 (descriptors from 0xa07e9188, 0x1e00 bytes each).
 - Frames are Annex B: access unit delimiter, then SPS (High profile) and
   PPS on keyframes, every 15 frames; about 75 KB per frame at 20 Mbps.
-- A frame's size is set before all of its data reaches memory: about 1 in
-  10 frames read straight away changes afterwards, in 512-byte-aligned
-  chunks. Staying 6 frames behind (about 200 ms) avoids it; 2-4 frames
-  still gives damaged frames.
-- Once every 60 frames (once per pass through the table) an entry's frame
-  number is updated before its address, so for a moment it points at the
-  frame from 60 frames earlier, which has been overwritten. Frames are
-  written back to back, so `stream.py` only accepts a frame that starts
-  where the previous one ended (or at the ring start) and waits
-  otherwise. It also takes frames strictly in order. With both, 20-second
-  captures decode with no errors.
+- Descriptor entries lag the encoder. Once per pass through the table an
+  entry's frame number is updated before the rest of it, so for a while it
+  still describes the frame from 60 frames earlier (old address, size and
+  timestamp). And a finished frame's size can be corrected by up to a few
+  KB after it's listed. Reading frames as soon as they're listed gives
+  damaged frames; staying 6 frames behind avoids it but adds 200 ms.
+- What works (`next_frame` in `stream.py`): take frame n only when its
+  timestamp is 3003 ticks after frame n-1's and it starts where n-1 ended
+  (or at the ring start), and frame n+1 has started with the next
+  timestamp exactly at n's address + size (or at the ring start). The next
+  frame's entry gets its address when encoding starts, so 91 of 94 frames
+  pass as soon as n+1 starts: about one frame (33 ms) behind the encoder.
+  Two 20-second captures decode with no errors.
 - Result: 1920x1080 at 29.97 frames per second, decodable by ffmpeg.
 
 Next: stop the recorder from writing the card (recording stops at 29
