@@ -8,6 +8,7 @@ Set the camera's USB mode to MTP (Custom menu, USB Mode), connect it, then:
   uv run scripts/ptp.py poke 0x7e400000 code.bin  # write camera memory
   uv run scripts/ptp.py run 0x7e400000 1 2        # call a function
   uv run scripts/ptp.py shoot                     # live view with USB connected
+  uv run scripts/ptp.py output evf                # 800x600 live view instead of 568x480
 
 `peek`, `poke` and `run` need the usb-tools patch (commands 0x9484-0x9486).
 USB transfers only reach the uncached view of RAM, so addresses in
@@ -250,6 +251,24 @@ def shoot(cam):
     print('requested shooting mode')
 
 
+OUTPUTS = {'lcd': 0x01, 'evf': 0x10}   # CameraCommon::changeOutLine lines
+
+
+def output(cam, name):
+    """Send live view to the rear screen or the built-in viewfinder.
+
+    The screen buffer holds whatever the active display needs: 568x480 for
+    the rear screen, 800x600 (800x450 in movie mode) for the viewfinder.
+    """
+    install_helpers(cam)
+    api = read32(cam, 0x602B243C)                   # CameraCommon API object
+    change_out_line = read32(cam, read32(cam, api) + 16)
+    result = call(cam, change_out_line, (OUTPUTS[name], 0, api))[0]
+    if result:
+        sys.exit(f'changeOutLine failed: {result:#010x}')
+    print(f'output: {name}')
+
+
 def run(cam, function, args):
     code, params, _ = cam.transact(RUN, (function, *args), timeout=20000)
     if code != OK:
@@ -269,6 +288,8 @@ def main():
     po.add_argument('address', type=lambda s: int(s, 0))
     po.add_argument('data', help='a file, or hex bytes like 0102abcd')
     sub.add_parser('shoot', help='switch to shooting mode with USB connected')
+    out = sub.add_parser('output', help='send live view to the rear screen or viewfinder')
+    out.add_argument('name', choices=sorted(OUTPUTS))
     ru = sub.add_parser('run')
     ru.add_argument('function', type=lambda s: int(s, 0))
     ru.add_argument('args', nargs='*', type=lambda s: int(s, 0), help='d0, d1, a0, a1')
@@ -283,6 +304,8 @@ def main():
             peek(cam, args.address, args.length, args.out)
         elif args.cmd == 'shoot':
             shoot(cam)
+        elif args.cmd == 'output':
+            output(cam, args.name)
         elif args.cmd == 'poke':
             data = open(args.data, 'rb').read() if os.path.exists(args.data) else bytes.fromhex(args.data)
             poke(cam, args.address, data)

@@ -255,6 +255,19 @@ mode with USB connected, photo and movie mode, 0xa0000000-0xbe000000:
   0x7eaa6644) returns 0xf0000001 with no HDMI cable, and the HDMI buffers
   stay untouched. `changeOutLine(0x01)` returns 0 (back to the panel).
 
+### Viewfinder output: 800x600 over USB
+
+`changeOutLine(0x10)` (internal EVF) works from USB in PC shooting mode
+and returns 0. The screen buffer then holds the viewfinder image: 800x600
+in photo mode, 800x450 plus a dark band in 16:9 movie mode, against
+568x480 for the rear screen. The output stays on the viewfinder (checked
+for 12 s). `ptp.py output evf` / `output lcd` switch it; `live.py` detects
+the picture size and streams 800x450 at about 28 frames per second.
+
+Panel sizes come from per-panel functions in the display driver (for
+example 0x7e780e16 reports 90x15, 800x600, 640x480), called directly from
+0x7e77e9c9 and 0x7e7898be, so changing them means changing code.
+
 ### Frame source candidates
 
 - `CapThr_ThroughImage` "PSP JPEG": live view is encoded to JPEG in real
