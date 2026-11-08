@@ -10,11 +10,12 @@ import Foundation
 import ImageCaptureCore
 
 enum CameraError: LocalizedError {
-    case notFound, session(Error?), command(UInt16, String), timeout
+    case notFound, disconnected, session(Error?), command(UInt16, String), timeout
 
     var errorDescription: String? {
         switch self {
         case .notFound: "No E-M5 found. Connect it by USB and choose MTP on the camera."
+        case .disconnected: "The camera was turned off or unplugged."
         case .session(let error): "Couldn't open the camera: \(error?.localizedDescription ?? "unknown error")."
         case .command(let code, let name): "The camera refused \(name) (\(String(format: "0x%04x", code)))."
         case .timeout: "The camera stopped responding."
@@ -32,6 +33,7 @@ final class Camera: NSObject, ICDeviceBrowserDelegate, ICCameraDeviceDelegate {
     private let found = DispatchSemaphore(value: 0)
     private let opened = DispatchSemaphore(value: 0)
     private var openError: Error?
+    private var removed = false
     var onDisconnect: (() -> Void)?
 
     /// Finds the camera and opens a session, waiting up to `timeout` seconds.
@@ -53,7 +55,7 @@ final class Camera: NSObject, ICDeviceBrowserDelegate, ICCameraDeviceDelegate {
     func disconnect(_ done: @escaping () -> Void = {}) {
         DispatchQueue.main.async {
             guard let device = self.device, device.hasOpenSession else {
-                self.browser.stop()
+                self.release()
                 done()
                 return
             }
@@ -66,15 +68,25 @@ final class Camera: NSObject, ICDeviceBrowserDelegate, ICCameraDeviceDelegate {
     private var closed: (() -> Void)?
 
     private func finishClose() {
+        guard let closed else { return }
+        self.closed = nil
+        release()
+        closed()
+    }
+
+    /// Stops browsing and unhooks this object from ImageCaptureCore, which
+    /// doesn't retain its delegates and would otherwise call into a freed
+    /// object when the camera is unplugged or turned off later.
+    private func release() {
+        device?.delegate = nil
+        browser.delegate = nil
         browser.stop()
-        closed?()
-        closed = nil
     }
 
     /// Sends one PTP command and returns (response parameters, data from the camera).
     @discardableResult
     func send(_ code: UInt16, _ params: [UInt32], data out: Data? = nil, name: String) throws -> ([UInt32], Data) {
-        guard let device else { throw CameraError.notFound }
+        guard let device else { throw removed ? CameraError.disconnected : CameraError.notFound }
         transaction &+= 1
         var command = Data()
         command.append(le: UInt32(12 + 4 * params.count))
@@ -91,7 +103,11 @@ final class Camera: NSObject, ICDeviceBrowserDelegate, ICCameraDeviceDelegate {
             failure = error
             done.signal()
         }
-        guard done.wait(timeout: .now() + 10) == .success else { throw CameraError.timeout }
+        let answered = done.wait(timeout: .now() + 10) == .success
+        // A camera that turns off mid-command answers with an empty
+        // response, just before ImageCaptureCore reports it gone.
+        if removed || (answered && failure == nil && response.count < 8) { throw CameraError.disconnected }
+        guard answered else { throw CameraError.timeout }
         if failure != nil { throw CameraError.session(failure) }
         // Response container: length, type, code, transaction, parameters.
         let rcode = response.count >= 8 ? response.le(UInt16.self, at: 6) : 0
@@ -130,7 +146,9 @@ final class Camera: NSObject, ICDeviceBrowserDelegate, ICCameraDeviceDelegate {
 
     func deviceBrowser(_ browser: ICDeviceBrowser, didRemove device: ICDevice, moreGoing: Bool) {
         if device === self.device {
+            device.delegate = nil
             self.device = nil
+            removed = true
             onDisconnect?()
         }
     }
