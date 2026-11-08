@@ -4,16 +4,16 @@ Turns an original Olympus OM-D E-M5 (Mark I, 2012) into a Mac webcam over a sing
 
 ## Where it stands
 
-Mark One works end to end. Plug in the camera (USB Mode set to MTP) and click Start, and Mark One:
+Mark One works end to end, with nothing to click. It sits in the menu bar and can open at login. Plug in the camera with its USB Mode set to MTP, switch it on, and open a video app. Mark One:
 
 1. connects through ImageCaptureCore, which works inside the App Store sandbox
 2. switches the camera to live view with USB connected, so movies don't write to the card and have no time limit (that last part is still untested)
-3. presses the camera's REC button for you
+3. presses the camera's REC button for you when an app starts using the Mark One camera
 4. follows the camera's 1080p, 30 frames per second H.264 movie stream straight out of its memory
 5. decodes it with libavcodec
 6. publishes it as the "Mark One" camera through a Core Media IO camera extension, for FaceTime, Zoom, OBS, QuickTime and so on
 
-Stop, or quitting the app, stops the recording. The camera's power switch turns it off as usual, and Mark One says so. Video reaches the Mac about 200 ms after it happens.
+Recording stops 5 seconds after the last app stops using the camera, and when you quit Mark One. Mark One notices when the camera is switched back on or plugged in again and sets it up again. The camera's power switch turns it off as usual, and Mark One says so. Video reaches the Mac about 200 ms after it happens.
 
 All of this rests on one firmware change, `usb-tools`, which adds USB commands that read and write camera memory and run code. Everything else Mark One does lives in the camera's memory only, and switching the camera off undoes it. Flashing modified firmware can brick a camera, so read the risks in `NOTES.md` first.
 
@@ -23,7 +23,6 @@ All of this rests on one firmware change, `usb-tools`, which adds USB commands t
 
 The goal is software that feels like magic: plug in the camera, open a video call, and it works, with nothing to press on the camera or in Mark One.
 
-- **Start on demand.** The camera extension can tell when an app starts and stops using the Mark One camera. Mark One should start the camera then, and stop it when the last app lets go. It should also notice when the camera is switched back on or plugged in, and set it up again. That probably means a menu bar app, or a small helper that launches at login, instead of a window with a Start button.
 - **Webcam mode in the firmware.** Today Mark One rewrites camera memory every time it starts. A firmware build with webcam mode built in would be faster and sturdier: it would enter webcam mode by itself when Mark One connects, and skip card writes and the time limit only in that mode.
 - **Install the firmware from Mark One.** Olympus's own updater installs firmware over USB, so the camera has a USB update path. Work out its protocol, then let Mark One check the camera's firmware and offer to install the webcam firmware, with no SD card. Olympus's firmware can't be shipped in the app, so Mark One would download the stock file from Olympus (as `scripts/setup.sh` does), patch it on the Mac, and send it to the camera. This needs care: a failed flash can brick the camera, and App Review will want to see a clear explanation.
 - **Power.** The E-M5 doesn't run from USB power, so long calls drain the battery. Look at a dummy battery with a power adapter, and show the battery level in Mark One.
@@ -60,7 +59,7 @@ xcodebuild -project MarkOne.xcodeproj -scheme MarkOne -configuration Debug \
 cp -R "build/Build/Products/Debug/Mark One.app" /Applications/
 ```
 
-The app has to run from `/Applications` to install its camera extension. Click Install camera once, approve the extension in System Settings > General > Login Items & Extensions > Camera Extensions, then click Start with the camera connected. Quit Mark One normally rather than force-quitting it. Force-quitting it mid-session can leave macOS's camera service stuck, and then the camera doesn't show up again until you unplug it.
+The app has to run from `/Applications` to install its camera extension. It installs its camera extension when it opens; approve it the first time in System Settings > General > Login Items & Extensions > Camera Extensions. Quit Mark One normally rather than force-quitting it. Force-quitting it mid-session can leave macOS's camera service stuck, and then the camera doesn't show up again until you unplug it.
 
 ## Running it
 

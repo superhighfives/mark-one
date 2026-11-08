@@ -1,33 +1,42 @@
-// Mark One: installs the Mark One camera extension, which makes an Olympus
-// OM-D E-M5 available as a camera in video apps.
+// Mark One: a menu bar app that installs the Mark One camera extension and
+// feeds it from an Olympus OM-D E-M5, so the camera shows up in video apps.
 
+import ServiceManagement
 import SwiftUI
 import SystemExtensions
 
 @main
 struct MarkOneApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
-    @StateObject private var installer = ExtensionInstaller()
+    @StateObject private var installer = ExtensionInstaller.shared
     @StateObject private var pipeline = Pipeline.shared
 
     var body: some Scene {
-        WindowGroup {
+        MenuBarExtra {
             ContentView(installer: installer, pipeline: pipeline)
-                .frame(width: 420)
-                .fixedSize()
+                .frame(width: 320)
+        } label: {
+            Image(systemName: pipeline.state == .streaming ? "video.fill"
+                  : pipeline.state == .ready ? "video" : "video.slash")
         }
-        .windowResizability(.contentSize)
+        .menuBarExtraStyle(.window)
     }
 }
 
-/// Closes the camera session before quitting. Quitting with it open can
-/// leave macOS's camera service stuck, so the camera doesn't show up again
-/// until it's unplugged.
+/// Installs the camera extension and starts watching for the camera at
+/// launch, and closes the camera session before quitting. Quitting with it
+/// open can leave macOS's camera service stuck, so the camera doesn't show
+/// up again until it's unplugged.
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        Task { @MainActor in
+            ExtensionInstaller.shared.activate()
+            Pipeline.shared.run()
+        }
+    }
+
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        let pipeline = Pipeline.shared
-        guard pipeline.running else { return .terminateNow }
-        pipeline.stop {
+        Pipeline.shared.stop {
             sender.reply(toApplicationShouldTerminate: true)
         }
         return .terminateLater
@@ -37,53 +46,60 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct ContentView: View {
     @ObservedObject var installer: ExtensionInstaller
     @ObservedObject var pipeline: Pipeline
+    @State private var openAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("Mark One")
-                .font(.title2.weight(.semibold))
-            Text("Adds your E-M5 as a camera you can pick in FaceTime, Zoom, OBS and other video apps.")
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            HStack {
-                Button("Install camera") { installer.activate() }
-                    .keyboardShortcut(.defaultAction)
-                Button("Remove camera") { installer.deactivate() }
-            }
-            Text(installer.status)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Divider()
-            HStack {
-                Button(pipeline.running ? "Stop" : "Start") {
-                    pipeline.running ? pipeline.stop() : pipeline.start()
-                }
-                if pipeline.framesPerSecond > 0 {
-                    Text(String(format: "%.0f frames per second", pipeline.framesPerSecond))
-                        .font(.callout.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-            }
+                .font(.headline)
             Text(pipeline.status)
-                .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            if pipeline.framesPerSecond > 0 {
+                Text(String(format: "%.0f frames per second", pipeline.framesPerSecond))
+                    .font(.callout.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+            if !installer.installed {
+                Text(installer.status)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Install camera") { installer.activate() }
+            }
+            Divider()
+            Toggle("Open at login", isOn: $openAtLogin)
+                .onChange(of: openAtLogin) { _, on in
+                    do {
+                        try on ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister()
+                    } catch {
+                        openAtLogin = SMAppService.mainApp.status == .enabled
+                    }
+                }
+            HStack {
+                Button("Remove camera") { installer.deactivate() }
+                Spacer()
+                Button("Quit") { NSApp.terminate(nil) }
+                    .keyboardShortcut("q")
+            }
         }
-        .padding(20)
+        .padding(16)
     }
 }
 
 /// Installs and removes the camera extension embedded in the app.
 @MainActor
 final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionRequestDelegate {
+    static let shared = ExtensionInstaller()
+
     @Published var status = "Not installed yet."
+    @Published var installed = false
 
     private let identifier = "com.superhighfives.markone.camera"
     private var removing = false
 
     func activate() {
-        status = "Installing…"
+        status = "Installing the camera…"
         removing = false
         let request = OSSystemExtensionRequest.activationRequest(forExtensionWithIdentifier: identifier, queue: .main)
         request.delegate = self
@@ -93,6 +109,7 @@ final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionReq
     func deactivate() {
         status = "Removing…"
         removing = true
+        installed = false
         let request = OSSystemExtensionRequest.deactivationRequest(forExtensionWithIdentifier: identifier, queue: .main)
         request.delegate = self
         OSSystemExtensionManager.shared.submitRequest(request)
@@ -116,7 +133,8 @@ final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionReq
             if result == .willCompleteAfterReboot {
                 status = "Restart your Mac to finish."
             } else {
-                status = removing ? "Removed." : "Installed. Pick “Mark One” as the camera in your video app."
+                status = removing ? "Removed." : "Installed."
+                installed = !removing
             }
         }
     }

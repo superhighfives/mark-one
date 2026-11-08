@@ -10,6 +10,9 @@ import Foundation
 final class CameraSink {
     static let deviceUID = "5B2F6E1C-9A3D-4C8E-B0F1-4D2A7C6E8B10"   // see Extension/Provider.swift
 
+    /// The extension's "used" property: "1" while an app uses the camera.
+    static let inUseSelector = 0x7573_6564
+
     private let device: CMIODeviceID
     private let stream: CMIOStreamID
     private let queue: CMSimpleQueue
@@ -44,6 +47,16 @@ final class CameraSink {
 
     deinit {
         CMIODeviceStopStream(device, stream)
+    }
+
+    /// Whether any app is using the Mark One camera. False if the camera
+    /// extension isn't installed.
+    static func inUse() -> Bool {
+        let devices = objectIDs(of: CMIOObjectID(kCMIOObjectSystemObject), kCMIOHardwarePropertyDevices)
+        guard let device = devices.first(where: { string(of: $0, kCMIODevicePropertyDeviceUID) == deviceUID }) else {
+            return false
+        }
+        return string(of: device, inUseSelector) == "1"
     }
 
     /// Queues one frame, dropping it if the extension hasn't taken the last one.

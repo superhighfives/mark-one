@@ -10,7 +10,7 @@ settings:
   base:
     CODE_SIGN_STYLE: Automatic
     MARKETING_VERSION: "0.1"
-    CURRENT_PROJECT_VERSION: "1"
+    CURRENT_PROJECT_VERSION: "2"
     SWIFT_VERSION: "5.0"
     ENABLE_HARDENED_RUNTIME: YES
 targets:
@@ -25,6 +25,7 @@ targets:
         CODE_SIGN_ENTITLEMENTS: App/MarkOne.entitlements
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Mark One
+        INFOPLIST_KEY_LSUIElement: YES
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.video
         INFOPLIST_KEY_NSHumanReadableCopyright: ""
         INFOPLIST_KEY_NSCameraUsageDescription: Mark One reads your E-M5's video and sends it to the Mark One camera.

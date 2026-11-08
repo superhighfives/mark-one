@@ -17,6 +17,10 @@ let deviceUID = "5B2F6E1C-9A3D-4C8E-B0F1-4D2A7C6E8B10"
 let sourceStreamUID = "5B2F6E1C-9A3D-4C8E-B0F1-4D2A7C6E8B11"
 let sinkStreamUID = "5B2F6E1C-9A3D-4C8E-B0F1-4D2A7C6E8B12"
 
+/// "1" while any app is using the camera, "0" otherwise. Mark One reads it
+/// to start the E-M5 only when it's wanted.
+let inUseProperty = CMIOExtensionProperty(rawValue: "4cc_used_glob_0000")
+
 
 final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
     private(set) var device: CMIOExtensionDevice!
@@ -57,7 +61,11 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
         placeholder = makePlaceholder()
     }
 
-    var availableProperties: Set<CMIOExtensionProperty> { [.deviceTransportType, .deviceModel] }
+    var availableProperties: Set<CMIOExtensionProperty> { [.deviceTransportType, .deviceModel, inUseProperty] }
+
+    private var inUseState: CMIOExtensionPropertyState<AnyObject> {
+        CMIOExtensionPropertyState(value: (queue.sync { sourceClients } > 0 ? "1" : "0") as NSString)
+    }
 
     func deviceProperties(forProperties properties: Set<CMIOExtensionProperty>) throws -> CMIOExtensionDeviceProperties {
         let result = CMIOExtensionDeviceProperties(dictionary: [:])
@@ -66,6 +74,9 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
         }
         if properties.contains(.deviceModel) {
             result.model = "Mark One"
+        }
+        if properties.contains(inUseProperty) {
+            result.setPropertyState(inUseState, forProperty: inUseProperty)
         }
         return result
     }
@@ -76,6 +87,7 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
     func startSource() {
         queue.async { [self] in
             sourceClients += 1
+            if sourceClients == 1 { notifyInUse(true) }
             guard placeholderTimer == nil else { return }
             // Fill in with the placeholder whenever the feed is quiet.
             let timer = DispatchSource.makeTimerSource(queue: queue)
@@ -93,10 +105,16 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
         queue.async { [self] in
             sourceClients = max(0, sourceClients - 1)
             if sourceClients == 0 {
+                notifyInUse(false)
                 placeholderTimer?.cancel()
                 placeholderTimer = nil
             }
         }
+    }
+
+    private func notifyInUse(_ inUse: Bool) {
+        let state = CMIOExtensionPropertyState<AnyObject>(value: (inUse ? "1" : "0") as NSString)
+        device.notifyPropertiesChanged([inUseProperty: state])
     }
 
     private func send(_ sample: CMSampleBuffer) {

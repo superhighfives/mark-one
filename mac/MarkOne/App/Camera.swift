@@ -33,22 +33,29 @@ final class Camera: NSObject, ICDeviceBrowserDelegate, ICCameraDeviceDelegate {
     private let found = DispatchSemaphore(value: 0)
     private let opened = DispatchSemaphore(value: 0)
     private var openError: Error?
-    private var removed = false
+    private let removed = Flag()
     var onDisconnect: (() -> Void)?
 
-    /// Finds the camera and opens a session, waiting up to `timeout` seconds.
-    func connect(timeout: TimeInterval = 10) throws {
+    /// Waits for the camera to appear, for as long as `keepWaiting` returns
+    /// true, then opens a session.
+    func connect(while keepWaiting: () -> Bool) throws {
         DispatchQueue.main.async {
             self.browser.delegate = self
             let mask = ICDeviceTypeMask.camera.rawValue | ICDeviceLocationTypeMask.local.rawValue
             self.browser.browsedDeviceTypeMask = ICDeviceTypeMask(rawValue: mask)!
             self.browser.start()
         }
-        guard found.wait(timeout: .now() + timeout) == .success, let device else { throw CameraError.notFound }
+        while found.wait(timeout: .now() + 0.5) == .timedOut {
+            if !keepWaiting() { throw CameraError.notFound }
+        }
+        guard let device else { throw CameraError.disconnected }
         DispatchQueue.main.async { device.requestOpenSession() }
-        guard opened.wait(timeout: .now() + timeout) == .success else { throw CameraError.timeout }
+        guard opened.wait(timeout: .now() + 10) == .success else { throw CameraError.timeout }
         if let openError { throw CameraError.session(openError) }
     }
+
+    /// False once the camera has been turned off or unplugged.
+    var connected: Bool { !removed.value }
 
     /// Closes the session; `done` runs on the main thread once it's closed
     /// (or after two seconds if the camera doesn't answer).
@@ -86,7 +93,7 @@ final class Camera: NSObject, ICDeviceBrowserDelegate, ICCameraDeviceDelegate {
     /// Sends one PTP command and returns (response parameters, data from the camera).
     @discardableResult
     func send(_ code: UInt16, _ params: [UInt32], data out: Data? = nil, name: String) throws -> ([UInt32], Data) {
-        guard let device else { throw removed ? CameraError.disconnected : CameraError.notFound }
+        guard let device else { throw removed.value ? CameraError.disconnected : CameraError.notFound }
         transaction &+= 1
         var command = Data()
         command.append(le: UInt32(12 + 4 * params.count))
@@ -106,7 +113,7 @@ final class Camera: NSObject, ICDeviceBrowserDelegate, ICCameraDeviceDelegate {
         let answered = done.wait(timeout: .now() + 10) == .success
         // A camera that turns off mid-command answers with an empty
         // response, just before ImageCaptureCore reports it gone.
-        if removed || (answered && failure == nil && response.count < 8) { throw CameraError.disconnected }
+        if removed.value || (answered && failure == nil && response.count < 8) { throw CameraError.disconnected }
         guard answered else { throw CameraError.timeout }
         if failure != nil { throw CameraError.session(failure) }
         // Response container: length, type, code, transaction, parameters.
@@ -148,7 +155,7 @@ final class Camera: NSObject, ICDeviceBrowserDelegate, ICCameraDeviceDelegate {
         if device === self.device {
             device.delegate = nil
             self.device = nil
-            removed = true
+            removed.value = true
             onDisconnect?()
         }
     }
