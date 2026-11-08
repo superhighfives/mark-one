@@ -9,6 +9,7 @@ Set the camera's USB mode to MTP (Custom menu, USB Mode), connect it, then:
   uv run scripts/ptp.py run 0x7e400000 1 2        # call a function
   uv run scripts/ptp.py shoot                     # live view with USB connected
   uv run scripts/ptp.py output evf                # 800x600 live view instead of 568x480
+  uv run scripts/ptp.py trace                     # print what the mode manager logs
 
 `peek`, `poke` and `run` need the usb-tools patch (commands 0x9484-0x9486).
 USB transfers only reach the uncached view of RAM, so addresses in
@@ -297,12 +298,14 @@ def shoot(cam):
     MTP connection uses 0x6005, so point 0x6005 at 0x6004's event list (a
     superset of its own) and then post the event the way the serial console's
     `nfPcCbk 50 1` does. Also applies RUNTIME_PATCHES: movies don't write
-    the card and have no 29-minute limit. A restart undoes all of it.
+    the card and have no 29-minute limit, and lets the power switch turn
+    the camera off. A restart undoes all of it.
     """
     install_helpers(cam)
     apply_runtime_patches(cam)
     write32(cam, 0x7EEF375C, 0x7EEF30EC)    # sub-state 0x6005: event list...
     write32(cam, 0x7EEF3760, 8)             # ...and its length
+    write32(cam, 0x7EEEA8B0, 0x7EDC726A)    # power switch: see NOTES.md
     pc = read32(cam, 0x605F0D3C)            # PC mode object
     call(cam, 0x7EDD55BA, (2, 50, pc, 1))   # notification 50, value 1
     print('requested shooting mode')
@@ -326,6 +329,75 @@ def output(cam, name):
     print(f'output: {name}')
 
 
+# asm/trace.s: records the mode manager's log messages in a ring that a
+# peek can read. TRACE_HOOKS replace the start of its two loggers with
+# jumps to the stub, as {address: (stock bytes, patched bytes)}; each
+# covers whole even addresses because pokes need them.
+TRACE = 0x7EAB0390
+TRACE_CODE = bytes.fromhex(
+    '979200cd2700000098dd349f32008008dc4a9e3200829792cd1200000098dd1f9f32008008dc4b9e3200'
+    'fcdcdc03abbe74f1e54464f1d5f8e11f55e5fcdde003abbef165f01df81104df0000')
+TRACE_COUNT, TRACE_RING, TRACE_SIZE = 0x7EAB03DC, 0x7EAB03E0, 32
+TRACE_HOOKS = {
+    0x7EDDA1E2: ('0c9792cde8008008', '0cdcad61cdff8008'),   # 0x7edda1e3: jmp 0x7eab0390
+    0x7EDDA1F8: ('829792cdd2008008', 'dcad61cdff008008'),   # 0x7edda1f8: jmp 0x7eab03a5
+}
+CURRENT_REQUEST = 0x602B4A90        # the mode manager's last mode change request
+FIRMWARE = range(0x7E421020, 0x7F200000)
+
+
+def trace(cam, seconds):
+    """Print the mode manager's log messages as they happen.
+
+    Shows every state handler, mode change request, refusal and incoming
+    system event (with its number), which tells what the camera does with
+    an event such as the power switch. Stays until the camera restarts.
+    """
+    install_helpers(cam)
+    if cam.transact(PEEK, (uncached(TRACE), len(TRACE_CODE)))[2] != TRACE_CODE:
+        poke(cam, TRACE_COUNT, bytes(4), quiet=True)
+        poke(cam, TRACE, TRACE_CODE, quiet=True)
+    for address, (stock, patched) in TRACE_HOOKS.items():
+        current = cam.transact(PEEK, (uncached(address), len(stock) // 2))[2].hex()
+        if current == stock:
+            poke(cam, address, bytes.fromhex(patched), quiet=True)
+        elif current != patched:
+            sys.exit(f'unexpected code at {address:#010x}: {current}')
+    names = {}
+
+    def name(address):
+        if address not in FIRMWARE:
+            return f'{address:#010x}'
+        if address not in names:
+            raw = cam.transact(PEEK, (uncached(address & ~1), 80))[2][address & 1:]
+            names[address] = raw.split(b'\0')[0].decode('latin-1')
+        return names[address]
+
+    def count():
+        return struct.unpack('<I', cam.transact(PEEK, (uncached(TRACE_COUNT), 4))[2])[0]
+
+    seen = count()
+    request = read32(cam, CURRENT_REQUEST)
+    print(f'tracing; mode change request {request}')
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        now = count()
+        if now - seen > TRACE_SIZE:
+            print(f'... {now - seen - TRACE_SIZE} messages lost')
+            seen = now - TRACE_SIZE
+        if now != seen:
+            ring = struct.unpack(f'<{2 * TRACE_SIZE}I', cam.transact(PEEK, (uncached(TRACE_RING), 8 * TRACE_SIZE))[2])
+            for k in range(seen, now):
+                message, number = ring[2 * (k % TRACE_SIZE)], ring[2 * (k % TRACE_SIZE) + 1]
+                print(f'{time.strftime("%H:%M:%S")}  {name(message)}' + (f' {number:#x}' if number else ''))
+            seen = now
+        latest = read32(cam, CURRENT_REQUEST)
+        if latest != request:
+            print(f'mode change request {request} -> {latest}')
+            request = latest
+        time.sleep(0.05)
+
+
 def run(cam, function, args):
     code, params, _ = cam.transact(RUN, (function, *args), timeout=20000)
     if code != OK:
@@ -347,6 +419,8 @@ def main():
     sub.add_parser('shoot', help='switch to shooting mode with USB connected')
     out = sub.add_parser('output', help='send live view to the rear screen or viewfinder')
     out.add_argument('name', choices=sorted(OUTPUTS))
+    tr = sub.add_parser('trace', help="print the mode manager's log messages")
+    tr.add_argument('seconds', type=float, nargs='?', default=120)
     ru = sub.add_parser('run')
     ru.add_argument('function', type=lambda s: int(s, 0))
     ru.add_argument('args', nargs='*', type=lambda s: int(s, 0), help='d0, d1, a0, a1')
@@ -361,6 +435,8 @@ def main():
             peek(cam, args.address, args.length, args.out)
         elif args.cmd == 'shoot':
             shoot(cam)
+        elif args.cmd == 'trace':
+            trace(cam, args.seconds)
         elif args.cmd == 'output':
             output(cam, args.name)
         elif args.cmd == 'poke':

@@ -13,7 +13,7 @@ Mark One works end to end. Plug in the camera (USB Mode set to MTP) and click St
 5. decodes it with libavcodec
 6. publishes it as the "Mark One" camera through a Core Media IO camera extension, for FaceTime, Zoom, OBS, QuickTime and so on
 
-Stop, or quitting the app, stops the recording. Video reaches the Mac about 200 ms after it happens.
+Stop, or quitting the app, stops the recording. The camera's power switch turns it off as usual, and Mark One says so. Video reaches the Mac about 200 ms after it happens.
 
 All of this rests on one firmware change, `usb-tools`, which adds USB commands that read and write camera memory and run code. Everything else Mark One does lives in the camera's memory only, and switching the camera off undoes it. Flashing modified firmware can brick a camera, so read the risks in `NOTES.md` first.
 
@@ -23,9 +23,8 @@ All of this rests on one firmware change, `usb-tools`, which adds USB commands t
 
 The goal is software that feels like magic: plug in the camera, open a video call, and it works, with nothing to press on the camera or in Mark One.
 
-- **The power switch.** Once the camera is in webcam mode, the power switch does nothing: it won't turn the camera off, or back on. Find out why (the camera probably ignores the switch while USB is in a PC mode) and make switching off leave webcam mode cleanly.
-- **Start on demand.** The camera extension can tell when an app starts and stops using the Mark One camera. Mark One should start the camera then, and stop it when the last app lets go. That probably means a menu bar app, or a small helper that launches at login, instead of a window with a Start button.
-- **Webcam mode in the firmware.** Today Mark One rewrites camera memory every time it starts. A firmware build with webcam mode built in would be faster and sturdier: it would enter webcam mode by itself when Mark One connects, skip card writes and the time limit only in that mode, and handle the power switch properly.
+- **Start on demand.** The camera extension can tell when an app starts and stops using the Mark One camera. Mark One should start the camera then, and stop it when the last app lets go. It should also notice when the camera is switched back on or plugged in, and set it up again. That probably means a menu bar app, or a small helper that launches at login, instead of a window with a Start button.
+- **Webcam mode in the firmware.** Today Mark One rewrites camera memory every time it starts. A firmware build with webcam mode built in would be faster and sturdier: it would enter webcam mode by itself when Mark One connects, and skip card writes and the time limit only in that mode.
 - **Install the firmware from Mark One.** Olympus's own updater installs firmware over USB, so the camera has a USB update path. Work out its protocol, then let Mark One check the camera's firmware and offer to install the webcam firmware, with no SD card. Olympus's firmware can't be shipped in the app, so Mark One would download the stock file from Olympus (as `scripts/setup.sh` does), patch it on the Mac, and send it to the camera. This needs care: a failed flash can brick the camera, and App Review will want to see a clear explanation.
 - **Power.** The E-M5 doesn't run from USB power, so long calls drain the battery. Look at a dummy battery with a power adapter, and show the battery level in Mark One.
 - **Picture controls.** Exposure, white balance, picture mode and focus from Mark One, through the same camera API the firmware's own menus use.

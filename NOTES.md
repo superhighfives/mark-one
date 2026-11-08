@@ -11,10 +11,6 @@ targets firmware 2.3, so update the camera to 2.3 before flashing anything.
   at 20 Mbps), when the QuickTime writer may split or stop the file.
 - Card space: after a long streamed recording, check that the card's
   free space didn't shrink.
-- Power switch: in webcam mode the switch neither turns the camera off
-  nor back on. Check whether stock PC mode (MTP connected, no `shoot`)
-  ignores it too, then trace what reads the switch (key "Powr", 0x000c,
-  and "Lock", 0x000e, in the key table) and where PC mode drops it.
 
 ## Stock behavior (dead ends without firmware changes)
 
@@ -488,6 +484,41 @@ $T/mn10300-elf-ld -Ttext=0x7eab0380 --defsym key_post=0x7e751c1b \
   -e key -o asm/key.elf asm/key.o
 $T/mn10300-elf-objcopy -O binary asm/key.elf asm/key.bin
 ```
+
+## Power switch in webcam mode (fixed)
+
+In webcam mode the power switch did nothing. It never turned the camera
+off, so sliding it back on did nothing either. Normal PC mode (MTP, no
+`shoot`) turns off fine.
+
+`ptp.py trace` shows why. It loads `asm/trace.s`, which hooks the mode
+manager's two loggers (0x7edda1e3 and 0x7edda1f8, both reached by
+jumps that fit in one cache line) and records each message and number in
+a ring the computer can peek. The mode manager logs every state handler,
+mode change request and refusal, so the trace reads like a story.
+
+The switch reaches the mode manager in both modes, through
+`notifySystemEventCallback` (0x7edd910c), which turns system event 0x27
+into OLY_POWER_SW_OFF (0x01000049; 0x26 is OLY_POWER_SW_ON, 0x01000048).
+The event loop (0x7edd904b) then asks `CheckEvent` (0x7edc720c) whether
+the event is a mode change. Its table at 0x7eeea834 pairs
+event - 0x00ffffff with a handler. Three events, 0x01000000, 0x01050001
+(USB disconnected) and 0x01000049, use 0x7edc725f, which answers yes when
+the app changer's state (+20) is 3. That state is the PC camera mode,
+which only `shoot` reaches. A yes sends the event to `applicationChanger`
+(0x7edc7281) instead of the current app. The app changer ends the app on
+USB disconnect but has no case for the power switch, so it drops it.
+
+In PC mode, and in normal shooting, the answer is no, the app's own event
+list runs ("startPowerOff" in PC mode, 0x7edce234 in Shooting), and the
+app requests mode change 6, power off.
+
+The fix points the power switch's entry (0x7eeea8b0) at 0x7edc726a, the
+handler that answers no. Mark One and `ptp.py shoot` write it through
+the cache. Only state 3 behaves differently, so nothing else changes.
+With it, the switch turns the camera off from webcam mode through the
+usual path (Misc app, `executePowerOffSubAppStateMisc`), even while
+recording, and the camera starts up normally when switched back on.
 
 ## Recording time limit (patch ready, untested)
 

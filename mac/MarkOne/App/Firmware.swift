@@ -49,10 +49,19 @@ enum Firmware {
         // the "start camera control" events.
         try camera.run(write32, 0x7EEF_30EC, 0, 0x7EEF_375C)
         try camera.run(write32, 8, 0, 0x7EEF_3760)
+        // Let the power switch turn the camera off: send its event to the
+        // shooting app, as in normal shooting, instead of the app changer,
+        // which drops it in this mode.
+        try camera.run(write32, powerSwitchCheck, 0, powerSwitchEntry)
         let pcMode = try camera.run(read32, 0, 0, 0x605F_0D3C).0
         try camera.run(0x7EDD_55BA, 2, 50, pcMode, 1)      // notification 50: camera control
         try camera.poke(keyStub, keyCode)
     }
+
+    /// The power switch's entry in the mode manager's event check table
+    /// (0x7eeea834), and the stock handler that answers "not an app change".
+    static let powerSwitchEntry = UInt32(0x7EEE_A8B0)
+    static let powerSwitchCheck = UInt32(0x7EDC_726A)
 
     /// asm/key.s: puts a key event on the camera's key queue, as a button
     /// press does. Placed over console-only code, after asm/post.s.
