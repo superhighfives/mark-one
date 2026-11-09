@@ -286,11 +286,15 @@ final class Pipeline: ObservableObject {
                     throw CameraError.disconnected
                 }
                 report("Setting up the camera…")
+                // Open the camera extension first: setting up locks the
+                // camera's buttons and dial, and nothing unlocks them if
+                // the extension turns out to be missing.
+                let sink = try CameraSink()
                 try Firmware.prepare(camera)
                 Thread.sleep(forTimeInterval: 1)
                 let saved = try Firmware.applyPresets(camera)
                 defer { if camera.connected { try? Firmware.releasePresets(camera, saved) } }
-                try serve(camera)
+                try serve(camera, to: sink)
             } catch PipelineInterrupt.install {
                 // Recording has stopped and the camera's settings are back.
                 // Installing from here, in the shooting mode Mark One set
@@ -433,8 +437,7 @@ final class Pipeline: ObservableObject {
     }
 
     /// Records while an app uses the Mark One camera, until the camera goes away.
-    private nonisolated func serve(_ camera: Camera) throws {
-        let sink = try CameraSink()
+    private nonisolated func serve(_ camera: Camera, to sink: CameraSink) throws {
         var applied = Applied()
         while !stopRequested.value {
             report("Ready. Pick “Mark One” as the camera in a video app.", .ready)
