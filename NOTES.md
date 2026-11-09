@@ -697,6 +697,8 @@ isn't needed for it. The computer can tell Webcam from MTP by reading
   `E0972300.BIN` and renamed to `E0971000.BIN`, so the file name isn't
   what it checks. The updater reads the version word at file offset 0x10
   (the main block head) and compares it with the installed version.
+  Equal versions pass, so never build above 2.3: a camera on 2.4 would
+  refuse stock 2.3 and have no way back.
   Same-version images install fine, so build at 2.3 and use the stock 2.3
   image on the card to go back.
 
