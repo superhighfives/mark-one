@@ -57,7 +57,27 @@ enum Firmware {
         try camera.run(0x7EDD_55BA, 2, 50, pcMode, 1)      // notification 50: camera control
         try camera.poke(keyStub, keyCode)
         try camera.poke(buttonStub, buttonCode)
+        // Unplugging mid-call: unlock the camera and stop recording (asm/unplug.s).
+        try camera.poke(unplugStub, unplugCode)
+        let callback = try camera.peek(callbackHook, callbackStock.count)
+        if callbackStock.matches(callback) {
+            try camera.poke(callbackHook, callbackJump)
+        } else if callback != callbackJump {
+            throw FirmwareError.unexpected("system event callback")
+        }
     }
+
+    /// asm/unplug.s: when the USB cable comes out, does what Mark One does
+    /// when it lets go (unlock the buttons, free the mode dial, stop
+    /// recording), which nothing else would. Placed over console-only code.
+    static let unplugStub = UInt32(0x7EAA_F600)
+    static let unplugCode = Data(hex: "a509c952f8fef0430047044208460cfca4bced5a60fce00000fffffc81bced5a60fcfff9bb0100fca4f41f2b60a010c91afccc09120002fcff490d0000fccc09120102fcff3d0d00005c005d045808590cf8fe10cff0f8fee4dcb89a3200")
+    /// The system event callback (0x7edd910c) starts with a jump to the stub
+    /// instead of `movm [d2,d3,a2,a3],(sp); add -28,sp`, which the stub runs.
+    /// The next byte comes along unchanged, since writes have to be even.
+    static let callbackHook = UInt32(0x7EDD_910C)
+    static let callbackStock = StockCode(count: 6, sha256: "3e8fea91360178799dce3b020de404718accca5e25d09568f59ca80f34e8f4c1")
+    static let callbackJump = Data(hex: "dcf464cdff93")
 
     /// The power switch's entry in the mode manager's event check table
     /// (0x7eeea834), and the stock handler that answers "not an app change".

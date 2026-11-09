@@ -18,6 +18,7 @@ camera is likely to be stuck afterwards; a battery pull clears it.
 
   uv run scripts/unplug.py                 # find the context, then post
   uv run scripts/unplug.py --find-only     # just search for the context
+  uv run scripts/unplug.py --context 0x60010e44 --fix   # with asm/unplug.s
 """
 import argparse
 import struct
@@ -40,6 +41,12 @@ LOCKED_KEYS = [48, 49, 52, 53, 56, 57, 60, 61, 64, 65, 68, 69, 72, 73, 76, 77,
 KEY_STUB, REC = 0x7EAB0380, 0x1209
 SEQUENCE = 0x602B1FF4                   # 0x10 while a movie records
 CONNECTION = 0x605F0D14
+# asm/unplug.s, and the jump to it that replaces the system event callback's
+# first two instructions (with the next byte, unchanged, to keep the poke even)
+UNPLUG_STUB = 0x7EAAF600
+UNPLUG_CODE = bytes.fromhex('a509c952f8fef0430047044208460cfca4bced5a60fce00000fffffc81bced5a60fcfff9bb0100fca4f41f2b60a010c91afccc09120002fcff490d0000fccc09120102fcff3d0d00005c005d045808590cf8fe10cff0f8fee4dcb89a3200')
+CALLBACK_HOOK = 0x7EDD910C
+CALLBACK_STOCK, CALLBACK_JUMP = bytes.fromhex('cff0f8fee493'), bytes.fromhex('dcf464cdff93')
 
 
 def find_context(cam):
@@ -74,13 +81,17 @@ def set_up(cam, record):
         ptp.write32(cam, KEY_LIST + 4 * index, key)
     ptp.call(cam, CANCEL_KEYS, (len(LOCKED_KEYS), 0, 0, KEY_LIST))
     if record:
-        ptp.call(cam, KEY_STUB, (0x02000000 | REC, 0, 0, 0))
-        time.sleep(0.5)
-        ptp.call(cam, KEY_STUB, (0x02010000 | REC, 0, 0, 0))
-        for _ in range(30):
+        # The first press sometimes comes before live view is up; try again.
+        for _ in range(3):
+            ptp.call(cam, KEY_STUB, (0x02000000 | REC, 0, 0, 0))
+            time.sleep(0.5)
+            ptp.call(cam, KEY_STUB, (0x02010000 | REC, 0, 0, 0))
+            for _ in range(40):
+                if ptp.read32(cam, SEQUENCE) == 0x10:
+                    break
+                time.sleep(0.1)
             if ptp.read32(cam, SEQUENCE) == 0x10:
                 break
-            time.sleep(0.1)
     state(cam, 'set up')
 
 
@@ -96,6 +107,7 @@ def main():
     p.add_argument('--context', type=lambda s: int(s, 0), help='use this context instead of searching')
     p.add_argument('--idle', action='store_true', help="don't start a recording first")
     p.add_argument('--seconds', type=float, default=15, help='how long to print the log afterwards')
+    p.add_argument('--fix', action='store_true', help='install asm/unplug.s on the unplug path first')
     args = p.parse_args()
 
     cam = ptp.Camera()
@@ -112,6 +124,13 @@ def main():
         # first thing to confirm on the camera, so show it and ask.
         sys.exit('Check the words around the hit, then run again with --context.')
     set_up(cam, record=not args.idle)
+    if args.fix:
+        ptp.poke(cam, UNPLUG_STUB, UNPLUG_CODE, quiet=True)
+        current = cam.transact(ptp.PEEK, (ptp.uncached(CALLBACK_HOOK), len(CALLBACK_STOCK)))[2]
+        if current not in (CALLBACK_STOCK, CALLBACK_JUMP):
+            sys.exit(f'unexpected code at {CALLBACK_HOOK:#010x}: {current.hex()}')
+        ptp.poke(cam, CALLBACK_HOOK, CALLBACK_JUMP, quiet=True)
+        print(f'system event callback now starts with a jump to {UNPLUG_STUB:#010x}')
 
     since = ptp.install_trace(cam)
     print(f'posting unplug: call {UNPLUG_CALLBACK:#010x} with a0 = {context:#010x}, d1 = {UNPLUG_EVENT}')

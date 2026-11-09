@@ -742,7 +742,35 @@ for n in prompt ok select mode; do
 done
 ```
 
-## Unplugging in webcam mode (open, 2026-11-08)
+## Unplugging in webcam mode (fixed, 2026-11-09)
+
+Found with `scripts/unplug.py`, which posts the unplug event (system
+event 9) to the system event callback with the cable still in. Its
+context is 0x60010e44 (vtable 0x7ef013f4, beside the event table at
+0x7ef013fc); `--find-only` finds it next to the callback in RAM.
+
+- Not recording: the event goes through CheckEvent to
+  applicationChanger (event 0x8000005, info 0x6000002), SEND_END_APP
+  ends the PC app's sub-app and mode change 6 follows. With the cable in,
+  the camera goes back to its USB menu, but Mark One's key cancel list is
+  still in place there, so the arrows and OK do nothing (the control dial
+  still moves the selection).
+- Recording: the shooting app drops the event. Nothing else happens, and
+  stopping the recording afterwards doesn't bring it back. So a real
+  unplug mid-call leaves the camera recording, with the buttons locked and
+  the mode dial forced to movie: the stuck camera.
+
+Fix (`asm/unplug.s`, loaded by Mark One's `prepare` and by
+`scripts/unplug.py --fix`): the callback's first two instructions become a
+jump to a stub at 0x7eaaf600. For event 9 it clears the dial state in the
+override, calls resetKeyEvent and, if a movie is recording, presses and
+releases REC through the key stub; then it runs the replaced instructions
+and carries on at 0x7edd9111. Posted mid-recording with the fix, the
+camera stopped recording, dropped off USB and came back with its buttons
+and dial working. Still to check: a real unplug mid-call, and whether a
+camera unplugged this way then connects normally.
+
+### Before the fix (2026-11-08)
 
 Unplugging the cable while Mark One uses the camera leaves it stuck: it
 keeps showing movie mode, the mode dial and buttons do nothing, and only
@@ -1089,9 +1117,8 @@ and restores over USB, and 1080p video from the movie recorder. HDMI
 through a capture card is no longer the plan; the hdmi-liveview patch
 stays here for reference, untested.
 
-1. Unplugging in webcam mode leaves the camera stuck. Trace it with the
-   unplug event posted over USB, then fix it with a stub on the unplug
-   path. See "Unplugging in webcam mode".
+1. Unplugging in webcam mode: fixed in Mark One (see "Unplugging in
+   webcam mode"). Check a real unplug mid-call.
 2. Record past 30 minutes to confirm the time limit change holds, and
    that nothing is written to the card. See "Recording time limit".
 3. Done (2026-11-09): a USB install works on a camera Mark One has set
