@@ -742,6 +742,66 @@ for n in prompt ok select mode; do
 done
 ```
 
+## Unplugging in webcam mode (open, 2026-11-08)
+
+Unplugging the cable while Mark One uses the camera leaves it stuck: it
+keeps showing movie mode, the mode dial and buttons do nothing, and only
+a battery pull recovers it. Plugging a stuck camera back in freezes it
+(black screen with the shooting info on it, no USB). Mark One's own
+cleanup (stop recording, `releasePresets`) can't run once USB is gone.
+Mark One now keeps the camera's own settings on the Mac until they're
+back on it (`Firmware.Saved.pending`), so they survive this.
+
+What the code shows (read in main.s, not yet traced on the camera):
+
+- Unplugging is system event 9, which `notifySystemEventCallback`
+  (0x7edd910c, table at 0x7ef013fc) turns into 0x01050001 for the mode
+  manager. `CheckEvent`'s entry for it, at 0x7eeea89c, is
+  {0x00050002, 0x7edc725f}, the same "yes while the app changer's state
+  is 3" handler the power switch had. State 3 is the PC camera mode only
+  `shoot` reaches, so in webcam mode the event goes to
+  `applicationChanger` (0x7edc7281). It rewrites it to PC_RETURN
+  (0x08000007) and sends MNG_END_CAM to the camera app, which has to end
+  the shooting sub-app before CHANGE_APP restarts the PC app. That
+  hand-off seems never to finish while a movie records. Stock never
+  reaches state 3 here, so this path is new.
+- In stock PC mode (Storage or MTP, no `shoot`) unplugging turns the
+  camera off: the PC app's common list maps 0x01050001 to 0x7edd5900
+  ("UsbDisconnectSubAppStatePc"), which calls "startPowerOff".
+- The dial override (0x605aedbc) and the key cancel list (0x605aabd0)
+  are plain RAM, so they stay set however the hand-off ends.
+
+Tried: the power switch's fix applied to unplugging, writing 0x7edc726a
+("not an app change") to 0x7eeea8a0 so the event goes to the shooting
+app's handler (0x7edce234: 0x7edcc367, then mode change 6, power off).
+The recording stopped but the camera didn't turn off; it stayed in movie
+mode with the dial dead. Clearing the low half of 0x605aedbc and calling
+resetKeyEvent over USB afterwards didn't bring it back either, so
+something else is stuck, perhaps mode change 6 being refused. Mark One
+doesn't make this change.
+
+Next:
+
+1. Trace it without pulling the cable. Load `ptp.py trace`, set the
+   camera up as Mark One does, then post the unplug event with the cable
+   still in: call 0x7edd910c with d1 = 9 and a0 = the mode manager object
+   it was registered with (fn_7edd8fd1, called from 0x7edc71ff with
+   `(52,a0)` of the app changer). Read the ring afterwards. A real unplug
+   leaves nothing to read, since the camera drops off USB and a battery
+   pull clears RAM.
+2. From the trace, find where it stops: the shooting sub-app's end, mode
+   change 6 refused (the release permission flag at 0x602b1f20 is 1 in PC
+   shooting; see "Objects and settings"), or something else.
+3. Likely fix: a small stub on the unplug path (in `prepare`, like the key
+   and button stubs) that clears the dial override, resets the cancelled
+   keys and then lets the camera turn off, the way stock PC mode does.
+   A draft that does the first two and answers "no" lives with the
+   session's scratch files; the free space at 0x7eaaf600-0x7eaaf680
+   (console usage text) is clear of what Mark One uses. `ptp.py trace`'s
+   ring (0x7eab03e0, 256 bytes) overwrites the firmup stub at 0x7eab0400
+   and the revision marker at 0x7eab0414, so don't trust identify after
+   tracing.
+
 ## Installing firmware over USB (recorded, 2026-11-08)
 
 Goal: Mark One installs the webcam firmware itself, with no SD card.
