@@ -104,13 +104,19 @@ final class Camera: NSObject, ICDeviceBrowserDelegate, ICCameraDeviceDelegate {
 
         let done = DispatchSemaphore(value: 0)
         var received = Data(), response = Data(), failure: Error?
-        device.requestSendPTPCommand(command, outData: out) { data, responseData, error in
-            received = data
-            response = responseData
-            failure = error
-            done.signal()
+        // ImageCaptureCore leaves autoreleased objects behind for each
+        // command, each holding a Mach port. Mark One's threads never drain
+        // a pool on their own, so without this one, streaming used up the
+        // process's ports in about 8 minutes and crashed.
+        let answered = autoreleasepool {
+            device.requestSendPTPCommand(command, outData: out) { data, responseData, error in
+                received = data
+                response = responseData
+                failure = error
+                done.signal()
+            }
+            return done.wait(timeout: .now() + 10) == .success
         }
-        let answered = done.wait(timeout: .now() + 10) == .success
         // A camera that turns off mid-command answers with an empty
         // response, just before ImageCaptureCore reports it gone.
         if removed.value || (answered && failure == nil && response.count < 8) { throw CameraError.disconnected }
