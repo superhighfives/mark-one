@@ -554,8 +554,29 @@ seconds of "0".
   recording, though the camera shows no value on screen), AF target
   0x79 (1 to 35, by columns on the 7x5 grid: 18 is the center, 31 the
   top right), movie AF mode 0x1b2 (0 single, 1 continuous, 2 manual),
-  picture mode 0x136, USB mode 0x76 (0xff is Auto), sleep 0x2f, auto
-  power off 0xb2, backlit LCD 0xfe.
+  USB mode 0x76 (0xff is Auto), sleep 0x2f, auto power off 0xb2,
+  backlit LCD 0xfe. 0x136 has the first six picture mode values but
+  isn't the picture mode.
+- More setting IDs, found by reading every setting before and after a
+  change on the camera (2026-11-08):
+  - White balance 0x0b: Auto 0, Sunny 6, Shade 8, Cloudy 7, Incandescent 1,
+    Fluorescent 3, Underwater 18, Flash 17, One-touch 13 and 14, Custom 9.
+  - Picture mode 0xac: i-Enhance 7, Vivid 0, Natural 1, Muted 2, Portrait 5,
+    Monotone 3, Custom 6, e-Portrait 8, then the art filters 9-18.
+  - Face priority 0x172: off 0, faces 1, then the three eye options 2-4.
+  - Movie quality 0x43: Full HD Fine 0, Full HD Normal 1, HD Fine 2,
+    HD Normal 3, AVI 4 and 5. The camera reads it when a recording starts.
+  White balance, picture mode and face priority take effect at once in
+  shooting mode.
+- Every setting has a 20-byte descriptor: {u16 id, u16 flags, value
+  pointer, pointer to the allowed values, u16 count × 64, ...}. The
+  descriptors hang off a hash table of 128 buckets at 0x605ca034 (nodes
+  {descriptor, next}). The allowed values come in the order the camera's
+  menu lists them, which is how the names above were matched. Read values
+  through getSetting and the read32 helper. Peeking the out word misses
+  writes still in the cache.
+- Battery: the standard PTP property 0x5001 (uint8, 1-100), which the
+  camera lists in its device info.
 - The camera reads the movie AF mode when a recording starts. Changing
   it mid-recording does nothing until the next one, so Mark One restarts
   the recording when the setting changes.
@@ -720,6 +741,70 @@ for n in prompt ok select mode; do
   $T/mn10300-elf-objcopy -O binary asm/webcam/$n.elf asm/webcam/$n.bin
 done
 ```
+
+## Unplugging in webcam mode (open, 2026-11-08)
+
+Unplugging the cable while Mark One uses the camera leaves it stuck: it
+keeps showing movie mode, the mode dial and buttons do nothing, and only
+a battery pull recovers it. Plugging a stuck camera back in freezes it
+(black screen with the shooting info on it, no USB). Mark One's own
+cleanup (stop recording, `releasePresets`) can't run once USB is gone.
+Mark One now keeps the camera's own settings on the Mac until they're
+back on it (`Firmware.Saved.pending`), so they survive this.
+
+What the code shows (read in main.s, not yet traced on the camera):
+
+- Unplugging is system event 9, which `notifySystemEventCallback`
+  (0x7edd910c, table at 0x7ef013fc) turns into 0x01050001 for the mode
+  manager. `CheckEvent`'s entry for it, at 0x7eeea89c, is
+  {0x00050002, 0x7edc725f}, the same "yes while the app changer's state
+  is 3" handler the power switch had. State 3 is the PC camera mode only
+  `shoot` reaches, so in webcam mode the event goes to
+  `applicationChanger` (0x7edc7281). It rewrites it to PC_RETURN
+  (0x08000007) and sends MNG_END_CAM to the camera app, which has to end
+  the shooting sub-app before CHANGE_APP restarts the PC app. That
+  hand-off seems never to finish while a movie records. Stock never
+  reaches state 3 here, so this path is new.
+- In stock PC mode (Storage or MTP, no `shoot`) unplugging turns the
+  camera off: the PC app's common list maps 0x01050001 to 0x7edd5900
+  ("UsbDisconnectSubAppStatePc"), which calls "startPowerOff".
+- The dial override (0x605aedbc) and the key cancel list (0x605aabd0)
+  are plain RAM, so they stay set however the hand-off ends.
+
+Tried: the power switch's fix applied to unplugging, writing 0x7edc726a
+("not an app change") to 0x7eeea8a0 so the event goes to the shooting
+app's handler (0x7edce234: 0x7edcc367, then mode change 6, power off).
+The recording stopped but the camera didn't turn off; it stayed in movie
+mode with the dial dead. Clearing the low half of 0x605aedbc and calling
+resetKeyEvent over USB afterwards didn't bring it back either, so
+something else is stuck, perhaps mode change 6 being refused. Mark One
+doesn't make this change.
+
+Next:
+
+1. Trace it without pulling the cable. Load `ptp.py trace`, set the
+   camera up as Mark One does, then post the unplug event with the cable
+   still in: call 0x7edd910c with d1 = 9 and a0 = the mode manager object
+   it was registered with (fn_7edd8fd1, called from 0x7edc71ff with
+   `(52,a0)` of the app changer). Read the ring afterwards. A real unplug
+   leaves nothing to read, since the camera drops off USB and a battery
+   pull clears RAM.
+2. From the trace, find where it stops: the shooting sub-app's end, mode
+   change 6 refused (the release permission flag at 0x602b1f20 is 1 in PC
+   shooting; see "Objects and settings"), or something else.
+3. Likely fix: a small stub on the unplug path (in `prepare`, like the key
+   and button stubs) that clears the dial override, resets the cancelled
+   keys and then lets the camera turn off, the way stock PC mode does.
+   A draft that does the first two and answers "no", for 0x7eaaf600
+   (free console usage text up to 0x7eaaf680, clear of what Mark One
+   uses), linked with `--defsym reset_keys=0x7eacb21a --defsym
+   answer_no=0x7edc726a`:
+   `mov (20,a0),d0; cmp 3,d0; bne done; mov a0,a2; add -8,sp;
+   mov (0x605aedbc),d0; and 0xffff0000,d0; mov d0,(0x605aedbc);
+   calls reset_keys; add 8,sp; mov a2,a0; done: jmp answer_no`. `ptp.py trace`'s
+   ring (0x7eab03e0, 256 bytes) overwrites the firmup stub at 0x7eab0400
+   and the revision marker at 0x7eab0414, so don't trust identify after
+   tracing.
 
 ## Installing firmware over USB (recorded, 2026-11-08)
 

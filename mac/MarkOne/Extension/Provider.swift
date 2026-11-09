@@ -21,6 +21,10 @@ let sinkStreamUID = "5B2F6E1C-9A3D-4C8E-B0F1-4D2A7C6E8B12"
 /// to start the E-M5 only when it's wanted.
 let inUseProperty = CMIOExtensionProperty(rawValue: "4cc_used_glob_0000")
 
+/// The process ID of the app that last started using the camera, or ""
+/// while none is. Mark One shows its name in the panel.
+let clientProperty = CMIOExtensionProperty(rawValue: "4cc_clnt_glob_0000")
+
 
 final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
     private(set) var device: CMIOExtensionDevice!
@@ -31,6 +35,10 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
     private var placeholderTimer: DispatchSourceTimer?
     private var placeholder: CMSampleBuffer?
     private var sourceClients = 0
+    /// The processes that started the source stream, latest last. stopStream
+    /// doesn't say which one stopped, so this empties when they all have, or
+    /// as each disconnects from the provider.
+    private var clientPIDs: [pid_t] = []
     private var sinkClient: CMIOExtensionClient?
     private var lastSinkFrame = Date.distantPast
 
@@ -61,10 +69,17 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
         placeholder = makePlaceholder()
     }
 
-    var availableProperties: Set<CMIOExtensionProperty> { [.deviceTransportType, .deviceModel, inUseProperty] }
+    var availableProperties: Set<CMIOExtensionProperty> {
+        [.deviceTransportType, .deviceModel, inUseProperty, clientProperty]
+    }
 
     private var inUseState: CMIOExtensionPropertyState<AnyObject> {
         CMIOExtensionPropertyState(value: (queue.sync { sourceClients } > 0 ? "1" : "0") as NSString)
+    }
+
+    /// Call on `queue`.
+    private var clientState: CMIOExtensionPropertyState<AnyObject> {
+        CMIOExtensionPropertyState(value: (clientPIDs.last.map { "\($0)" } ?? "") as NSString)
     }
 
     func deviceProperties(forProperties properties: Set<CMIOExtensionProperty>) throws -> CMIOExtensionDeviceProperties {
@@ -78,16 +93,24 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
         if properties.contains(inUseProperty) {
             result.setPropertyState(inUseState, forProperty: inUseProperty)
         }
+        if properties.contains(clientProperty) {
+            result.setPropertyState(queue.sync { clientState }, forProperty: clientProperty)
+        }
         return result
     }
 
     func setDeviceProperties(_ deviceProperties: CMIOExtensionDeviceProperties) throws {}
 
 
-    func startSource() {
+    func startSource(pid: pid_t?) {
         queue.async { [self] in
             sourceClients += 1
             if sourceClients == 1 { notifyInUse(true) }
+            if let pid {
+                clientPIDs.removeAll { $0 == pid }
+                clientPIDs.append(pid)
+                notifyClient()
+            }
             guard placeholderTimer == nil else { return }
             // Fill in with the placeholder whenever the feed is quiet.
             let timer = DispatchSource.makeTimerSource(queue: queue)
@@ -106,6 +129,8 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
             sourceClients = max(0, sourceClients - 1)
             if sourceClients == 0 {
                 notifyInUse(false)
+                clientPIDs = []
+                notifyClient()
                 placeholderTimer?.cancel()
                 placeholderTimer = nil
             }
@@ -115,6 +140,19 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
     private func notifyInUse(_ inUse: Bool) {
         let state = CMIOExtensionPropertyState<AnyObject>(value: (inUse ? "1" : "0") as NSString)
         device.notifyPropertiesChanged([inUseProperty: state])
+    }
+
+    /// Forgets a process that has gone away.
+    func forget(pid: pid_t) {
+        queue.async { [self] in
+            guard clientPIDs.contains(pid) else { return }
+            clientPIDs.removeAll { $0 == pid }
+            notifyClient()
+        }
+    }
+
+    private func notifyClient() {
+        device.notifyPropertiesChanged([clientProperty: clientState])
     }
 
     private func send(_ sample: CMSampleBuffer) {
@@ -211,9 +249,14 @@ final class SourceStream: NSObject, CMIOExtensionStreamSource {
 
     func setStreamProperties(_ streamProperties: CMIOExtensionStreamProperties) throws {}
 
-    func authorizedToStartStream(for client: CMIOExtensionClient) -> Bool { true }
+    private var pid: pid_t?
 
-    func startStream() throws { device.startSource() }
+    func authorizedToStartStream(for client: CMIOExtensionClient) -> Bool {
+        pid = client.pid
+        return true
+    }
+
+    func startStream() throws { device.startSource(pid: pid) }
 
     func stopStream() throws { device.stopSource() }
 }
@@ -282,7 +325,9 @@ final class ProviderSource: NSObject, CMIOExtensionProviderSource {
 
     func connect(to client: CMIOExtensionClient) throws {}
 
-    func disconnect(from client: CMIOExtensionClient) {}
+    func disconnect(from client: CMIOExtensionClient) {
+        deviceSource.forget(pid: client.pid)
+    }
 
     var availableProperties: Set<CMIOExtensionProperty> { [.providerManufacturer] }
 

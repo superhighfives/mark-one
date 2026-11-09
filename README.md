@@ -37,7 +37,7 @@ The goal is software that feels like magic: plug in the camera, open a video cal
 
 - Credit FFmpeg in the app, link to its source and include the LGPL 2.1 text. Mark One ships libavcodec as separate, unmodified dynamic libraries for this reason.
 - Remove the Downloads entitlement, which only the debug capture uses (the `SaveCapture` default), or put the capture behind a debug build.
-- A Release build, an app icon, screenshots and App Review notes that explain the firmware requirement.
+- A Release build, screenshots and App Review notes that explain the firmware requirement.
 - Decide how people get the `usb-tools` firmware onto their camera until Mark One can install it itself.
 
 ### Open questions

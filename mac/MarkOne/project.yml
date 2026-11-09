@@ -23,6 +23,7 @@ targets:
         PRODUCT_NAME: Mark One
         PRODUCT_BUNDLE_IDENTIFIER: com.superhighfives.markone
         CODE_SIGN_ENTITLEMENTS: App/MarkOne.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Mark One
         INFOPLIST_KEY_LSUIElement: YES

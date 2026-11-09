@@ -53,8 +53,12 @@ final class Preview: @unchecked Sendable {
 
 /// The preview's view. It asks for video only while its window is on screen.
 struct PreviewView: NSViewRepresentable {
+    /// Flips the picture left to right, like a mirror. Only the preview:
+    /// video apps get the camera's picture as it is.
+    var mirrored = false
+
     func makeNSView(context: Context) -> PreviewNSView { PreviewNSView() }
-    func updateNSView(_ view: PreviewNSView, context: Context) {}
+    func updateNSView(_ view: PreviewNSView, context: Context) { view.mirrored = mirrored }
 }
 
 final class PreviewNSView: NSView {
@@ -71,9 +75,22 @@ final class PreviewNSView: NSView {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    var mirrored = false {
+        didSet {
+            guard mirrored != oldValue else { return }
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            display.setAffineTransform(mirrored ? CGAffineTransform(scaleX: -1, y: 1) : .identity)
+            CATransaction.commit()
+        }
+    }
+
     override func layout() {
         super.layout()
-        display.frame = bounds
+        // Bounds and position rather than frame, which isn't defined once
+        // the layer is flipped.
+        display.bounds = bounds
+        display.position = CGPoint(x: bounds.midX, y: bounds.midY)
     }
 
     override func viewDidMoveToWindow() {

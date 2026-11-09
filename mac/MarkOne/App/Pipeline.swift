@@ -3,8 +3,8 @@
 // camera or the panel shows its preview, record, follow the movie recorder's H.264 stream, decode it and
 // send the frames to the camera extension.
 
+import AppKit
 import CoreVideo
-import Foundation
 import os.log
 
 private let log = Logger(subsystem: "com.superhighfives.markone", category: "pipeline")
@@ -18,6 +18,10 @@ final class Pipeline: ObservableObject {
     @Published private(set) var state = State.waiting
     @Published private(set) var status = "Starting…"
     @Published private(set) var framesPerSecond = 0.0
+
+    /// Why Mark One is waiting, when it's something the user can fix.
+    enum Problem { case cameraOff, wrongFirmware, connectedForPhotos }
+    @Published private(set) var problem: Problem?
 
     /// Whether the camera's buttons are locked while Mark One uses it.
     @Published var lockControls = UserDefaults.standard.object(forKey: "LockCameraControls") as? Bool ?? true {
@@ -46,6 +50,67 @@ final class Pipeline: ObservableObject {
         }
     }
     private let continuousWanted = Flag()
+
+    /// The camera's white balance, as values of setting 0x0b.
+    enum WhiteBalance: UInt32, CaseIterable, Identifiable {
+        case auto = 0, daylight = 6, cloudy = 7, shade = 8, incandescent = 1, fluorescent = 3
+        var id: Self { self }
+        var label: String {
+            switch self {
+            case .auto: "Auto"
+            case .daylight: "Daylight"
+            case .cloudy: "Cloudy"
+            case .shade: "Shade"
+            case .incandescent: "Incandescent"
+            case .fluorescent: "Fluorescent"
+            }
+        }
+    }
+
+    /// The camera's picture mode, as values of setting 0xac.
+    enum PictureMode: UInt32, CaseIterable, Identifiable {
+        case iEnhance = 7, vivid = 0, natural = 1, muted = 2, portrait = 5, monotone = 3
+        var id: Self { self }
+        var label: String {
+            switch self {
+            case .iEnhance: "i-Enhance"
+            case .vivid: "Vivid"
+            case .natural: "Natural"
+            case .muted: "Muted"
+            case .portrait: "Portrait"
+            case .monotone: "Monotone"
+            }
+        }
+    }
+
+    @Published var whiteBalance = UInt32(exactly: UserDefaults.standard.integer(forKey: "WhiteBalance")).flatMap { WhiteBalance(rawValue: $0) } ?? .auto {
+        didSet {
+            UserDefaults.standard.set(Int(whiteBalance.rawValue), forKey: "WhiteBalance")
+            whiteBalanceWanted.value = whiteBalance.rawValue
+        }
+    }
+    private let whiteBalanceWanted = Locked(WhiteBalance.auto.rawValue)
+
+    @Published var pictureMode = UInt32(exactly: UserDefaults.standard.object(forKey: "PictureMode") as? Int ?? 1).flatMap { PictureMode(rawValue: $0) } ?? .natural {
+        didSet {
+            UserDefaults.standard.set(Int(pictureMode.rawValue), forKey: "PictureMode")
+            pictureModeWanted.value = pictureMode.rawValue
+        }
+    }
+    private let pictureModeWanted = Locked(PictureMode.natural.rawValue)
+
+    /// Whether autofocus looks for faces first.
+    @Published var faceFocus = UserDefaults.standard.object(forKey: "FacePriority") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(faceFocus, forKey: "FacePriority")
+            faceWanted.value = faceFocus
+        }
+    }
+    private let faceWanted = Flag()
+
+    /// The camera's battery level, 1 to 100, while it's connected.
+    @Published private(set) var battery: Int?
+
     private let focusRequested = Flag()
     @Published private(set) var focusing = false
 
@@ -118,9 +183,39 @@ final class Pipeline: ObservableObject {
     private let stopRequested = Flag()
     private var onStopped: [() -> Void] = []
 
+    /// How long to keep recording after the last app stops using the camera.
+    enum Grace: TimeInterval, CaseIterable, Identifiable {
+        case short = 5, medium = 30, long = 120
+        var id: Self { self }
+        var duration: String {
+            switch self {
+            case .short: "5 seconds"
+            case .medium: "30 seconds"
+            case .long: "2 minutes"
+            }
+        }
+        var label: String { "After \(duration)" }
+    }
+
     /// How long to keep recording after the last app stops using the camera,
     /// so switching cameras or settings in an app doesn't restart it.
-    private nonisolated static let grace: TimeInterval = 5
+    @Published var grace = Grace(rawValue: UserDefaults.standard.double(forKey: "StopDelay")) ?? .short {
+        didSet {
+            UserDefaults.standard.set(grace.rawValue, forKey: "StopDelay")
+            graceWanted.value = grace.rawValue
+        }
+    }
+    private let graceWanted = Locked(Grace.short.rawValue)
+
+    /// The app using the Mark One camera, for "In use by FaceTime". Nil
+    /// when no app is, or when macOS doesn't give it a name.
+    @Published private(set) var activeApp: String?
+
+    private nonisolated func showClient(_ pid: pid_t?) {
+        Task { @MainActor in
+            self.activeApp = pid.flatMap { NSRunningApplication(processIdentifier: $0)?.localizedName }
+        }
+    }
 
     /// Starts watching for the camera. From then on Mark One sets the camera
     /// up whenever it's connected and switched on, and records while an app
@@ -130,6 +225,10 @@ final class Pipeline: ObservableObject {
         lockWanted.value = lockControls
         brightnessWanted.value = brightness
         continuousWanted.value = continuousFocus
+        graceWanted.value = grace.rawValue
+        whiteBalanceWanted.value = whiteBalance.rawValue
+        pictureModeWanted.value = pictureMode.rawValue
+        faceWanted.value = faceFocus
         let thread = Thread { [weak self] in self?.loop() }
         thread.qualityOfService = .userInteractive
         thread.start()
@@ -152,12 +251,17 @@ final class Pipeline: ObservableObject {
         }
     }
 
+    private nonisolated func note(_ problem: Problem?) {
+        Task { @MainActor in self.problem = problem }
+    }
+
     private nonisolated func loop() {
         while !stopRequested.value {
             let camera = Camera()
             report("Waiting for the camera. Connect it by USB and switch it on.", .waiting)
             do {
                 try camera.connect { !self.stopRequested.value }
+                note(nil)
                 let firmware = try Firmware.identify(camera)
                 Task { @MainActor in
                     self.firmware = firmware
@@ -179,6 +283,7 @@ final class Pipeline: ObservableObject {
                 if case .markOne(let revision) = firmware, revision >= 1,
                    try Firmware.connectionType(camera) != Firmware.webcamConnection {
                     report("Connected for photos (MTP). To use the camera as a webcam, choose Webcam on its screen when you connect it.", .waiting)
+                    note(.connectedForPhotos)
                     while camera.connected && !stopRequested.value {
                         if installImage.value != nil { try installIfRequested(camera) }
                         Thread.sleep(forTimeInterval: 0.5)
@@ -202,7 +307,10 @@ final class Pipeline: ObservableObject {
                 report("Switch the camera off and on again to start the install.", .waiting)
                 while camera.connected && !stopRequested.value { Thread.sleep(forTimeInterval: 0.5) }
             } catch {
-                if !stopRequested.value { report(error.localizedDescription, .waiting) }
+                if !stopRequested.value {
+                    report(error.localizedDescription, .waiting)
+                    note(Problem(error))
+                }
                 // Wait for the camera to go away before trying it again, so a
                 // camera Mark One can't use doesn't get set up over and over.
                 if case CameraError.disconnected = error {} else {
@@ -214,6 +322,7 @@ final class Pipeline: ObservableObject {
             closed.wait()
             Task { @MainActor in
                 self.firmware = nil
+                self.battery = nil
                 self.reportsOlderVersion = false
             }
         }
@@ -252,6 +361,10 @@ final class Pipeline: ObservableObject {
         var locked: Bool?
         var brightness: Int?
         var continuous: Bool?
+        var whiteBalance: UInt32?
+        var pictureMode: UInt32?
+        var face: Bool?
+        var batteryChecked = Date.distantPast
         let focus = FocusWatch()
     }
 
@@ -288,6 +401,24 @@ final class Pipeline: ObservableObject {
         if applied.brightness != brightness {
             try Firmware.setBrightness(camera, brightness)
             applied.brightness = brightness
+        }
+        let whiteBalance = whiteBalanceWanted.value, pictureMode = pictureModeWanted.value, face = faceWanted.value
+        if applied.whiteBalance != whiteBalance {
+            try Firmware.writeSetting(camera, Firmware.whiteBalance, whiteBalance)
+            applied.whiteBalance = whiteBalance
+        }
+        if applied.pictureMode != pictureMode {
+            try Firmware.writeSetting(camera, Firmware.pictureMode, pictureMode)
+            applied.pictureMode = pictureMode
+        }
+        if applied.face != face {
+            try Firmware.writeSetting(camera, Firmware.facePriority, face ? 1 : 0)
+            applied.face = face
+        }
+        if Date().timeIntervalSince(applied.batteryChecked) >= 30 {
+            applied.batteryChecked = Date()
+            let level = try Firmware.battery(camera)
+            Task { @MainActor in self.battery = level }
         }
         // Focus holds the shutter button half down until the picture
         // settles, and keeps streaming meanwhile.
@@ -328,7 +459,7 @@ final class Pipeline: ObservableObject {
         }
     }
 
-    /// Records and streams until no app has used the camera for `grace` seconds.
+    /// Records and streams until nothing has wanted video for `grace`.
     private nonisolated func stream(_ camera: Camera, to sink: CameraSink, applied: inout Applied) throws {
         let decoder = FrameDecoder()
         var shown = 0
@@ -347,6 +478,7 @@ final class Pipeline: ObservableObject {
         let streamer = Streamer(camera: camera)
         var since = Date(), lastUsed = Date(), lastChecked = Date()
         var received = 0, failuresBefore = 0
+        var client: pid_t?
         let capture = UserDefaults.standard.bool(forKey: "SaveCapture") ? Capture() : nil
         report("Starting to record…", .streaming)
         setBusy("Starting the camera…")
@@ -354,6 +486,7 @@ final class Pipeline: ObservableObject {
         try Firmware.setRecording(camera, true)
         defer {
             setBusy(nil)
+            showClient(nil)
             if camera.connected {
                 report("Stopping the recording…")
                 try? Firmware.setRecording(camera, false)
@@ -377,7 +510,12 @@ final class Pipeline: ObservableObject {
             if Date().timeIntervalSince(lastChecked) >= 0.5 {
                 lastChecked = Date()
                 if wanted() { lastUsed = lastChecked }
-                if lastChecked.timeIntervalSince(lastUsed) >= Pipeline.grace { return }
+                if lastChecked.timeIntervalSince(lastUsed) >= graceWanted.value { return }
+                let now = CameraSink.client()
+                if now != client {
+                    client = now
+                    showClient(now)
+                }
             }
             let elapsed = Date().timeIntervalSince(since)
             if elapsed >= 2 {
@@ -514,5 +652,15 @@ final class FocusWatch {
         }
         let mean = sum / count
         return squares / count - mean * mean
+    }
+}
+
+private extension Pipeline.Problem {
+    init?(_ error: Error) {
+        switch error {
+        case CameraError.disconnected: self = .cameraOff
+        case FirmwareError.unexpected: self = .wrongFirmware
+        default: return nil
+        }
     }
 }
