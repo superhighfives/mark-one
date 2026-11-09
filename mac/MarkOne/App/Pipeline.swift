@@ -469,6 +469,7 @@ final class Pipeline: ObservableObject {
         let streamer = Streamer(camera: camera)
         var since = Date(), lastUsed = Date(), lastChecked = Date()
         var received = 0, failuresBefore = 0
+        var lastReceived = Date()
         var client: pid_t?
         let capture = UserDefaults.standard.bool(forKey: "SaveCapture") ? Capture() : nil
         report("Starting to record…", .streaming)
@@ -487,6 +488,15 @@ final class Pipeline: ObservableObject {
             if installImage.value != nil { throw PipelineInterrupt.install }
             let frames = try streamer.poll()
             received += frames.count
+            if !frames.isEmpty {
+                // Apps fill gaps with the last picture, then a gray one after
+                // 3 seconds. Log each gap to find out what causes them.
+                let gap = Date().timeIntervalSince(lastReceived)
+                if gap > 0.2 {
+                    log.notice("No video from the camera for \(gap, format: .fixed(precision: 2), privacy: .public) s, then \(frames.count, privacy: .public) frames at once")
+                }
+                lastReceived = Date()
+            }
             for frame in frames {
                 let before = decoder.failures
                 decoded = false

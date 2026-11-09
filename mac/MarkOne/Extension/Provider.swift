@@ -41,6 +41,10 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
     private var clientPIDs: [pid_t] = []
     private var sinkClient: CMIOExtensionClient?
     private var lastSinkFrame = Date.distantPast
+    /// The latest frame from Mark One, repeated through short gaps in its feed.
+    private var lastSample: CMSampleBuffer?
+    /// The time given to the last frame sent.
+    private var lastTime = CMTime.zero
 
     init(localizedName: String) {
         super.init()
@@ -112,12 +116,20 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
                 notifyClient()
             }
             guard placeholderTimer == nil else { return }
-            // Fill in with the placeholder whenever the feed is quiet.
+            // Fill in whenever the feed is quiet: the last picture through a
+            // short gap, so apps see a freeze, and the placeholder after a
+            // long one or before any video.
             let timer = DispatchSource.makeTimerSource(queue: queue)
             timer.schedule(deadline: .now(), repeating: 1.0 / Double(frameRate))
             timer.setEventHandler { [weak self] in
-                guard let self, Date().timeIntervalSince(self.lastSinkFrame) > 0.5, let placeholder = self.placeholder else { return }
-                self.send(placeholder)
+                guard let self else { return }
+                let quiet = Date().timeIntervalSince(self.lastSinkFrame)
+                guard quiet > 2.0 / Double(frameRate) else { return }
+                if quiet < 3, let last = self.lastSample {
+                    self.send(last)
+                } else if let placeholder = self.placeholder {
+                    self.send(placeholder)
+                }
             }
             timer.resume()
             placeholderTimer = timer
@@ -155,10 +167,22 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
         device.notifyPropertiesChanged([clientProperty: clientState])
     }
 
+    /// Sends a frame to apps, timed now. Recorders such as QuickTime's fail
+    /// if a frame's time doesn't move forward, and repeated frames would
+    /// otherwise share one, so each frame gets a copy with a new time.
     private func send(_ sample: CMSampleBuffer) {
         guard sourceClients > 0 else { return }
-        let now = CMClockGetTime(CMClockGetHostTimeClock())
-        source.stream.send(sample, discontinuity: [], hostTimeInNanoseconds: UInt64(now.seconds * Double(NSEC_PER_SEC)))
+        let now = CMTimeConvertScale(CMClockGetTime(CMClockGetHostTimeClock()), timescale: 1_000_000_000,
+                                     method: .roundTowardPositiveInfinity)
+        let time = CMTimeMaximum(now, CMTimeAdd(lastTime, CMTime(value: 1, timescale: 1_000_000)))
+        var timing = CMSampleTimingInfo(duration: CMTime(value: 1, timescale: frameRate),
+                                        presentationTimeStamp: time, decodeTimeStamp: .invalid)
+        var copy: CMSampleBuffer?
+        guard CMSampleBufferCreateCopyWithNewTiming(allocator: kCFAllocatorDefault, sampleBuffer: sample,
+                                                    sampleTimingEntryCount: 1, sampleTimingArray: &timing,
+                                                    sampleBufferOut: &copy) == noErr, let copy else { return }
+        lastTime = time
+        source.stream.send(copy, discontinuity: [], hostTimeInNanoseconds: UInt64(time.value))
     }
 
 
@@ -170,7 +194,10 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
     }
 
     func stopSink() {
-        queue.async { [self] in sinkClient = nil }
+        queue.async { [self] in
+            sinkClient = nil
+            lastSample = nil
+        }
     }
 
     private func consume(from client: CMIOExtensionClient) {
@@ -180,6 +207,7 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
             self.queue.async {
                 if let sample {
                     self.lastSinkFrame = Date()
+                    self.lastSample = sample
                     self.send(sample)
                     let now = CMClockGetTime(CMClockGetHostTimeClock())
                     let output = CMIOExtensionScheduledOutput(sequenceNumber: sequence,
