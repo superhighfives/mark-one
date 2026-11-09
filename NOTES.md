@@ -767,8 +767,8 @@ override, calls resetKeyEvent and, if a movie is recording, presses and
 releases REC through the key stub; then it runs the replaced instructions
 and carries on at 0x7edd9111. Posted mid-recording with the fix, the
 camera stopped recording, dropped off USB and came back with its buttons
-and dial working. Still to check: a real unplug mid-call, and whether a
-camera unplugged this way then connects normally.
+and dial working. Checked with a real unplug mid-call (2026-11-09): the
+camera recovers, and plugged back in it connects and streams normally.
 
 ### Before the fix (2026-11-08)
 
@@ -1127,8 +1127,8 @@ stays here for reference, untested.
    `project.yml`) increasing from here, and check that the next update
    (1.0/2 or later) replaces the camera without a restart. This is the
    Mac app's build number only. The camera firmware stays at 2.3.
-1. Unplugging in webcam mode: fixed in Mark One (see "Unplugging in
-   webcam mode"). Check a real unplug mid-call, then plugging back in.
+1. Done (2026-11-09): unplugging mid-call leaves the camera usable, and
+   plugging it back in works. See "Unplugging in webcam mode".
 2. Record past 30 minutes to confirm the time limit change holds, and
    that nothing is written to the card. See "Recording time limit".
 3. Done (2026-11-09): a USB install works on a camera Mark One has set

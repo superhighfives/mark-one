@@ -9,6 +9,9 @@ struct MenuView: View {
     @Environment(\.openSettings) private var openSettings
     @Environment(\.openWindow) private var openWindow
 
+    private static let width: CGFloat = 320
+    private static let padding: CGFloat = 14
+
     private enum Mode { case install, waiting, photos, off, firmware, connected }
 
     private var mode: Mode {
@@ -50,8 +53,8 @@ struct MenuView: View {
             }
             footer
         }
-        .padding(14)
-        .frame(width: 320)
+        .padding(Self.padding)
+        .frame(width: Self.width)
     }
 
     private var header: some View {
@@ -171,8 +174,10 @@ struct MenuView: View {
     private var connected: some View {
         let live = pipeline.state == .streaming
         return VStack(alignment: .leading, spacing: 12) {
+            // A set height: the panel squashes anything that can shrink, and
+            // an aspect ratio alone lets the preview collapse.
             PreviewView(mirrored: preferences.mirrorPreview)
-                .aspectRatio(16 / 9, contentMode: .fit)
+                .frame(height: (Self.width - 2 * Self.padding) * 9 / 16)
                 .overlay { PreviewOverlay(busy: pipeline.busy, focusing: pipeline.focusing) }
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(alignment: .topLeading) {
@@ -222,7 +227,7 @@ struct MenuView: View {
 
     private var footer: some View {
         VStack(spacing: 6) {
-            Divider().padding(.horizontal, -14)
+            Divider().padding(.horizontal, -Self.padding)
             HStack {
                 Button("Settings…") {
                     openSettings()
