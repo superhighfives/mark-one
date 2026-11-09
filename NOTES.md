@@ -1096,8 +1096,11 @@ stays here for reference, untested.
    that nothing is written to the card. See "Recording time limit".
 3. Try a USB install on a camera Mark One has already set up. If it
    works, the app can drop its "switch the camera off and on" step.
-4. App Store: done on the app's side; see "App Store". Open: whether
-   review accepts installing modified camera firmware.
+4. App Store: done on the app's side; see "App Store" and
+   `appstore/README.md`. Before launch: settle the content rights answer
+   (Olympus's firmware license forbids modifying it), whether review
+   accepts installing modified camera firmware, screenshots, a build
+   upload and the review video.
 
 ## App Store (prep, 2026-11-09)
 
