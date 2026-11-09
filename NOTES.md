@@ -801,10 +801,11 @@ Next:
    answer_no=0x7edc726a`:
    `mov (20,a0),d0; cmp 3,d0; bne done; mov a0,a2; add -8,sp;
    mov (0x605aedbc),d0; and 0xffff0000,d0; mov d0,(0x605aedbc);
-   calls reset_keys; add 8,sp; mov a2,a0; done: jmp answer_no`. `ptp.py trace`'s
-   ring (0x7eab03e0, 256 bytes) overwrites the firmup stub at 0x7eab0400
-   and the revision marker at 0x7eab0414, so don't trust identify after
-   tracing.
+   calls reset_keys; add 8,sp; mov a2,a0; done: jmp answer_no`.
+   `ptp.py trace` keeps its ring at 0x7eab041c-0x7eab04a0, after the
+   firmup stub and revision marker. Its first version used 0x7eab03e0,
+   256 bytes, which overwrote both in RAM, so MTP's command setup would
+   have jumped into ring data on the next connection.
 
 ## Installing firmware over USB (recorded, 2026-11-08)
 
@@ -1078,19 +1079,18 @@ a CoreMediaIO camera extension.
 
 ## Next
 
-The goal is image quality: the camera's lens and color, not a cheap webcam
-image. HDMI through the Elgato gives 1080p video with the least new code.
-USB is the cable-free route, aiming at the 1080p HDMI buffers.
+Mark One works end to end over USB: firmware setup from the card, updates
+and restores over USB, and 1080p video from the movie recorder. HDMI
+through a capture card is no longer the plan; the hdmi-liveview patch
+stays here for reference, untested.
 
-
-1. Run the test plan on a camera running stock 2.3.
-2. If HDMI stays dark: trace GUI message 110 handling in the shooting GUI app.
-3. If it works but shows overlays: find the INFO display mode for HDMI.
-4. USB: trace the PSP JPEG path in `CapThr_ThroughImage` (where the JPEG
-   lands, how big it is, what turns it on) and the movie debug buffer dump.
-5. USB: find what happens to the USB session if a PC-mode handler requests
-   PC_CAM_SHOOTING (request 24) after connecting.
-6. USB: flash usb-tools, run `ptp.py info` and small peeks, then read
-   0x602adef8 and the video buffers while the camera is in shooting mode.
-7. USB: find a higher resolution live frame than the 568x480 panel buffer:
-   the HDMI 1080p buffers (with hdmi-liveview), or the movie pipeline.
+1. Unplugging in webcam mode leaves the camera stuck. Trace it with the
+   unplug event posted over USB, then fix it with a stub on the unplug
+   path. See "Unplugging in webcam mode".
+2. Record past 30 minutes to confirm the time limit change holds, and
+   that nothing is written to the card. See "Recording time limit".
+3. Try a USB install on a camera Mark One has already set up. If it
+   works, the app can drop its "switch the camera off and on" step.
+4. App Store: FFmpeg credit and the LGPL text, drop the Downloads
+   entitlement (only debug captures use it), and check review of the
+   camera extension and USB access.
