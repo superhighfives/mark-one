@@ -16,10 +16,6 @@ final class Planned: ObservableObject {
     /// STUB: read it from the camera.
     @Published var battery: Int? = 62
 
-    /// The app using the Mark One camera, for "In use by FaceTime".
-    /// STUB: the camera extension would need to find out which app it is.
-    @Published var activeApp: String? = "FaceTime"
-
     // MARK: Picture
 
     enum WhiteBalance: String, CaseIterable, Identifiable {
@@ -38,30 +34,6 @@ final class Planned: ObservableObject {
     @Published var pictureMode = PictureMode.natural
     /// STUB: turn on the camera's face priority autofocus.
     @Published var faceFocus = true
-
-    // MARK: Behaviour
-
-    enum Grace: TimeInterval, CaseIterable, Identifiable {
-        case short = 5, medium = 30, long = 120
-        var id: Self { self }
-        var label: String {
-            switch self {
-            case .short: "After 5 seconds"
-            case .medium: "After 30 seconds"
-            case .long: "After 2 minutes"
-            }
-        }
-    }
-
-    /// How long to keep recording after the last app stops using the camera.
-    /// STUB: Pipeline.grace is fixed at 5 seconds.
-    @Published var grace = Grace.short
-    /// STUB: mirror the panel's preview.
-    @Published var mirrorPreview = false
-    /// STUB: show Mark One in the Dock as well as the menu bar.
-    @Published var showInDock = false
-    /// STUB: post a notification when the camera is switched off mid-session.
-    @Published var notifyWhenOff = true
 }
 
 /// The camera's battery level, as a battery symbol and a percentage.

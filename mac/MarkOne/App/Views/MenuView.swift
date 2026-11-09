@@ -6,6 +6,7 @@ struct MenuView: View {
     @ObservedObject var installer: ExtensionInstaller
     @ObservedObject var pipeline: Pipeline
     @ObservedObject private var planned = Planned.shared
+    @ObservedObject private var preferences = Preferences.shared
     @Environment(\.openSettings) private var openSettings
     @Environment(\.openWindow) private var openWindow
 
@@ -171,7 +172,7 @@ struct MenuView: View {
     private var connected: some View {
         let live = pipeline.state == .streaming
         return VStack(alignment: .leading, spacing: 12) {
-            PreviewView()
+            PreviewView(mirrored: preferences.mirrorPreview)
                 .aspectRatio(16 / 9, contentMode: .fit)
                 .overlay { PreviewOverlay(busy: pipeline.busy, focusing: pipeline.focusing) }
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -179,10 +180,10 @@ struct MenuView: View {
                     if live { LiveBadge().padding(8) }
                 }
             VStack(alignment: .leading, spacing: 2) {
-                if live, let app = planned.activeApp {
+                if live, let app = pipeline.activeApp {
                     Text("In use by \(app)").fontWeight(.semibold)
                 }
-                Text(live ? "Nothing is saved to the card. Recording stops 5 seconds after the call ends."
+                Text(live ? "Nothing is saved to the card. Recording stops \(pipeline.grace.duration) after the call ends."
                           : "Choose **Mark One** as the camera in FaceTime, Zoom or any video app. Mark One presses REC for you.")
                     .font(.callout)
                     .foregroundStyle(.secondary)

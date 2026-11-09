@@ -35,6 +35,7 @@ struct MarkOneApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         Task { @MainActor in
+            Preferences.shared.start(Pipeline.shared)
             ExtensionInstaller.shared.activate()
             Pipeline.shared.run()
             if WelcomeWindow.needed { WelcomeWindow.show() }

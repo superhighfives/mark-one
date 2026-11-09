@@ -8,7 +8,7 @@ struct SettingsView: View {
 
     var body: some View {
         TabView {
-            GeneralSettings()
+            GeneralSettings(pipeline: pipeline)
                 .tabItem { Label("General", systemImage: "gearshape") }
             CameraSettings(installer: installer, pipeline: pipeline)
                 .tabItem { Label("Camera", systemImage: "camera") }
@@ -20,23 +20,29 @@ struct SettingsView: View {
 }
 
 private struct GeneralSettings: View {
-    @ObservedObject private var planned = Planned.shared
+    @ObservedObject var pipeline: Pipeline
+    @ObservedObject private var preferences = Preferences.shared
 
     var body: some View {
         Form {
             Section {
                 OpenAtLoginToggle()
-                Toggle("Show in the Dock", isOn: $planned.showInDock)
-                Toggle("Tell me when the camera turns off", isOn: $planned.notifyWhenOff)
+                Toggle("Show in the Dock", isOn: $preferences.showInDock)
+                Toggle(isOn: $preferences.notifyWhenOff) {
+                    Text("Tell me when the camera turns off")
+                    if preferences.notificationsDenied {
+                        Text("Notifications are off for Mark One. Turn them on in System Settings, under Notifications.")
+                    }
+                }
             }
             Section("Recording") {
-                Picker(selection: $planned.grace) {
-                    ForEach(Planned.Grace.allCases) { Text($0.label).tag($0) }
+                Picker(selection: $pipeline.grace) {
+                    ForEach(Pipeline.Grace.allCases) { Text($0.label).tag($0) }
                 } label: {
                     Text("Stop after the call ends")
                     Text("A short wait lets you switch apps without the camera restarting.")
                 }
-                Toggle("Mirror the preview", isOn: $planned.mirrorPreview)
+                Toggle("Mirror the preview", isOn: $preferences.mirrorPreview)
             }
             Section {
                 LabeledContent("Setup") {

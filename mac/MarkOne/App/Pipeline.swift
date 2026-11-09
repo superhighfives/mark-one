@@ -3,8 +3,8 @@
 // camera or the panel shows its preview, record, follow the movie recorder's H.264 stream, decode it and
 // send the frames to the camera extension.
 
+import AppKit
 import CoreVideo
-import Foundation
 import os.log
 
 private let log = Logger(subsystem: "com.superhighfives.markone", category: "pipeline")
@@ -122,9 +122,39 @@ final class Pipeline: ObservableObject {
     private let stopRequested = Flag()
     private var onStopped: [() -> Void] = []
 
+    /// How long to keep recording after the last app stops using the camera.
+    enum Grace: TimeInterval, CaseIterable, Identifiable {
+        case short = 5, medium = 30, long = 120
+        var id: Self { self }
+        var duration: String {
+            switch self {
+            case .short: "5 seconds"
+            case .medium: "30 seconds"
+            case .long: "2 minutes"
+            }
+        }
+        var label: String { "After \(duration)" }
+    }
+
     /// How long to keep recording after the last app stops using the camera,
     /// so switching cameras or settings in an app doesn't restart it.
-    private nonisolated static let grace: TimeInterval = 5
+    @Published var grace = Grace(rawValue: UserDefaults.standard.double(forKey: "StopDelay")) ?? .short {
+        didSet {
+            UserDefaults.standard.set(grace.rawValue, forKey: "StopDelay")
+            graceWanted.value = grace.rawValue
+        }
+    }
+    private let graceWanted = Locked(Grace.short.rawValue)
+
+    /// The app using the Mark One camera, for "In use by FaceTime". Nil
+    /// when no app is, or when macOS doesn't give it a name.
+    @Published private(set) var activeApp: String?
+
+    private nonisolated func showClient(_ pid: pid_t?) {
+        Task { @MainActor in
+            self.activeApp = pid.flatMap { NSRunningApplication(processIdentifier: $0)?.localizedName }
+        }
+    }
 
     /// Starts watching for the camera. From then on Mark One sets the camera
     /// up whenever it's connected and switched on, and records while an app
@@ -134,6 +164,7 @@ final class Pipeline: ObservableObject {
         lockWanted.value = lockControls
         brightnessWanted.value = brightness
         continuousWanted.value = continuousFocus
+        graceWanted.value = grace.rawValue
         let thread = Thread { [weak self] in self?.loop() }
         thread.qualityOfService = .userInteractive
         thread.start()
@@ -341,7 +372,7 @@ final class Pipeline: ObservableObject {
         }
     }
 
-    /// Records and streams until no app has used the camera for `grace` seconds.
+    /// Records and streams until nothing has wanted video for `grace`.
     private nonisolated func stream(_ camera: Camera, to sink: CameraSink, applied: inout Applied) throws {
         let decoder = FrameDecoder()
         var shown = 0
@@ -360,6 +391,7 @@ final class Pipeline: ObservableObject {
         let streamer = Streamer(camera: camera)
         var since = Date(), lastUsed = Date(), lastChecked = Date()
         var received = 0, failuresBefore = 0
+        var client: pid_t?
         let capture = UserDefaults.standard.bool(forKey: "SaveCapture") ? Capture() : nil
         report("Starting to record…", .streaming)
         setBusy("Starting the camera…")
@@ -367,6 +399,7 @@ final class Pipeline: ObservableObject {
         try Firmware.setRecording(camera, true)
         defer {
             setBusy(nil)
+            showClient(nil)
             if camera.connected {
                 report("Stopping the recording…")
                 try? Firmware.setRecording(camera, false)
@@ -390,7 +423,12 @@ final class Pipeline: ObservableObject {
             if Date().timeIntervalSince(lastChecked) >= 0.5 {
                 lastChecked = Date()
                 if wanted() { lastUsed = lastChecked }
-                if lastChecked.timeIntervalSince(lastUsed) >= Pipeline.grace { return }
+                if lastChecked.timeIntervalSince(lastUsed) >= graceWanted.value { return }
+                let now = CameraSink.client()
+                if now != client {
+                    client = now
+                    showClient(now)
+                }
             }
             let elapsed = Date().timeIntervalSince(since)
             if elapsed >= 2 {

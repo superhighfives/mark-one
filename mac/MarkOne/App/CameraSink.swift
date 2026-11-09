@@ -12,6 +12,9 @@ final class CameraSink {
 
     /// The extension's "used" property: "1" while an app uses the camera.
     static let inUseSelector = 0x7573_6564
+    /// The extension's "clnt" property: the process ID of the app that last
+    /// started using the camera, or "" when none is.
+    static let clientSelector = 0x636C_6E74
 
     private let device: CMIODeviceID
     private let stream: CMIOStreamID
@@ -52,11 +55,20 @@ final class CameraSink {
     /// Whether any app is using the Mark One camera. False if the camera
     /// extension isn't installed.
     static func inUse() -> Bool {
-        let devices = objectIDs(of: CMIOObjectID(kCMIOObjectSystemObject), kCMIOHardwarePropertyDevices)
-        guard let device = devices.first(where: { string(of: $0, kCMIODevicePropertyDeviceUID) == deviceUID }) else {
-            return false
-        }
+        guard let device = installedDevice() else { return false }
         return string(of: device, inUseSelector) == "1"
+    }
+
+    /// The process using the Mark One camera, when the extension knows it.
+    static func client() -> pid_t? {
+        guard let device = installedDevice(), let text = string(of: device, clientSelector),
+              let pid = pid_t(text), pid != getpid() else { return nil }
+        return pid
+    }
+
+    private static func installedDevice() -> CMIODeviceID? {
+        objectIDs(of: CMIOObjectID(kCMIOObjectSystemObject), kCMIOHardwarePropertyDevices)
+            .first { string(of: $0, kCMIODevicePropertyDeviceUID) == deviceUID }
     }
 
     /// Queues one frame, dropping it if the extension hasn't taken the last one.
