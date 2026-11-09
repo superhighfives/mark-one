@@ -16,9 +16,9 @@ __pycache__/
 .venv/
 
 # Assembler output; rebuild with the commands in NOTES.md.
-asm/*.o
-asm/*.elf
-asm/*.bin
+asm/**/*.o
+asm/**/*.elf
+asm/**/*.bin
 
 # Built from mac/; see the build line at the top of each source file.
 mac/viewer/viewer

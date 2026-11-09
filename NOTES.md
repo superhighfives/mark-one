@@ -638,6 +638,75 @@ $T/mn10300-elf-ld -Ttext=0x7eaaf5e0 --defsym key_task_send=0x7e9df69d \
 $T/mn10300-elf-objcopy -O binary asm/button.elf asm/button.bin
 ```
 
+## Webcam USB choice and version 2.4 (built, not flashed)
+
+The `webcam` patch set in `scripts/build.py` adds a "Webcam" choice to the
+camera's USB prompt (Storage, MTP, Webcam, Print, Exit) and to Custom
+menu > USB Mode, bakes in Mark One's run-time helpers, and reports version
+2.4. Build it on top of usb-tools:
+
+```sh
+uv run scripts/build.py fw/OLY_E_097_2300_0000_0000.BIN \
+  patched/usb-tools+webcam/E0972300.BIN usb-tools webcam
+```
+
+How a USB connection picks its type: the type lives at 0x605f0d14.
+With USB Mode on Auto the prompt (built at 0x7eec6dab, OK handled at
+0x7eec70d7) sends a GUI param to checkEndUsbSelect (0x7edd5b9b), which maps
+15, 16 and 17 to Storage (1), MTP (2) and Print (4). Otherwise 0x7edd54f6
+maps the USB Mode setting (118) to a type. checkPcMode (0x7edd59ea) sends
+types 1 and 2 to startPc, whose protocol choice at 0x7edd5564 picks MTP
+for type 2 and mass storage for the rest. completedPcConnect gives type 2
+PC sub-state 0x6005 and everything else 0x6004. No other code compares
+the type with 2.
+
+Webcam is a new type 7. The prompt sends GUI param 20 for it,
+checkEndUsbSelect and the USB Mode mapping turn 20 and setting value 7
+into type 7, and the protocol choice now picks mass storage only for type
+1. Type 7 lands in sub-state 0x6004, whose event list already includes
+the "start camera control" events, so the run-time 0x6005 table write
+isn't needed for it. The computer can tell Webcam from MTP by reading
+0x605f0d14.
+
+- The prompt's list (`asm/webcam/prompt.s`), OK button
+  (`asm/webcam/ok.s`), checkEndUsbSelect (`asm/webcam/select.s`) and the
+  USB Mode mapping (`asm/webcam/mode.s`) are rewritten in place as table
+  lookups. The prompt also writes 5 to screen 0's cursor wrap count, the
+  halfword at 0x602bceb0, which has no static writer.
+- The USB Mode option records at 0x7f00ab30 (28 bytes each) run straight
+  into the next list's, so the five records go over console-only code at
+  0x7eaaf680 and the list header at 0x7f00c63c points there. Unknown:
+  whether the settings code accepts 7 for setting 118.
+- The label is string 0x3fd ("A. OLYMPUS PENPAL Share", shown only for
+  the PENPAL accessory), rewritten to "Webcam" in all 34 languages of the
+  resource block (0101). Each language region in that block has a table
+  of 1695 pointers to UTF-16 strings, relative to 0xbff3d020; region 8 is
+  English. This is the first image that changes block 0101.
+- Version: the main block head's version word (0x10, `00 23`) sets the
+  displayed version (setting 0xc082) at boot; the PTP DeviceInfo version
+  has a hardcoded 0x2300 at 0x7f0dd970. Both now say 2.4. Downgrading from
+  2.4 to 2.3 by card is untested; Olympus's updater will treat 2.4 as
+  newer.
+
+Build the patches:
+
+```sh
+T=toolchain/install/bin
+for f in prompt:0x7eec6dfb ok:0x7eec7101 select:0x7edd5bb2 mode:0x7edd54ff; do
+  n=${f%%:*}; $T/mn10300-elf-as -o asm/webcam/$n.o asm/webcam/$n.s
+done
+$T/mn10300-elf-ld -Ttext=0x7eec6dfb -e prompt --defsym set_screen=0x7eec7262 \
+  --defsym done=0x7eec6f49 -o asm/webcam/prompt.elf asm/webcam/prompt.o
+$T/mn10300-elf-ld -Ttext=0x7eec7101 -e ok --defsym exit_path=0x7eec7126 \
+  --defsym send=0x7eec7169 -o asm/webcam/ok.elf asm/webcam/ok.o
+$T/mn10300-elf-ld -Ttext=0x7edd5bb2 -e select -o asm/webcam/select.elf asm/webcam/select.o
+$T/mn10300-elf-ld -Ttext=0x7edd54ff -e mode --defsym resume=0x7edd5535 \
+  -o asm/webcam/mode.elf asm/webcam/mode.o
+for n in prompt ok select mode; do
+  $T/mn10300-elf-objcopy -O binary asm/webcam/$n.elf asm/webcam/$n.bin
+done
+```
+
 ## Recording time limit (patch ready, untested)
 
 0x7e7bbe71 works out how long a movie may run and logs "MAX Time" (what

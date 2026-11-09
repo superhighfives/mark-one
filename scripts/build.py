@@ -5,8 +5,11 @@ Usage:
   uv run scripts/build.py --roundtrip fw/OLY_E_097_2300_0000_0000.BIN
 
 Patches are defined in PATCHES below as (runtime address, expected bytes, new bytes),
-applied to the decoded main block. Each expected value is checked first, so a
-patch can't land on the wrong build.
+applied to the decoded main block. Addresses below BASE land in the main
+block's 32-byte head, which the camera copies to RAM just before the code.
+Each expected value is checked first, so a patch can't land on the wrong
+build. STRINGS replaces menu strings in every language of the resource
+block (0101).
 """
 import hashlib, struct, sys, os
 
@@ -77,7 +80,113 @@ PATCHES = {
          '20cacbcff0f8feec470c92f82e10f80214f80618f82620f8221cf0f35d0c2e01'
          '20f0798a02f8190cf81110f83114dff024'),
     ],
+    # A "Webcam" connection: a fifth choice in the USB prompt (Storage,
+    # MTP, Webcam, Print, Exit) and in Custom menu > USB Mode. It connects
+    # like MTP but as connection type 7 (0x605f0d14), which the computer can
+    # read to tell it apart. Type 7 uses PC sub-state 0x6004, which already
+    # takes the "start camera control" events. Also bakes in what Mark One
+    # otherwise loads at run time, and reports version 2.4. See NOTES.md.
+    'webcam': [
+        # USB prompt: list five items (asm/webcam/prompt.s)
+        (0x7EEC6DFB,
+         stock(95, '593249da7f773be092180d2d3bd90dc7a2dd65295013e20c688b715fad6624bf'),
+         '88dd6604000000002ce305f8933c00f8923ef8923f8505f89742f89344f89746fc'
+         '87b0ce2b60950ef16dfcdc506eec7e8002f05104f855018502f85507f064f87508'
+         '200221288001fcd85a6eec7ec9e4dcfe0000000a01df05fd03d1004303'),
+        # USB prompt OK: Webcam sends GUI param 20 (asm/webcam/ok.s)
+        (0x7EEC7101,
+         stock(26, '99ee9403b4ae3093e6933c7fec8c9afd2331b8cae87d4d406f975271508a9994'),
+         '1ca004c822fcdc1771ec7ef160f0448011dc570000000f101411'),
+        # checkEndUsbSelect: param 20 -> connection type 7 (asm/webcam/select.s)
+        (0x7EDD5BB2,
+         stock(31, '70d1696173a6b5ed5d1b8457973a380f69e8a3efebd477e4ffb944ab56133aa4'),
+         'f8020428f1a005c7048003fcdcc95bdd7ef160f040ca0a010204050507cbcb'),
+        # USB Mode setting 7 -> connection type 7 (asm/webcam/mode.s)
+        (0x7EDD54FF,
+         stock(42, '902b9549055086e7c6eb0bfb1d11ea637406e700161c61da2304ffbf95aac8a1'),
+         '04fac8ff00c8128501a007c50cfcdc2155dd7ef160f044fc85140d5f60dc190000'
+         '000101040302020107'),
+        # startPc: mass storage only for type 1, MTP for 2 and 7
+        # (cmp 2,d0; beq -> cmp 1,d0; bne)
+        (0x7EDD5569, 'a002c804', 'a001c904'),
+        # Custom menu USB Mode: five options. The stock records at 0x7f00ab30
+        # run straight into the next list's, so copy them, with Webcam
+        # (string 0x3fd, value 7) after MTP, over console-only code...
+        (0x7EAAF680,
+         stock(140, 'de04e82fd578999ede3c876a4cf7811459936d1ede833cb077c7439096695c7f'),
+         '000247000000000000000000d0070000ff000000c0000000c500000000020a0100'
+         '00000000000000d007000000000000c0000000c50000000002df05000000000000'
+         '0000d007000004000000c0000000c50000000002fd030000000000000000d00700'
+         '0007000000c0000000c50000000002d1000000000000000000d007000002000000'
+         'c0000000c5000000'),
+        # ...and point the list header at them, with a count of 5
+        (0x7F00C63C, stock(16, 'b4bba7be7f16d0314b0b3dffd09ea85f0a14a263b6397d5aa74a504ee7c071a8'), '76000500000000000100000080f6aa7e'),
+        # Mark One's run-time helpers, over console-only code: read32 and
+        # write32 (see ptp.py), the key stub (asm/key.s) and the button stub
+        # (asm/button.s)
+        (0x7EAAAB74, stock(12, '20c6e360bb9ef99a61f316395c28f451cf2fb048383895c47823ff75553d9b14'), '70f0fccbcbcb6070f0fccbcb'),
+        (0x7EAB0380, stock(14, '51f403fdc60baed81304472a34eb4344344ba61f62cd46d41c2db607ba1778a0'), 'f8fef8dd9818caff0020df0008cb'),
+        (0x7EAAF5E0, stock(14, '8d1b005026535cf08274d4c9980f687f9d1309a8cc7cdd968c2ca40c9888aeed'), 'f8fef8ddba00f3ffc00cdf0008cb'),
+        # power switch in PC shooting (see NOTES.md, "Power switch in webcam
+        # mode"): 0x7edc725f -> 0x7edc726a
+        (0x7EEEA8B0, '5f72dc7e', '6a72dc7e'),
+        # version 2.4: the head's version word, which sets the displayed
+        # version (setting 0xc082) at boot...
+        (0x7E421010, '0023', '0024'),
+        # ...and the hardcoded 0x2300 in the PTP DeviceInfo version string
+        (0x7F0DD970, '2e0023', '2e0024'),
+    ],
 }
+
+# Menu string replacements for the resource block, as {string ID: text}.
+# Each language has a table of 1695 pointers (base 0xbff3d020) to UTF-16
+# strings; a replacement must be no longer than the original.
+STRINGS = {
+    # "A. OLYMPUS PENPAL Share", only shown for the PENPAL accessory
+    'webcam': {0x3FD: 'Webcam'},
+}
+STRING_COUNT, STRING_BASE = 1695, 0xBFF3D020
+
+
+def string_tables(body):
+    """Find each language's string pointer table in the resource block.
+
+    The block starts with a directory of {load address, size} entries; the
+    languages are the entries holding a table whose first pointer is 8 bytes
+    before STRING_BASE and whose pointers all fall inside the entry.
+    """
+    tables = []
+    for k in range(64):
+        load, size = struct.unpack_from('<II', body, 16 * k)
+        if load == 0:
+            break
+        start = load - 0x92E40000
+        first = struct.pack('<I', STRING_BASE - 0x18)
+        at = body.find(first, start, start + size)
+        while at != -1:
+            if at + 4 * STRING_COUNT <= start + size:
+                ptrs = struct.unpack_from(f'<{STRING_COUNT}I', body, at)
+                if all(STRING_BASE - 0x20 <= p < STRING_BASE + size for p in ptrs):
+                    tables.append((start, ptrs))
+                    break
+            at = body.find(first, at + 4, start + size)
+    return tables
+
+
+def patch_strings(body, replacements):
+    body = bytearray(body)
+    tables = string_tables(body)
+    assert len(tables) == 34, f'expected 34 languages, found {len(tables)}'
+    for start, ptrs in tables:
+        for string, text in replacements.items():
+            at = start + ptrs[string] - STRING_BASE
+            end = at
+            while body[end:end + 2] != b'\0\0':
+                end += 2
+            new = text.encode('utf-16-le')
+            assert len(new) <= end - at, f'{text!r} is longer than string {string:#x} at {at:#x}'
+            body[at:end] = new + bytes(end - at - len(new))
+    return bytes(body)
 
 
 def split(fw):
@@ -88,9 +197,9 @@ def split(fw):
     return blocks
 
 
-def pack_block(fw, off, hd, body):
+def pack_block(fw, off, hd, body, head=None):
     """Rebuild one block (head + scrambled body + tail) from a decoded body."""
-    head = bytearray(fw[off:off + 32])
+    head = bytearray(head if head is not None else fw[off:off + 32])
     tail = bytearray(fw[off + 32 + hd['len']:off + 64 + hd['len']])
     assert len(body) == hd['len']
     struct.pack_into('<I', tail, 0x1C, 0)
@@ -101,22 +210,32 @@ def pack_block(fw, off, hd, body):
 
 
 def build(fw, names):
+    """Returns the patched file and the decoded bodies it should contain."""
     blocks = split(fw)
     out = bytearray(fw)
     off, hd, main = blocks[0]
     assert hashlib.sha256(main).hexdigest() == MAIN_SHA256, 'main block is not stock v2.3'
-    main = bytearray(main)
+    head, main = bytearray(fw[off:off + 32]), bytearray(main)
     for name in names:
         for addr, old, new in PATCHES[name]:
-            o = addr - BASE
+            target, o = (head, addr - BASE + 32) if addr < BASE else (main, addr - BASE)
             new_b = bytes.fromhex(new)
-            got = bytes(main[o:o + (old[0] if isinstance(old, tuple) else len(old) // 2)])
+            got = bytes(target[o:o + (old[0] if isinstance(old, tuple) else len(old) // 2)])
             assert matches(old, got), f'{name} @ {addr:#x}: not the expected stock code'
-            main[o:o + len(new_b)] = new_b
-            print(f'  {name}: {addr:#010x} {got.hex()} -> {new}')
-    packed = pack_block(fw, off, hd, bytes(main))
+            target[o:o + len(new_b)] = new_b
+            print(f'  {name}: {addr:#010x} {got.hex()[:24]} -> {new[:24]}')
+    packed = pack_block(fw, off, hd, bytes(main), head)
     out[off:off + len(packed)] = packed
-    return bytes(out), bytes(main)
+    bodies = {off: bytes(main)}
+    replacements = {k: v for name in names for k, v in STRINGS.get(name, {}).items()}
+    if replacements:
+        roff, rhd, resources = next(b for b in blocks if b[1]['flags'] == 0x101)
+        resources = patch_strings(resources, replacements)
+        packed = pack_block(fw, roff, rhd, resources)
+        out[roff:roff + len(packed)] = packed
+        bodies[roff] = resources
+        print(f'  strings: {", ".join(f"{k:#x} -> {v!r}" for k, v in replacements.items())} in 34 languages')
+    return bytes(out), bodies
 
 
 def main():
@@ -128,13 +247,11 @@ def main():
     src, dst, names = sys.argv[1], sys.argv[2], sys.argv[3:]
     fw = open(src, 'rb').read()
     assert hashlib.sha256(fw).hexdigest() == STOCK_SHA256, 'input is not stock v2.3'
-    out, main_patched = build(fw, names)
-    # Re-read the result to confirm every block still checksums and the
-    # patched main block decodes to exactly what was intended.
-    blocks = split(out)
-    assert blocks[0][2] == main_patched
-    for (o1, h1, b1), (o2, h2, b2) in zip(split(fw)[1:], blocks[1:]):
-        assert b1 == b2, f'non-main block at {o1:#x} changed'
+    out, bodies = build(fw, names)
+    # Re-read the result to confirm every block still checksums and decodes
+    # to exactly what was intended, and that no other block changed.
+    for (o1, h1, b1), (o2, h2, b2) in zip(split(fw), split(out)):
+        assert o1 == o2 and b2 == bodies.get(o1, b1), f'block at {o1:#x} is not what was intended'
     diff = sum(1 for a, b in zip(fw, out) if a != b)
     os.makedirs(os.path.dirname(dst) or '.', exist_ok=True)
     open(dst, 'wb').write(out)
