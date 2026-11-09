@@ -144,6 +144,10 @@ def version_patch(name):
     major, minor = name.split('=')[1].split('.')
     assert major.isdigit() and minor.isdigit() and len(major) == len(minor) == 1, name
     version = f'{major}{minor}'
+    # The card updater refuses an older version than the one installed, so
+    # a camera running anything above stock 2.3 couldn't go back to stock.
+    if version > '23':
+        sys.exit(f'{name}: versions above 2.3 would block a return to stock firmware')
     return [(0x7E421010, '0023', f'00{version}'), (0x7F0DD970, '2e0023', f'2e00{version}')]
 
 # Menu string replacements for the resource block, as {string ID: text}.
