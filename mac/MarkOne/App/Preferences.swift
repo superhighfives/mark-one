@@ -26,7 +26,7 @@ final class Preferences: NSObject, ObservableObject {
 
     /// Whether to post a notification when the camera is switched off or
     /// unplugged while a video app is using it.
-    @Published var notifyWhenOff = UserDefaults.standard.object(forKey: "NotifyWhenCameraOff") as? Bool ?? true {
+    @Published var notifyWhenOff = UserDefaults.standard.object(forKey: "NotifyWhenCameraOff") as? Bool ?? false {
         didSet {
             UserDefaults.standard.set(notifyWhenOff, forKey: "NotifyWhenCameraOff")
             if notifyWhenOff && !oldValue { askToNotify() }
