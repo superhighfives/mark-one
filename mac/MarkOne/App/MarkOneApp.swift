@@ -52,6 +52,20 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Mark One")
                 .font(.headline)
+            PreviewView()
+                .frame(width: 288, height: 162)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+            HStack {
+                Text("Brightness")
+                Slider(value: Binding(get: { Double(pipeline.brightness) },
+                                      set: { pipeline.brightness = Int($0.rounded()) }),
+                       in: -9...9, step: 1)
+                Text(pipeline.brightness == 0 ? "0.0" : String(format: "%+.1f", Double(pipeline.brightness) / 3))
+                    .font(.callout.monospacedDigit())
+                    .frame(width: 34, alignment: .trailing)
+            }
+            Button(pipeline.focusing ? "Focusing…" : "Focus") { pipeline.focus() }
+                .disabled(pipeline.state != .streaming || pipeline.focusing)
             Text(pipeline.status)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -76,8 +90,18 @@ struct ContentView: View {
                         openAtLogin = SMAppService.mainApp.status == .enabled
                     }
                 }
+            DisclosureGroup("Advanced") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Toggle("Lock camera controls", isOn: $pipeline.lockControls)
+                    Text("While Mark One uses the camera, only its power switch, dials and shutter half press work, so a bump can't change a setting or take a photo.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button("Remove camera") { installer.deactivate() }
+                }
+                .padding(.top, 6)
+            }
             HStack {
-                Button("Remove camera") { installer.deactivate() }
                 Spacer()
                 Button("Quit") { NSApp.terminate(nil) }
                     .keyboardShortcut("q")
@@ -145,3 +169,4 @@ final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionReq
         }
     }
 }
+

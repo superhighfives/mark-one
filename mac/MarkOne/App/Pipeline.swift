@@ -1,6 +1,6 @@
 // Runs the whole path from the E-M5 to the Mark One camera: wait for the
 // camera on USB, set up the firmware, and while an app uses the Mark One
-// camera, record, follow the movie recorder's H.264 stream, decode it and
+// camera or the panel shows its preview, record, follow the movie recorder's H.264 stream, decode it and
 // send the frames to the camera extension.
 
 import CoreVideo
@@ -19,6 +19,32 @@ final class Pipeline: ObservableObject {
     @Published private(set) var status = "Starting…"
     @Published private(set) var framesPerSecond = 0.0
 
+    /// Whether the camera's buttons are locked while Mark One uses it.
+    @Published var lockControls = UserDefaults.standard.object(forKey: "LockCameraControls") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(lockControls, forKey: "LockCameraControls")
+            lockWanted.value = lockControls
+        }
+    }
+    private let lockWanted = Flag()
+
+    /// Exposure compensation in thirds of a stop, -9 to 9.
+    @Published var brightness = UserDefaults.standard.integer(forKey: "Brightness") {
+        didSet {
+            UserDefaults.standard.set(brightness, forKey: "Brightness")
+            brightnessWanted.value = brightness
+        }
+    }
+    private let brightnessWanted = Locked(0)
+    private let focusRequested = Flag()
+    @Published private(set) var focusing = false
+
+    /// Focuses the camera, as a half press of its shutter button does.
+    func focus() {
+        focusing = true
+        focusRequested.value = true
+    }
+
     private var thread: Thread?
     private let stopRequested = Flag()
     private var onStopped: [() -> Void] = []
@@ -32,6 +58,8 @@ final class Pipeline: ObservableObject {
     /// uses the Mark One camera.
     func run() {
         guard thread == nil else { return }
+        lockWanted.value = lockControls
+        brightnessWanted.value = brightness
         let thread = Thread { [weak self] in self?.loop() }
         thread.qualityOfService = .userInteractive
         thread.start()
@@ -62,6 +90,9 @@ final class Pipeline: ObservableObject {
                 try camera.connect { !self.stopRequested.value }
                 report("Setting up the camera…")
                 try Firmware.prepare(camera)
+                Thread.sleep(forTimeInterval: 1)
+                let saved = try Firmware.applyPresets(camera)
+                defer { if camera.connected { try? Firmware.releasePresets(camera, saved) } }
                 try serve(camera)
             } catch {
                 if !stopRequested.value { report(error.localizedDescription, .waiting) }
@@ -82,28 +113,70 @@ final class Pipeline: ObservableObject {
         }
     }
 
+    /// The controls last sent to the camera.
+    private struct Applied {
+        var locked: Bool?
+        var brightness: Int?
+        var focusUntil: Date?
+    }
+
+    /// Sends the panel's controls to the camera when they change.
+    private nonisolated func updateControls(_ camera: Camera, _ applied: inout Applied) throws {
+        let locked = lockWanted.value, brightness = brightnessWanted.value
+        if applied.locked != locked {
+            try Firmware.setControlsLocked(camera, locked)
+            applied.locked = locked
+        }
+        if applied.brightness != brightness {
+            try Firmware.setBrightness(camera, brightness)
+            applied.brightness = brightness
+        }
+        // Focus holds the shutter button half down for two seconds, long
+        // enough for the camera to finish focusing, and keeps streaming
+        // meanwhile.
+        if focusRequested.value {
+            focusRequested.value = false
+            if applied.focusUntil == nil { try Firmware.startFocus(camera) }
+            applied.focusUntil = Date() + 2
+        } else if let until = applied.focusUntil, Date() >= until {
+            applied.focusUntil = nil
+            try Firmware.endFocus(camera)
+            Task { @MainActor in self.focusing = false }
+        }
+    }
+
+    /// Whether anything wants video: an app using the Mark One camera, or
+    /// the preview in Mark One's panel.
+    private nonisolated func wanted() -> Bool {
+        Preview.shared.visible || CameraSink.inUse()
+    }
+
     /// Records while an app uses the Mark One camera, until the camera goes away.
     private nonisolated func serve(_ camera: Camera) throws {
         let sink = try CameraSink()
+        var applied = Applied()
         while !stopRequested.value {
             report("Ready. Pick “Mark One” as the camera in a video app.", .ready)
-            while !CameraSink.inUse() {
+            try Firmware.setScreen(camera, false)
+            while !wanted() {
                 if stopRequested.value { return }
                 if !camera.connected { throw CameraError.disconnected }
+                try updateControls(camera, &applied)
                 Thread.sleep(forTimeInterval: 0.25)
             }
-            try stream(camera, to: sink)
+            try stream(camera, to: sink, applied: &applied)
         }
     }
 
     /// Records and streams until no app has used the camera for `grace` seconds.
-    private nonisolated func stream(_ camera: Camera, to sink: CameraSink) throws {
+    private nonisolated func stream(_ camera: Camera, to sink: CameraSink, applied: inout Applied) throws {
         let decoder = FrameDecoder()
         var shown = 0
         var last: CVPixelBuffer?
         var decoded = false
         decoder.onFrame = { buffer in
             sink.send(buffer)
+            Preview.shared.show(buffer)
             last = buffer
             decoded = true
             shown += 1
@@ -113,6 +186,7 @@ final class Pipeline: ObservableObject {
         var received = 0, failuresBefore = 0
         let capture = UserDefaults.standard.bool(forKey: "SaveCapture") ? Capture() : nil
         report("Starting to record…", .streaming)
+        try Firmware.setScreen(camera, true)
         try Firmware.setRecording(camera, true)
         defer {
             if camera.connected {
@@ -133,9 +207,10 @@ final class Pipeline: ObservableObject {
                 if !decoded, let last { sink.send(last) }
             }
             if frames.isEmpty { Thread.sleep(forTimeInterval: 0.003) }
+            try updateControls(camera, &applied)
             if Date().timeIntervalSince(lastChecked) >= 0.5 {
                 lastChecked = Date()
-                if CameraSink.inUse() { lastUsed = lastChecked }
+                if wanted() { lastUsed = lastChecked }
                 if lastChecked.timeIntervalSince(lastUsed) >= Pipeline.grace { return }
             }
             let elapsed = Date().timeIntervalSince(since)
@@ -157,15 +232,23 @@ final class Pipeline: ObservableObject {
     }
 }
 
-/// A Bool shared between threads.
-final class Flag: @unchecked Sendable {
+/// A value shared between threads.
+final class Locked<Value>: @unchecked Sendable {
     private let lock = NSLock()
-    private var stored = false
+    private var stored: Value
 
-    var value: Bool {
+    init(_ value: Value) { stored = value }
+
+    var value: Value {
         get { lock.withLock { stored } }
         set { lock.withLock { stored = newValue } }
     }
+}
+
+typealias Flag = Locked<Bool>
+
+extension Locked where Value == Bool {
+    convenience init() { self.init(false) }
 }
 
 /// Saves the first 1800 frames (one minute) to the Downloads folder, with a list of

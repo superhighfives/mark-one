@@ -56,6 +56,7 @@ enum Firmware {
         let pcMode = try camera.run(read32, 0, 0, 0x605F_0D3C).0
         try camera.run(0x7EDD_55BA, 2, 50, pcMode, 1)      // notification 50: camera control
         try camera.poke(keyStub, keyCode)
+        try camera.poke(buttonStub, buttonCode)
     }
 
     /// The power switch's entry in the mode manager's event check table
@@ -67,10 +68,143 @@ enum Firmware {
     /// press does. Placed over console-only code, after asm/post.s.
     static let keyStub = UInt32(0x7EAB_0380)
     static let keyCode = Data(hex: "f8fef8dd9818caff0020df0008cb")
+    /// asm/button.s: sends a key event through the key task's own send
+    /// function, the way a real button press arrives.
+    static let buttonStub = UInt32(0x7EAA_F5E0)
+    static let buttonCode = Data(hex: "f8fef8ddba00f3ffc00cdf0008cb")
     /// The REC button ("Cut2" in the firmware's key table).
     static let recordButton = UInt32(0x1209)
     /// The shooting API's sequence state: 0x10 while a movie records.
     static let sequence = UInt32(0x602B_1FF4)
+
+    /// Objects whose methods the firmware's own menus call. Each is a pointer
+    /// to the object; the methods take it in a0.
+    static let settingsObject = UInt32(0x602B_2598)    // OlyHfwUserSettingManager
+    static let commonObject = UInt32(0x602B_243C)      // CameraCommon
+    static let setSetting = UInt32(0x7EAD_1020)        // d0 = setting, d1 = 0, a1 = value
+    static let setModeDial = UInt32(0x7EAA_71CD)       // d0 = dial state
+    static let getModeDial = UInt32(0x7EAA_683F)
+    static let backlight = UInt32(0x7EAA_6EBC)         // d0 = 1 on, 0 off
+    static let undim = UInt32(0x7EAA_6BF6)
+    static let cancelKeys = UInt32(0x7EAC_B1A9)        // d0 = count, a1 = list
+    static let resetKeys = UInt32(0x7EAC_B21A)
+    /// Set while the dial state comes from setModeDial instead of the dial.
+    static let dialOverride = UInt32(0x605A_EDBC)
+    static let movieDial = UInt32(5)
+    static let getSetting = UInt32(0x7EAD_08AA)        // d0 = setting, a1 = where to put the value
+    static let afTarget = UInt32(0x79)                 // 1-35, by columns; 18 is the center
+    static let movieAFMode = UInt32(0x1B2)             // 0 single, 1 continuous, 2 manual
+    /// A word for getSetting's answer, in the same console usage text as keyList.
+    static let settingOut = UInt32(0x7EAA_F5F0)
+    /// Where the list of locked controls goes: the usage text of the
+    /// console's `sdk api cancelKeyEvent` command.
+    static let keyList = UInt32(0x7EAA_F460)
+    /// Every control but the power switch, the eye sensor, the two dials
+    /// (exposure compensation) and a half press of the shutter button
+    /// (focus). The full press and the movie button are locked too; Mark
+    /// One's key stub reaches the key queue past this list.
+    static let lockedKeys: [UInt32] = [48, 49, 52, 53, 56, 57, 60, 61, 64, 65, 68, 69, 72, 73, 76, 77,
+                                       80, 81, 84, 85, 88, 89, 92, 93, 96, 97, 100, 101, 120, 121, 127, 128]
+
+    /// Camera settings Mark One changes and puts back afterwards.
+    struct Saved {
+        var movieAFMode: UInt32
+    }
+
+    static func readSetting(_ camera: Camera, _ setting: UInt32) throws -> UInt32 {
+        let settings = try camera.run(read32, 0, 0, settingsObject).0
+        try camera.run(getSetting, setting, 0, settings, settingOut)
+        return try camera.run(read32, 0, 0, settingOut).0
+    }
+
+    static func writeSetting(_ camera: Camera, _ setting: UInt32, _ value: UInt32) throws {
+        let settings = try camera.run(read32, 0, 0, settingsObject).0
+        try camera.run(setSetting, setting, 0, settings, value)
+    }
+
+    /// Sets the camera up the same way every time: movie mode whatever the
+    /// mode dial says, the center focus point, and single autofocus, so the
+    /// camera focuses only when asked instead of hunting mid-call. Run after
+    /// `prepare`; the camera takes a moment to switch to shooting. Returns
+    /// the settings to restore with `releasePresets`.
+    static func applyPresets(_ camera: Camera) throws -> Saved {
+        let common = try camera.run(read32, 0, 0, commonObject).0
+        let settings = try camera.run(read32, 0, 0, settingsObject).0
+        for _ in 0..<20 {
+            try camera.run(setModeDial, movieDial, 0, common)
+            if try camera.run(getModeDial, 0, 0, common).0 == movieDial { break }
+            Thread.sleep(forTimeInterval: 0.25)
+        }
+        try camera.run(setSetting, afTarget, 0, settings, 18)
+        let saved = Saved(movieAFMode: try readSetting(camera, movieAFMode))
+        try writeSetting(camera, movieAFMode, 0)
+        return saved
+    }
+
+    /// Locks every control but the power switch, the dials and focusing, or
+    /// unlocks them all.
+    static func setControlsLocked(_ camera: Camera, _ locked: Bool) throws {
+        try camera.run(resetKeys)
+        guard locked else { return }
+        for (index, key) in lockedKeys.enumerated() {
+            try camera.run(write32, key, 0, keyList + UInt32(4 * index))
+        }
+        try camera.run(cancelKeys, UInt32(lockedKeys.count), 0, 0, keyList)
+    }
+
+    /// Hands the controls back: the mode dial and buttons work again and the
+    /// screen is on.
+    static func releasePresets(_ camera: Camera, _ saved: Saved) throws {
+        try camera.run(resetKeys)
+        try writeSetting(camera, movieAFMode, saved.movieAFMode)
+        let word = try camera.run(read32, 0, 0, dialOverride).0
+        try camera.run(write32, word & 0xFFFF_0000, 0, dialOverride)
+        try setScreen(camera, true)
+    }
+
+    /// Exposure compensation: 0x100 is one stop.
+    static let exposureCompensation = UInt32(0x03)
+
+    /// Sets exposure compensation in thirds of a stop. Works while recording.
+    static func setBrightness(_ camera: Camera, _ thirds: Int) throws {
+        let settings = try camera.run(read32, 0, 0, settingsObject).0
+        let value = Int32((Double(thirds) * 256 / 3).rounded())
+        try camera.run(setSetting, exposureCompensation, 0, settings, UInt32(bitPattern: value))
+    }
+
+    /// Turns the rear screen on at full brightness, or off.
+    static func setScreen(_ camera: Camera, _ on: Bool) throws {
+        let common = try camera.run(read32, 0, 0, commonObject).0
+        try camera.run(backlight, on ? 1 : 0, 0, common)
+        if on { try camera.run(undim, 0, 0, common) }
+    }
+
+    /// A half press of the shutter button ("Trg1" in the firmware's key table).
+    static let halfPressKey = UInt32(0x0100)
+
+    /// The key task's record of the shutter button: one byte each at
+    /// 0x60501e98 to 0x60501e9b. When the button is pushed halfway, the key
+    /// task (0x7e5ec962) sets 0x60501e99 and 0x60501e9b to 1 and sends the
+    /// press event; when it's let go, it clears them and sends the release.
+    static let shutterState = UInt32(0x6050_1E98)
+    static let halfPressHeld = UInt32(0x0100_0100)
+
+    /// Presses the shutter button halfway, which focuses, even while
+    /// recording. While recording, the camera keeps checking whether the
+    /// button is still down (0x7e5ebb4b, from 0x7eb75d93) and stops focusing
+    /// once it isn't. That check reads the key task's record rather than
+    /// the button itself, so mark the button as held there too.
+    static func startFocus(_ camera: Camera) throws {
+        let state = try camera.run(read32, 0, 0, shutterState).0
+        try camera.run(write32, state | halfPressHeld, 0, shutterState)
+        try camera.run(buttonStub, 0x0200_0000 | halfPressKey)
+    }
+
+    static func endFocus(_ camera: Camera) throws {
+        try camera.run(buttonStub, 0x0201_0000 | halfPressKey)
+        let state = try camera.run(read32, 0, 0, shutterState).0
+        try camera.run(write32, state & ~halfPressHeld, 0, shutterState)
+    }
 
     static func isRecording(_ camera: Camera) throws -> Bool {
         try camera.run(read32, 0, 0, sequence).0 == 0x10
