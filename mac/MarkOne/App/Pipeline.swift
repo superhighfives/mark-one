@@ -83,7 +83,7 @@ final class Pipeline: ObservableObject {
         }
     }
 
-    @Published var whiteBalance = WhiteBalance(rawValue: UInt32(UserDefaults.standard.integer(forKey: "WhiteBalance"))) ?? .auto {
+    @Published var whiteBalance = UInt32(exactly: UserDefaults.standard.integer(forKey: "WhiteBalance")).flatMap { WhiteBalance(rawValue: $0) } ?? .auto {
         didSet {
             UserDefaults.standard.set(Int(whiteBalance.rawValue), forKey: "WhiteBalance")
             whiteBalanceWanted.value = whiteBalance.rawValue
