@@ -5,7 +5,6 @@ import SwiftUI
 struct MenuView: View {
     @ObservedObject var installer: ExtensionInstaller
     @ObservedObject var pipeline: Pipeline
-    @ObservedObject private var planned = Planned.shared
     @ObservedObject private var preferences = Preferences.shared
     @Environment(\.openSettings) private var openSettings
     @Environment(\.openWindow) private var openWindow
@@ -71,7 +70,7 @@ struct MenuView: View {
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
-            if mode == .connected || mode == .firmware, let battery = planned.battery {
+            if mode == .connected || mode == .firmware, let battery = pipeline.battery {
                 BatteryLevel(level: battery)
             }
         }
@@ -200,16 +199,11 @@ struct MenuView: View {
             Card {
                 VStack(alignment: .leading, spacing: 12) {
                     BrightnessControl(pipeline: pipeline)
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("White balance")
-                        Picker("White balance", selection: $planned.whiteBalance) {
-                            ForEach(Planned.WhiteBalance.allCases) { Text($0.rawValue).tag($0) }
-                        }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
+                    Picker("White balance", selection: $pipeline.whiteBalance) {
+                        ForEach(Pipeline.WhiteBalance.allCases) { Text($0.label).tag($0) }
                     }
-                    Picker("Picture mode", selection: $planned.pictureMode) {
-                        ForEach(Planned.PictureMode.allCases) { Text($0.rawValue).tag($0) }
+                    Picker("Picture mode", selection: $pipeline.pictureMode) {
+                        ForEach(Pipeline.PictureMode.allCases) { Text($0.label).tag($0) }
                     }
                     HStack {
                         Button(pipeline.focusing ? "Focusing…" : "Focus") { pipeline.focus() }

@@ -58,12 +58,11 @@ struct WelcomeView: View {
     let done: () -> Void
     @ObservedObject private var installer = ExtensionInstaller.shared
     @ObservedObject private var pipeline = Pipeline.shared
-    @ObservedObject private var planned = Planned.shared
     @Environment(\.openWindow) private var openWindow
 
     private var connectedDetail: String {
         var parts = [pipeline.firmware.map { "Firmware: \($0.label)" } ?? "Checking the firmware…"]
-        if let battery = planned.battery { parts.append("Battery \(battery)%") }
+        if let battery = pipeline.battery { parts.append("Battery \(battery)%") }
         return parts.joined(separator: " · ")
     }
 

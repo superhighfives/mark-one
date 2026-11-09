@@ -206,3 +206,29 @@ struct PreviewOverlay: View {
         .allowsHitTesting(false)
     }
 }
+
+/// The camera's battery level, as a battery symbol and a percentage.
+struct BatteryLevel: View {
+    let level: Int
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: symbol)
+            Text("\(level)%").monospacedDigit()
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Camera battery \(level) percent")
+    }
+
+    private var symbol: String {
+        switch level {
+        case ..<13: "battery.0percent"
+        case ..<38: "battery.25percent"
+        case ..<63: "battery.50percent"
+        case ..<88: "battery.75percent"
+        default: "battery.100percent"
+        }
+    }
+}

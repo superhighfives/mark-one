@@ -106,9 +106,16 @@ enum Firmware {
     static let lockedKeys: [UInt32] = [48, 49, 52, 53, 56, 57, 60, 61, 64, 65, 68, 69, 72, 73, 76, 77,
                                        80, 81, 84, 85, 88, 89, 92, 93, 96, 97, 100, 101, 120, 121, 127, 128]
 
+    static let whiteBalance = UInt32(0x0B)             // see Pipeline.WhiteBalance
+    static let pictureMode = UInt32(0xAC)              // see Pipeline.PictureMode
+    static let facePriority = UInt32(0x172)            // 0 off, 1 faces, 2-4 faces and eyes
+
     /// Camera settings Mark One changes and puts back afterwards.
     struct Saved {
         var movieAFMode: UInt32
+        var whiteBalance: UInt32
+        var pictureMode: UInt32
+        var facePriority: UInt32
     }
 
     static func readSetting(_ camera: Camera, _ setting: UInt32) throws -> UInt32 {
@@ -137,7 +144,10 @@ enum Firmware {
             Thread.sleep(forTimeInterval: 0.25)
         }
         try camera.run(setSetting, afTarget, 0, settings, 18)
-        let saved = Saved(movieAFMode: try readSetting(camera, movieAFMode))
+        let saved = Saved(movieAFMode: try readSetting(camera, movieAFMode),
+                          whiteBalance: try readSetting(camera, whiteBalance),
+                          pictureMode: try readSetting(camera, pictureMode),
+                          facePriority: try readSetting(camera, facePriority))
         try writeSetting(camera, movieAFMode, 0)
         return saved
     }
@@ -158,6 +168,9 @@ enum Firmware {
     static func releasePresets(_ camera: Camera, _ saved: Saved) throws {
         try camera.run(resetKeys)
         try writeSetting(camera, movieAFMode, saved.movieAFMode)
+        try writeSetting(camera, whiteBalance, saved.whiteBalance)
+        try writeSetting(camera, pictureMode, saved.pictureMode)
+        try writeSetting(camera, facePriority, saved.facePriority)
         let word = try camera.run(read32, 0, 0, dialOverride).0
         try camera.run(write32, word & 0xFFFF_0000, 0, dialOverride)
         try setScreen(camera, true)
@@ -210,6 +223,14 @@ enum Firmware {
         try camera.run(buttonStub, 0x0201_0000 | halfPressKey)
         let state = try camera.run(read32, 0, 0, shutterState).0
         try camera.run(write32, state & ~halfPressHeld, 0, shutterState)
+    }
+
+    /// The battery level, 1 to 100, from the standard PTP property.
+    /// The E-M5 reports it in coarse steps.
+    static func battery(_ camera: Camera) throws -> Int {
+        let data = try camera.send(0x1015, [0x5001], name: "the battery level").1
+        guard let level = data.first else { throw CameraError.notFound }
+        return Int(level)
     }
 
     static func isRecording(_ camera: Camera) throws -> Bool {

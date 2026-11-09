@@ -50,6 +50,67 @@ final class Pipeline: ObservableObject {
         }
     }
     private let continuousWanted = Flag()
+
+    /// The camera's white balance, as values of setting 0x0b.
+    enum WhiteBalance: UInt32, CaseIterable, Identifiable {
+        case auto = 0, daylight = 6, cloudy = 7, shade = 8, incandescent = 1, fluorescent = 3
+        var id: Self { self }
+        var label: String {
+            switch self {
+            case .auto: "Auto"
+            case .daylight: "Daylight"
+            case .cloudy: "Cloudy"
+            case .shade: "Shade"
+            case .incandescent: "Incandescent"
+            case .fluorescent: "Fluorescent"
+            }
+        }
+    }
+
+    /// The camera's picture mode, as values of setting 0xac.
+    enum PictureMode: UInt32, CaseIterable, Identifiable {
+        case iEnhance = 7, vivid = 0, natural = 1, muted = 2, portrait = 5, monotone = 3
+        var id: Self { self }
+        var label: String {
+            switch self {
+            case .iEnhance: "i-Enhance"
+            case .vivid: "Vivid"
+            case .natural: "Natural"
+            case .muted: "Muted"
+            case .portrait: "Portrait"
+            case .monotone: "Monotone"
+            }
+        }
+    }
+
+    @Published var whiteBalance = WhiteBalance(rawValue: UInt32(UserDefaults.standard.integer(forKey: "WhiteBalance"))) ?? .auto {
+        didSet {
+            UserDefaults.standard.set(Int(whiteBalance.rawValue), forKey: "WhiteBalance")
+            whiteBalanceWanted.value = whiteBalance.rawValue
+        }
+    }
+    private let whiteBalanceWanted = Locked(WhiteBalance.auto.rawValue)
+
+    @Published var pictureMode = PictureMode(rawValue: UInt32(UserDefaults.standard.object(forKey: "PictureMode") as? Int ?? 1)) ?? .natural {
+        didSet {
+            UserDefaults.standard.set(Int(pictureMode.rawValue), forKey: "PictureMode")
+            pictureModeWanted.value = pictureMode.rawValue
+        }
+    }
+    private let pictureModeWanted = Locked(PictureMode.natural.rawValue)
+
+    /// Whether autofocus looks for faces first.
+    @Published var faceFocus = UserDefaults.standard.object(forKey: "FacePriority") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(faceFocus, forKey: "FacePriority")
+            faceWanted.value = faceFocus
+        }
+    }
+    private let faceWanted = Flag()
+
+    /// The camera's battery level, 1 to 100, while it's connected.
+    @Published private(set) var battery: Int?
+
     private let focusRequested = Flag()
     @Published private(set) var focusing = false
 
@@ -165,6 +226,9 @@ final class Pipeline: ObservableObject {
         brightnessWanted.value = brightness
         continuousWanted.value = continuousFocus
         graceWanted.value = grace.rawValue
+        whiteBalanceWanted.value = whiteBalance.rawValue
+        pictureModeWanted.value = pictureMode.rawValue
+        faceWanted.value = faceFocus
         let thread = Thread { [weak self] in self?.loop() }
         thread.qualityOfService = .userInteractive
         thread.start()
@@ -258,6 +322,7 @@ final class Pipeline: ObservableObject {
             closed.wait()
             Task { @MainActor in
                 self.firmware = nil
+                self.battery = nil
                 self.reportsOlderVersion = false
             }
         }
@@ -296,6 +361,10 @@ final class Pipeline: ObservableObject {
         var locked: Bool?
         var brightness: Int?
         var continuous: Bool?
+        var whiteBalance: UInt32?
+        var pictureMode: UInt32?
+        var face: Bool?
+        var batteryChecked = Date.distantPast
         let focus = FocusWatch()
     }
 
@@ -332,6 +401,24 @@ final class Pipeline: ObservableObject {
         if applied.brightness != brightness {
             try Firmware.setBrightness(camera, brightness)
             applied.brightness = brightness
+        }
+        let whiteBalance = whiteBalanceWanted.value, pictureMode = pictureModeWanted.value, face = faceWanted.value
+        if applied.whiteBalance != whiteBalance {
+            try Firmware.writeSetting(camera, Firmware.whiteBalance, whiteBalance)
+            applied.whiteBalance = whiteBalance
+        }
+        if applied.pictureMode != pictureMode {
+            try Firmware.writeSetting(camera, Firmware.pictureMode, pictureMode)
+            applied.pictureMode = pictureMode
+        }
+        if applied.face != face {
+            try Firmware.writeSetting(camera, Firmware.facePriority, face ? 1 : 0)
+            applied.face = face
+        }
+        if Date().timeIntervalSince(applied.batteryChecked) >= 30 {
+            applied.batteryChecked = Date()
+            let level = try Firmware.battery(camera)
+            Task { @MainActor in self.battery = level }
         }
         // Focus holds the shutter button half down until the picture
         // settles, and keeps streaming meanwhile.

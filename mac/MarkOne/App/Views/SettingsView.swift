@@ -62,7 +62,6 @@ private struct GeneralSettings: View {
 private struct CameraSettings: View {
     @ObservedObject var installer: ExtensionInstaller
     @ObservedObject var pipeline: Pipeline
-    @ObservedObject private var planned = Planned.shared
     @Environment(\.openWindow) private var openWindow
     @State private var confirmRemove = false
 
@@ -79,20 +78,20 @@ private struct CameraSettings: View {
                     }
                 }
                 LabeledContent("Video", value: "1080p, 30 fps, H.264")
-                if let battery = planned.battery {
+                if let battery = pipeline.battery {
                     LabeledContent("Battery") { BatteryLevel(level: battery) }
                 }
             }
             Section("Picture") {
                 BrightnessControl(pipeline: pipeline)
-                Picker("White balance", selection: $planned.whiteBalance) {
-                    ForEach(Planned.WhiteBalance.allCases) { Text($0.rawValue).tag($0) }
+                Picker("White balance", selection: $pipeline.whiteBalance) {
+                    ForEach(Pipeline.WhiteBalance.allCases) { Text($0.label).tag($0) }
                 }
-                Picker("Picture mode", selection: $planned.pictureMode) {
-                    ForEach(Planned.PictureMode.allCases) { Text($0.rawValue).tag($0) }
+                Picker("Picture mode", selection: $pipeline.pictureMode) {
+                    ForEach(Pipeline.PictureMode.allCases) { Text($0.label).tag($0) }
                 }
                 Toggle("Continuous autofocus", isOn: $pipeline.continuousFocus)
-                Toggle("Focus on faces", isOn: $planned.faceFocus)
+                Toggle("Focus on faces", isOn: $pipeline.faceFocus)
             }
             Section {
                 Toggle("Lock camera controls", isOn: $pipeline.lockControls)
