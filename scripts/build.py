@@ -85,7 +85,7 @@ PATCHES = {
     # like MTP but as connection type 7 (0x605f0d14), which the computer can
     # read to tell it apart. Type 7 uses PC sub-state 0x6004, which already
     # takes the "start camera control" events. Also bakes in what Mark One
-    # otherwise loads at run time, and reports version 2.4. See NOTES.md.
+    # otherwise loads at run time. See NOTES.md.
     'webcam': [
         # USB prompt: list five items (asm/webcam/prompt.s)
         (0x7EEC6DFB,

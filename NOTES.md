@@ -647,7 +647,7 @@ sets the version the camera reports. Build it on top of usb-tools:
 
 ```sh
 uv run scripts/build.py fw/OLY_E_097_2300_0000_0000.BIN \
-  patched/usb-tools+webcam/E0972300.BIN usb-tools webcam version=1.0
+  patched/usb-tools+webcam/E0972300.BIN usb-tools webcam
 ```
 
 How a USB connection picks its type: the type lives at 0x605f0d14.
@@ -684,11 +684,12 @@ isn't needed for it. The computer can tell Webcam from MTP by reading
   English. This is the first image that changes block 0101.
 - Version: the main block head's version word (0x10, `00 23`) sets the
   displayed version (setting 0xc082) at boot; the PTP DeviceInfo version
-  has a hardcoded 0x2300 at 0x7f0dd970. A version below 2.3 keeps
-  Olympus's updater willing to install stock 2.3 over it. Whether the card
-  updater accepts a lower version than the one installed is untested;
-  `patched/version-test` (usb-tools with version 1.0 and nothing else)
-  tests it.
+  has a hardcoded 0x2300 at 0x7f0dd970. The card updater won't install a
+  lower version than the one on the camera: `patched/version-test`
+  (usb-tools with version 1.0 and nothing else) went to a fast-flashing
+  light with no solid phase, and the camera stayed on 2.3 (2026-11-08).
+  Same-version images install fine, so build at 2.3 and use the stock 2.3
+  image on the card to go back.
 
 Build the patches:
 
