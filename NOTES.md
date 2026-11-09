@@ -776,13 +776,35 @@ Workspace needs a kernel extension there.
 
 The camera's own version check (same version or newer) applies here too.
 
-### Doing it from Mark One
+### Doing it from Mark One (built, untested on the camera)
 
 The firmup commands are registered only for connection modes 0 and 5,
-not MTP (mode 4). The webcam firmware could add them to the MTP command
-list, so Mark One sends the same sequence over the MTP connection it
-already uses. A stock camera still needs its first install from the
-card; after that, Mark One could install updates over USB.
+not MTP (mode 4). The dispatcher looks 0x9xxx commands up in the
+registered list only (0x7f0d9fcd, else 0x2005), so registering them is
+enough. In the webcam patch, MTP's setup (0x7f0d4a5b) ends with a jump
+to `asm/firmup.s` at 0x7eab0400 instead of its last `call register` and
+`ret [],4`. The stub makes that registration, calls the update block of
+modes 0 and 5's setup (0x7f0d49a4, which ends `ret [a2],8`), and returns
+for the setup function.
+
+The webcam patch also writes "MARK" and a revision number
+(`WEBCAM_REVISION` in `scripts/build.py`) at 0x7eab0414. Mark One reads
+it: a camera that refuses the read (0x2005) has stock firmware, one
+without the marker has a build from before revisions (0).
+
+`scripts/ptp.py versions` sends 0x911c and 0x9120, and `ptp.py update
+FILE` runs the whole sequence over MTP.
+
+Mark One's setup:
+
+- A stock camera gets its first install from the card. Mark One
+  downloads stock 2.3 from Olympus's server, checks its hash, applies its
+  changes as byte edits (`mac/MarkOne/App/Resources/webcam-firmware.json`,
+  from `scripts/build.py --edits`, so the app ships no Olympus code),
+  writes `DCOLYMP/E0972300.BIN` to the card and ejects it, then shows the
+  steps on the camera.
+- A camera with an older revision gets the update over USB, after Mark
+  One stops recording.
 
 Firmware comes from a POST of `<firmware_demand>` XML to
 `https://fw01.om-digitalsolutions.net/ww_inform/fcache.do`, documented

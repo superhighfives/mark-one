@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
 import olyfw  # noqa: E402
 
 BASE = 0x7E421020          # runtime address of main block byte 0
+WEBCAM_REVISION = 1        # the webcam patches' revision; see the marker at 0x7eab0414
 STOCK_SHA256 = 'cb158dbdd8092856e8060354b008369f7d33dff32a1204e966ef0d5bce85e535'
 MAIN_SHA256 = '4edb88f3b552ef2fb9066ce7d1ca8bf5b44494f4c21865ac02dcac39e833fcf9'
 
@@ -130,6 +131,15 @@ PATCHES = {
         # power switch in PC shooting (see NOTES.md, "Power switch in webcam
         # mode"): 0x7edc725f -> 0x7edc726a
         (0x7EEEA8B0, '5f72dc7e', '6a72dc7e'),
+        # firmware update commands over MTP (asm/firmup.s): the end of MTP's
+        # command setup jumps to a stub, over console-only code, that also
+        # registers modes 0 and 5's update commands
+        (0x7F0D4BCA, 'cded4ef014df0004', 'dc36b89dffcbcbcb'),
+        (0x7EAB0400, stock(17, '1be35d96dbc30e5f0071bf172e0a98d7c65044271db260d8f5352865567385e6'), 'ddb7966200f014dd9d4562002008df0004'),
+        # "MARK" and the firmware revision (a little-endian u32), which Mark
+        # One reads to tell whether the camera needs an update. Bump it with
+        # every change to these patches.
+        (0x7EAB0414, '7e8004ddc15fffff', '4d41524b' + struct.pack('<I', WEBCAM_REVISION).hex()),
     ],
 }
 
@@ -256,6 +266,11 @@ def main():
         out, _ = build(fw, [])
         print('roundtrip identical:', out == fw)
         sys.exit(0 if out == fw else 1)
+    edits_path = None
+    if '--edits' in sys.argv:
+        i = sys.argv.index('--edits')
+        edits_path = sys.argv[i + 1]
+        del sys.argv[i:i + 2]
     src, dst, names = sys.argv[1], sys.argv[2], sys.argv[3:]
     fw = open(src, 'rb').read()
     assert hashlib.sha256(fw).hexdigest() == STOCK_SHA256, 'input is not stock v2.3'
@@ -268,6 +283,30 @@ def main():
     os.makedirs(os.path.dirname(dst) or '.', exist_ok=True)
     open(dst, 'wb').write(out)
     print(f'wrote {dst}: {len(out)} bytes, {diff} file bytes differ, sha256 {hashlib.sha256(out).hexdigest()}')
+    if edits_path:
+        write_edits(edits_path, fw, out)
+
+
+def write_edits(path, fw, out):
+    """Write the changes as byte edits on the stock file, for Mark One.
+
+    Mark One downloads stock firmware from Olympus and applies these, so it
+    never ships Olympus code. Edits closer than 8 bytes are merged.
+    """
+    import json
+    edits, i = [], 0
+    while i < len(fw):
+        if fw[i] == out[i]:
+            i += 1
+            continue
+        j = i
+        while j < len(fw) and any(fw[k] != out[k] for k in range(j, min(j + 8, len(fw)))):
+            j += 1
+        edits.append([i, out[i:j].hex()])
+        i = j
+    json.dump({'stock_sha256': STOCK_SHA256, 'sha256': hashlib.sha256(out).hexdigest(),
+               'size': len(out), 'revision': WEBCAM_REVISION, 'edits': edits}, open(path, 'w'), indent=0)
+    print(f'wrote {path}: {len(edits)} edits')
 
 
 if __name__ == '__main__':

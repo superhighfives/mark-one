@@ -20,6 +20,10 @@ struct MarkOneApp: App {
                   : pipeline.state == .ready ? "video" : "video.slash")
         }
         .menuBarExtraStyle(.window)
+        Window("Camera Firmware", id: "firmware") {
+            FirmwareView(pipeline: pipeline)
+        }
+        .windowResizability(.contentSize)
     }
 }
 
@@ -47,6 +51,12 @@ struct ContentView: View {
     @ObservedObject var installer: ExtensionInstaller
     @ObservedObject var pipeline: Pipeline
     @State private var openAtLogin = SMAppService.mainApp.status == .enabled
+    @Environment(\.openWindow) private var openWindow
+
+    private func showFirmware() {
+        openWindow(id: "firmware")
+        NSApp.activate(ignoringOtherApps: true)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -73,6 +83,15 @@ struct ContentView: View {
             Text(pipeline.status)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            switch pipeline.firmware {
+            case .stock:
+                Button("Set Up Camera…") { showFirmware() }
+                    .buttonStyle(.borderedProminent)
+            case .markOne(let revision) where revision < FirmwareImage.bundledRevision:
+                Button("Update Camera…") { showFirmware() }
+            default:
+                EmptyView()
+            }
             if pipeline.framesPerSecond > 0 {
                 Text(String(format: "%.0f frames per second", pipeline.framesPerSecond))
                     .font(.callout.monospacedDigit())
@@ -101,6 +120,10 @@ struct ContentView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                    Button("Set up a camera…") { showFirmware() }
+                    Text("Puts Mark One's firmware on an E-M5 from its SD card.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     Button("Remove camera") { installer.deactivate() }
                 }
                 .padding(.top, 6)
