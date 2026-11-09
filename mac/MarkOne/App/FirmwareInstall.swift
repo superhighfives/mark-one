@@ -17,15 +17,12 @@ enum CameraFirmware: Equatable {
 extension Firmware {
     static let revisionMarker = UInt32(0x7EAB_0414)
 
-    /// Reads which firmware the camera has. Stock firmware refuses the
-    /// memory read that Mark One's firmware adds.
+    /// Reads which firmware the camera has, from the commands it lists.
+    /// Don't probe with a command stock firmware lacks: it doesn't answer
+    /// "not supported", it stalls the USB pipe until the camera restarts.
     static func identify(_ camera: Camera) throws -> CameraFirmware {
-        let marker: Data
-        do {
-            marker = try camera.peek(revisionMarker, 8)
-        } catch CameraError.command(0x2005, _) {
-            return .stock
-        }
+        guard try camera.operations().contains(0x9484) else { return .stock }
+        let marker = try camera.peek(revisionMarker, 8)
         guard marker.prefix(4) == Data("MARK".utf8) else { return .markOne(0) }
         return .markOne(Int(marker.le(UInt32.self, at: 4)))
     }

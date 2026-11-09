@@ -123,6 +123,21 @@ final class Camera: NSObject, ICDeviceBrowserDelegate, ICCameraDeviceDelegate {
         return ((0..<count).map { response.le(UInt32.self, at: 12 + 4 * $0) }, received)
     }
 
+    /// The commands the camera lists in its device info (GetDeviceInfo).
+    func operations() throws -> [UInt16] {
+        let info = try send(0x1001, [], name: "the device info").1
+        // Standard version, vendor extension ID and version, then the
+        // vendor extension description (a PTP string) and functional mode.
+        var offset = 8
+        guard info.count > offset else { return [] }
+        offset += 1 + 2 * Int(info[info.startIndex + offset]) + 2
+        guard info.count >= offset + 4 else { return [] }
+        let count = Int(info.le(UInt32.self, at: offset))
+        offset += 4
+        guard info.count >= offset + 2 * count else { return [] }
+        return (0..<count).map { info.le(UInt16.self, at: offset + 2 * $0) }
+    }
+
     /// USB transfers only reach the uncached view of RAM, 0x40000000 above the cached one.
     static func uncached(_ address: UInt32) -> UInt32 {
         (0x4000_0000..<0x8000_0000).contains(address) ? address + 0x4000_0000 : address

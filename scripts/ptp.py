@@ -126,7 +126,7 @@ class Camera:
     def open(self):
         try:
             code, _, _ = self.transact(OPEN_SESSION, (1,))
-        except usb.core.USBTimeoutError:
+        except (usb.core.USBTimeoutError, usb.core.USBError):
             # A transfer cut off halfway (a killed script, for example)
             # leaves the camera mid-command. Read and drop whatever it still
             # wants to send, then try again. Don't reset the device: in
