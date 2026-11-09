@@ -402,8 +402,8 @@ markone-feed schemes; set DEVELOPMENT_TEAM in `Local.xcconfig`):
 - `markone-feed` finds the device by its fixed UID, opens the sink with
   CMIOStreamCopyBufferQueue and enqueues each NV12 frame from stdin:
   `uv run scripts/stream.py --raw | markone-feed`. Works in QuickTime.
-- In-app pipeline (works; no Python, as the App Store needs): Start in
-  Mark One.app finds the camera with ImageCaptureCore (sandbox-friendly,
+- In-app pipeline (works; no Python, as the App Store needs): Mark
+  One.app, a menu bar app, finds the camera with ImageCaptureCore (sandbox-friendly,
   shares the camera with ptpcamerad instead of claiming the interface),
   sends the usb-tools commands with requestSendPTPCommand (`Camera.swift`),
   applies the same firmware setup as `ptp.py shoot` (`Firmware.swift`),
@@ -412,7 +412,7 @@ markone-feed schemes; set DEVELOPMENT_TEAM in `Local.xcconfig`):
   extension's sink (`CameraSink.swift`). ImageCaptureCore passes the
   vendor commands through and keeps up: all 30 frames a second arrive.
 - `defaults write com.superhighfives.markone SaveCapture -bool YES` makes
-  Start save the first minute of the stream to
+  the next recording save the first minute of the stream to
   `~/Downloads/markone-capture.h264`, with `markone-capture.txt` listing
   each frame's size and whether the decoder rejected it.
 
@@ -519,6 +519,124 @@ the cache. Only state 3 behaves differently, so nothing else changes.
 With it, the switch turns the camera off from webcam mode through the
 usual path (Misc app, `executePowerOffSubAppStateMisc`), even while
 recording, and the camera starts up normally when switched back on.
+
+## Webcam controls (Mark One, 2026-11-08)
+
+Everything here runs through the usb-tools commands while the camera is in
+shooting mode; nothing is flashed. Methods take their object in a0, so
+call them with `run(function, d0, d1, object, a1)`.
+
+### Starting on demand
+
+The camera extension publishes a custom device property
+`4cc_used_glob_0000` (selector 0x75736564, a CFString "1" or "0") that
+says whether any app has the Mark One camera's stream open. Mark One
+reads it every quarter second while idle, starts recording when it reads
+"1" (or when the panel's preview is on screen), and stops after 5
+seconds of "0".
+
+### Objects and settings
+
+- Settings, `*(0x602b2598)`: setSetting 0x7ead1020 (d0 = id, d1 = 0,
+  a1 = value), getSetting 0x7ead08aa (d0 = id, a1 = where to write the
+  value). changeMode (vtable slot 88) refuses with 0xf0000058
+  ("unresponsive") in PC shooting, because the release permission flag at
+  0x602b1f20 is 1.
+- CameraCommon, `*(0x602b243c)`: backlight 0x7eaa6ebc (d0 = 1 on at the
+  dimmed level, 0 off), endSaveLcd 0x7eaa6bf6 (undim), startSaveLcd
+  0x7eaa6b2c (dim), setModeDialState 0x7eaa71cd (d0 = state),
+  getModeDialState 0x7eaa683f. Dial states: movie 5, S 0xb.
+- setModeDialState stores an override position in the halfword at
+  0x605aedbc. While it's nonzero the camera ignores the real mode dial;
+  clearing the low 16 bits hands the dial back.
+- Setting IDs: exposure compensation 0x03 (0x100 is +1 stop, thirds are
+  0x55 and 0xab, negative values are two's complement; it works while
+  recording, though the camera shows no value on screen), AF target
+  0x79 (1 to 35, by columns on the 7x5 grid: 18 is the center, 31 the
+  top right), movie AF mode 0x1b2 (0 single, 1 continuous, 2 manual),
+  picture mode 0x136, USB mode 0x76 (0xff is Auto), sleep 0x2f, auto
+  power off 0xb2, backlit LCD 0xfe.
+- The camera reads the movie AF mode when a recording starts. Changing
+  it mid-recording does nothing until the next one, so Mark One restarts
+  the recording when the setting changes.
+
+### Keys
+
+Key events are `0x02KKxxxx`: 0x0200 press, 0x0201 release, 0x0202 held
+(sent about every 0.1 s by long-press keys). REC is 0x1209, the shutter
+half press ("Trg1") 0x0100, the full press ("Trg2") 0x0101. The key name
+table at 0x7ea0c1c0 is offset: each name pairs with the code six entries
+later.
+
+- The key task sends events through 0x7e9df69d (d0 = event, d1 = param,
+  a0 = source). It updates the long press table at 0x605aab98 (8-byte
+  entries {key, held, flag}; only REC, 0x000b, 0x120a, 0x2004, 0x2005
+  and 0x2202 are in it), runs the filter 0x7e751eeb, and posts with
+  key_post 0x7e751c1b. `asm/key.s` calls key_post directly, skipping the
+  filter; `asm/button.s` calls 0x7e9df69d, the way a real press arrives.
+- The filter drops events listed in the cancel list at 0x605aabd0 (75
+  entries of {event, param}). KeyCtrl's cancelKeyEvent 0x7eacb1a9 (d0 =
+  count, a1 = a list of event numbers) fills it and resetKeyEvent
+  0x7eacb21a clears it. Event numbers: power 36/37, half press 44/45,
+  full press 48/49, up 52/53, down 56/57, left 60/61, right 64/65, OK
+  68/69, menu 72/73, play 76/77, movie 80/81, delete 84/85, info 88/89,
+  Fn1 92/93, Fn2 96/97, zoom 100/101, EVF switch 120/121, main dial 125,
+  sub dial 126, focus ring 127, zoom ring 128. Mark One's lock cancels
+  all of these but power, the half press and the dials.
+- The real shutter button sends only a press and a release, with no held
+  events in between.
+
+### Focusing from the computer
+
+A half press focuses even while recording, but only if the camera thinks
+the button is still down. The key task keeps a record of the shutter
+button in four bytes at 0x60501e98. On a half press (0x7e5ec962) it sets
+0x60501e99 and 0x60501e9b to 1 and sends the press event; on release it
+clears them. 0x7e5ebb4b answers "is this key down" for keys 0x0100 and
+0x0101 from that record instead of the hardware (as long as 0x60501e9c
+is 0, which it is after startup).
+
+While recording, a half press starts focusing; message 16107, dispatched
+at 0x7ec7fd1b to 0x7eb75d93, then asks whether the half press is still
+down (0x7eb70eae, through 0x7e761b28 and 0x7e5ebb4b) and stops focusing if
+it isn't. With only the press event sent, the record says the button is
+up, so focusing stopped after about 0.3 seconds. Setting the two bytes
+before the press and clearing them after the release makes it focus like
+the real button. Dead ends on the way: repeating held events, and
+cancelling the release event (a cancelled release also counts as
+released).
+
+The camera doesn't say when movie autofocus has finished. The AF status
+call 0x7e75a7bd stays at 16 while recording, the AF indication
+0x7e68658c turns on partway through the search, and
+`CapTre_TakeReady::notifyAFOK` returns early while recording. Mark One
+watches the picture instead: sharpness in the middle of the frame falls
+while the lens searches and settles when it has focus, about 1.2 seconds
+after the press with a Panasonic 25mm f/1.4.
+
+To check a focus change without someone watching the camera, stream with
+a script, decode the frames with PyAV, and track the variance of a
+Laplacian over the center 400x400 pixels. A real half press took it from
+3 to 265 on an out of focus scene.
+
+### Watching key events
+
+To see what a button sends, hook the filter's entry (0x7e751eeb, jumping
+from 0x7e751eeb over `mov d0,a3; mov d0,d3` and the first part of the
+`and`, all in one cache line) and the start of key_post, and record
+{event, param, caller} in a ring that a peek reads, like `asm/trace.s`.
+Callers 0x7e9df6ae and 0x7e9df6bd are the key task; 0x7e761b48 is
+0x7e761b28, which code uses to ask whether an event would get through.
+
+Build the button stub:
+
+```sh
+T=toolchain/install/bin
+$T/mn10300-elf-as -o asm/button.o asm/button.s
+$T/mn10300-elf-ld -Ttext=0x7eaaf5e0 --defsym key_task_send=0x7e9df69d \
+  -e button -o asm/button.elf asm/button.o
+$T/mn10300-elf-objcopy -O binary asm/button.elf asm/button.bin
+```
 
 ## Recording time limit (patch ready, untested)
 
