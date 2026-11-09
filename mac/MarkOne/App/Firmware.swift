@@ -114,13 +114,16 @@ enum Firmware {
     static let fullHDFine = UInt32(0)
 
     /// Camera settings Mark One changes and puts back afterwards.
-    struct Saved {
+    struct Saved: Codable {
         var movieAFMode: UInt32
         var whiteBalance: UInt32
         var pictureMode: UInt32
         var facePriority: UInt32
         var movieQuality: UInt32
     }
+
+    /// Remembered on the Mac until they're back on the camera.
+    static let pendingKey = "CameraSettingsToRestore"
 
     static func readSetting(_ camera: Camera, _ setting: UInt32) throws -> UInt32 {
         let settings = try camera.run(read32, 0, 0, settingsObject).0
@@ -148,11 +151,15 @@ enum Firmware {
             Thread.sleep(forTimeInterval: 0.25)
         }
         try camera.run(setSetting, afTarget, 0, settings, 18)
-        let saved = Saved(movieAFMode: try readSetting(camera, movieAFMode),
-                          whiteBalance: try readSetting(camera, whiteBalance),
-                          pictureMode: try readSetting(camera, pictureMode),
-                          facePriority: try readSetting(camera, facePriority),
-                          movieQuality: try readSetting(camera, movieQuality))
+        // If the camera went off while Mark One had it (switched off or
+        // unplugged), it kept Mark One's settings, so the camera's own are the ones
+        // saved last time.
+        let saved = try Saved.pending ?? Saved(movieAFMode: readSetting(camera, movieAFMode),
+                                               whiteBalance: readSetting(camera, whiteBalance),
+                                               pictureMode: readSetting(camera, pictureMode),
+                                               facePriority: readSetting(camera, facePriority),
+                                               movieQuality: readSetting(camera, movieQuality))
+        Saved.pending = saved
         // The stream Mark One decodes is 1080p; the camera reads this when a
         // recording starts.
         try writeSetting(camera, movieQuality, fullHDFine)
@@ -180,6 +187,7 @@ enum Firmware {
         try writeSetting(camera, pictureMode, saved.pictureMode)
         try writeSetting(camera, facePriority, saved.facePriority)
         try writeSetting(camera, movieQuality, saved.movieQuality)
+        Saved.pending = nil
         let word = try camera.run(read32, 0, 0, dialOverride).0
         try camera.run(write32, word & 0xFFFF_0000, 0, dialOverride)
         try setScreen(camera, true)
@@ -287,5 +295,18 @@ extension Data {
             index = next
         }
         self.init(bytes)
+    }
+}
+
+extension Firmware.Saved {
+    /// The camera's own settings while Mark One's are on it.
+    static var pending: Self? {
+        get {
+            UserDefaults.standard.data(forKey: Firmware.pendingKey)
+                .flatMap { try? JSONDecoder().decode(Self.self, from: $0) }
+        }
+        set {
+            UserDefaults.standard.set(newValue.flatMap { try? JSONEncoder().encode($0) }, forKey: Firmware.pendingKey)
+        }
     }
 }
