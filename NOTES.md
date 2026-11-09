@@ -638,7 +638,12 @@ $T/mn10300-elf-ld -Ttext=0x7eaaf5e0 --defsym key_task_send=0x7e9df69d \
 $T/mn10300-elf-objcopy -O binary asm/button.elf asm/button.bin
 ```
 
-## Webcam USB choice (built, not flashed)
+## Webcam USB choice (working)
+
+Flashed 2026-11-08 at version 2.3. Custom menu > USB Mode lists Webcam
+after MTP, the USB prompt lists Storage, MTP, Webcam, Print, Exit, and
+choosing Webcam connects like MTP with 0x605f0d14 reading 7.
+
 
 The `webcam` patch set in `scripts/build.py` adds a "Webcam" choice to the
 camera's USB prompt (Storage, MTP, Webcam, Print, Exit) and to Custom
