@@ -802,6 +802,9 @@ started the install. The camera showed its update animation, then OK;
 switched off and on, it reported revision 1. Installs mid-session, after
 Mark One's setup, are untried, so the app asks for a restart first.
 
+Connected as Webcam (type 7), 0x911c and 0x9120 answer the same as over
+MTP, so the webcam connection gets the update commands too.
+
 Mark One's setup:
 
 - A stock camera gets its first install from the card. Mark One
