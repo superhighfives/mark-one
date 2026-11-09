@@ -638,16 +638,16 @@ $T/mn10300-elf-ld -Ttext=0x7eaaf5e0 --defsym key_task_send=0x7e9df69d \
 $T/mn10300-elf-objcopy -O binary asm/button.elf asm/button.bin
 ```
 
-## Webcam USB choice and version 2.4 (built, not flashed)
+## Webcam USB choice (built, not flashed)
 
 The `webcam` patch set in `scripts/build.py` adds a "Webcam" choice to the
 camera's USB prompt (Storage, MTP, Webcam, Print, Exit) and to Custom
-menu > USB Mode, bakes in Mark One's run-time helpers, and reports version
-2.4. Build it on top of usb-tools:
+menu > USB Mode and bakes in Mark One's run-time helpers. `version=X.Y`
+sets the version the camera reports. Build it on top of usb-tools:
 
 ```sh
 uv run scripts/build.py fw/OLY_E_097_2300_0000_0000.BIN \
-  patched/usb-tools+webcam/E0972300.BIN usb-tools webcam
+  patched/usb-tools+webcam/E0972300.BIN usb-tools webcam version=1.0
 ```
 
 How a USB connection picks its type: the type lives at 0x605f0d14.
@@ -684,9 +684,11 @@ isn't needed for it. The computer can tell Webcam from MTP by reading
   English. This is the first image that changes block 0101.
 - Version: the main block head's version word (0x10, `00 23`) sets the
   displayed version (setting 0xc082) at boot; the PTP DeviceInfo version
-  has a hardcoded 0x2300 at 0x7f0dd970. Both now say 2.4. Downgrading from
-  2.4 to 2.3 by card is untested; Olympus's updater will treat 2.4 as
-  newer.
+  has a hardcoded 0x2300 at 0x7f0dd970. A version below 2.3 keeps
+  Olympus's updater willing to install stock 2.3 over it. Whether the card
+  updater accepts a lower version than the one installed is untested;
+  `patched/version-test` (usb-tools with version 1.0 and nothing else)
+  tests it.
 
 Build the patches:
 

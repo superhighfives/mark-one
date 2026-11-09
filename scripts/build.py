@@ -1,7 +1,7 @@
 """Patch the E-M5 v2.3 firmware and repack it.
 
 Usage:
-  uv run scripts/build.py fw/OLY_E_097_2300_0000_0000.BIN patched/E0972300.BIN [patch ...]
+  uv run scripts/build.py fw/OLY_E_097_2300_0000_0000.BIN patched/E0972300.BIN [patch ...] [version=X.Y]
   uv run scripts/build.py --roundtrip fw/OLY_E_097_2300_0000_0000.BIN
 
 Patches are defined in PATCHES below as (runtime address, expected bytes, new bytes),
@@ -130,13 +130,21 @@ PATCHES = {
         # power switch in PC shooting (see NOTES.md, "Power switch in webcam
         # mode"): 0x7edc725f -> 0x7edc726a
         (0x7EEEA8B0, '5f72dc7e', '6a72dc7e'),
-        # version 2.4: the head's version word, which sets the displayed
-        # version (setting 0xc082) at boot...
-        (0x7E421010, '0023', '0024'),
-        # ...and the hardcoded 0x2300 in the PTP DeviceInfo version string
-        (0x7F0DD970, '2e0023', '2e0024'),
     ],
 }
+
+
+def version_patch(name):
+    """`version=X.Y`: the version the camera reports, one digit each side.
+
+    The main block head's version word sets the displayed version (setting
+    0xc082) at boot, and the PTP DeviceInfo version string has the stock
+    0x2300 hardcoded at 0x7f0dd970 (`mov 0x2300,d2`).
+    """
+    major, minor = name.split('=')[1].split('.')
+    assert major.isdigit() and minor.isdigit() and len(major) == len(minor) == 1, name
+    version = f'{major}{minor}'
+    return [(0x7E421010, '0023', f'00{version}'), (0x7F0DD970, '2e0023', f'2e00{version}')]
 
 # Menu string replacements for the resource block, as {string ID: text}.
 # Each language has a table of 1695 pointers (base 0xbff3d020) to UTF-16
@@ -217,7 +225,7 @@ def build(fw, names):
     assert hashlib.sha256(main).hexdigest() == MAIN_SHA256, 'main block is not stock v2.3'
     head, main = bytearray(fw[off:off + 32]), bytearray(main)
     for name in names:
-        for addr, old, new in PATCHES[name]:
+        for addr, old, new in (version_patch(name) if name.startswith('version=') else PATCHES[name]):
             target, o = (head, addr - BASE + 32) if addr < BASE else (main, addr - BASE)
             new_b = bytes.fromhex(new)
             got = bytes(target[o:o + (old[0] if isinstance(old, tuple) else len(old) // 2)])
