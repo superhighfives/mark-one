@@ -795,9 +795,13 @@ Next:
 3. Likely fix: a small stub on the unplug path (in `prepare`, like the key
    and button stubs) that clears the dial override, resets the cancelled
    keys and then lets the camera turn off, the way stock PC mode does.
-   A draft that does the first two and answers "no" lives with the
-   session's scratch files; the free space at 0x7eaaf600-0x7eaaf680
-   (console usage text) is clear of what Mark One uses. `ptp.py trace`'s
+   A draft that does the first two and answers "no", for 0x7eaaf600
+   (free console usage text up to 0x7eaaf680, clear of what Mark One
+   uses), linked with `--defsym reset_keys=0x7eacb21a --defsym
+   answer_no=0x7edc726a`:
+   `mov (20,a0),d0; cmp 3,d0; bne done; mov a0,a2; add -8,sp;
+   mov (0x605aedbc),d0; and 0xffff0000,d0; mov d0,(0x605aedbc);
+   calls reset_keys; add 8,sp; mov a2,a0; done: jmp answer_no`. `ptp.py trace`'s
    ring (0x7eab03e0, 256 bytes) overwrites the firmup stub at 0x7eab0400
    and the revision marker at 0x7eab0414, so don't trust identify after
    tracing.
