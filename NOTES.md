@@ -1117,16 +1117,27 @@ and restores over USB, and 1080p video from the movie recorder. HDMI
 through a capture card is no longer the plan; the hdmi-liveview patch
 stays here for reference, untested.
 
-0. Fixed by a Mac restart (2026-11-09): the Mark One camera disappeared
-   after the version change to 1.0 (build 1, from 0.1 build 2), with
-   1.0/1 activated and enabled but 0.1/1 and 0.1/2 waiting to uninstall
-   on reboot. After the restart only 1.0/1 is listed, its process runs,
-   and the Mark One device appears in `system_profiler
-   SPCameraDataType`. Unknown whether the lower build number caused it;
-   keep the app's build number (`CURRENT_PROJECT_VERSION` in
-   `project.yml`) increasing from here, and check that the next update
-   (1.0/2 or later) replaces the camera without a restart. This is the
-   Mac app's build number only. The camera firmware stays at 2.3.
+0. Updating the camera extension can lose the Mark One camera until the
+   Mac restarts. Seen going 0.1/2 to 1.0/1 and again 1.0/1 to 1.0/2, so
+   it isn't the build number. The system log shows why: sysextd asks
+   registerassistantservice to stop the old extension (launchd remove,
+   EINPROGRESS), then 4 ms later to start the new one, which it skips
+   with "extension is already running" because the old process hasn't
+   exited yet. The new version is then activated and enabled but never
+   launched, and reopening Mark One only gets "alreadyActive". SIP blocks
+   `launchctl kickstart` on registerassistantservice, but killing it
+   works: `sudo kill -KILL $(pgrep -x com.apple.cmio.registerassistantservice)`.
+   launchd restarts it, it launches the new extension, and Mark One then
+   needs reopening. A Mac restart also fixes it. Others hit the same race
+   (kortexa-ai/aicamera#73, grahamgilbert/movembercam#6 and #9; Apple
+   forums thread 756234). To keep users clear of it:
+   - Give the extension its own version, and change it only when the
+     extension changes, so app-only updates don't replace it. Today it
+     inherits `CURRENT_PROJECT_VERSION`.
+   - After activating, check that the Mark One device appears. If it
+     doesn't, say a restart is needed to finish the update. movembercam
+     also recovers with deactivate, wait, activate, which costs the user
+     a second approval.
 1. Done (2026-11-09): unplugging mid-call leaves the camera usable, and
    plugging it back in works. See "Unplugging in webcam mode".
 2. Record past 30 minutes to confirm the time limit change holds, and

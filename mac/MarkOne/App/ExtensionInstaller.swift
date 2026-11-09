@@ -40,7 +40,10 @@ final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionReq
     nonisolated func request(_ request: OSSystemExtensionRequest,
                              actionForReplacingExtension existing: OSSystemExtensionProperties,
                              withExtension ext: OSSystemExtensionProperties) -> OSSystemExtensionRequest.ReplacementAction {
-        .replace
+        // Replacing a running camera extension can leave none running until
+        // a restart (see NOTES.md), so only replace it with a different one.
+        let same = existing.bundleVersion == ext.bundleVersion && existing.bundleShortVersion == ext.bundleShortVersion
+        return same && existing.isEnabled && !existing.isAwaitingUserApproval ? .cancel : .replace
     }
 
     nonisolated func requestNeedsUserApproval(_ request: OSSystemExtensionRequest) {
@@ -65,6 +68,13 @@ final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionReq
 
     nonisolated func request(_ request: OSSystemExtensionRequest, didFailWithError error: Error) {
         Task { @MainActor in
+            // Cancelled above because this version is already installed.
+            if !removing, (error as? OSSystemExtensionError)?.code == .requestCanceled {
+                status = "Installed."
+                installed = true
+                needsApproval = false
+                return
+            }
             status = "Failed: \(error.localizedDescription)"
             failed = true
         }
