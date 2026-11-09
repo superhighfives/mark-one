@@ -37,6 +37,15 @@ extension Firmware {
         try camera.poke(0x7F0D_D972, Data([digits, 0xF2]))
     }
 
+    /// How the camera connected: 2 for MTP, 7 for Webcam (the webcam patch's
+    /// own type; see NOTES.md, "Webcam USB choice").
+    static let connectionTypeAddress = UInt32(0x605F_0D14)
+    static let webcamConnection = UInt32(7)
+
+    static func connectionType(_ camera: Camera) throws -> UInt32 {
+        try camera.peek(connectionTypeAddress, 4).le(UInt32.self, at: 0)
+    }
+
     /// Whether this firmware build lets MTP use the update commands.
     static func canUpdateOverUSB(_ firmware: CameraFirmware) -> Bool {
         if case .markOne(let revision) = firmware { return revision >= 1 }

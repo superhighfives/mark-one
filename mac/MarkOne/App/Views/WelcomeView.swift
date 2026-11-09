@@ -260,7 +260,7 @@ struct WelcomeView: View {
     private var connect: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Connect the camera").font(.title.weight(.bold))
-            Text("On the camera, set **USB Mode** to **MTP**, plug it in and switch it on.")
+            Text("Plug the camera in, switch it on and choose **Webcam** on its screen.")
                 .foregroundStyle(.secondary)
             Card(padding: 14) {
                 HStack(spacing: 14) {

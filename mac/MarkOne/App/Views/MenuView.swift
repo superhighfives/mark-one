@@ -9,7 +9,7 @@ struct MenuView: View {
     @Environment(\.openSettings) private var openSettings
     @Environment(\.openWindow) private var openWindow
 
-    private enum Mode { case install, waiting, off, firmware, connected }
+    private enum Mode { case install, waiting, photos, off, firmware, connected }
 
     private var mode: Mode {
         if !installer.installed && (installer.needsApproval || installer.failed) { return .install }
@@ -20,6 +20,7 @@ struct MenuView: View {
             switch pipeline.problem {
             case .wrongFirmware: return .firmware
             case .cameraOff: return .off
+            case .connectedForPhotos: return .photos
             case nil: return .waiting
             }
         }
@@ -29,6 +30,7 @@ struct MenuView: View {
         switch mode {
         case .install: "Needs your OK"
         case .waiting: "No camera yet"
+        case .photos: "Connected for photos"
         case .off: "Camera off"
         case .firmware: "Needs firmware"
         case .connected: pipeline.state == .streaming ? "Live" : "Ready"
@@ -41,6 +43,7 @@ struct MenuView: View {
             switch mode {
             case .install: install
             case .waiting: waiting
+            case .photos: photos
             case .off: off
             case .firmware: firmware
             case .connected: connected
@@ -106,9 +109,9 @@ struct MenuView: View {
             }
             Card {
                 VStack(alignment: .leading, spacing: 10) {
-                    StepRow(number: 1, text: "On the camera, set **USB Mode** to **MTP**.")
-                    StepRow(number: 2, text: "Plug it into this Mac with a USB cable.")
-                    StepRow(number: 3, text: "Switch the camera on.")
+                    StepRow(number: 1, text: "Plug it into this Mac with a USB cable.")
+                    StepRow(number: 2, text: "Switch the camera on.")
+                    StepRow(number: 3, text: "Choose **Webcam** on its screen.")
                 }
             }
             HStack(spacing: 8) {
@@ -118,6 +121,15 @@ struct MenuView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        }
+    }
+
+    private var photos: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Connected for photos").font(.title3.weight(.semibold))
+            Text("Mark One leaves the camera alone so photo apps can use it. To use it as a webcam, plug it in again and choose **Webcam** on its screen.")
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -161,16 +173,10 @@ struct MenuView: View {
         return VStack(alignment: .leading, spacing: 12) {
             PreviewView()
                 .aspectRatio(16 / 9, contentMode: .fit)
+                .overlay { PreviewOverlay(busy: pipeline.busy, focusing: pipeline.focusing) }
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(alignment: .topLeading) {
                     if live { LiveBadge().padding(8) }
-                }
-                .overlay {
-                    if !live {
-                        Text("Starting the camera…")
-                            .font(.callout)
-                            .foregroundStyle(.white.opacity(0.8))
-                    }
                 }
             VStack(alignment: .leading, spacing: 2) {
                 if live, let app = planned.activeApp {
