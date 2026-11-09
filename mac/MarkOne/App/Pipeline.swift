@@ -49,6 +49,17 @@ final class Pipeline: ObservableObject {
     private let focusRequested = Flag()
     @Published private(set) var focusing = false
 
+    /// What the camera is doing while the preview freezes (starting to
+    /// record, switching autofocus), for the preview's overlay.
+    @Published private(set) var busy: String?
+
+    private nonisolated func setBusy(_ text: String?) {
+        clearBusyOnFrame.value = text != nil
+        Task { @MainActor in self.busy = text }
+    }
+    /// Set while the overlay waits for the next picture to clear it.
+    private let clearBusyOnFrame = Flag()
+
     /// Focuses the camera, as a half press of its shutter button does.
     func focus() {
         focusing = true
@@ -162,6 +173,18 @@ final class Pipeline: ObservableObject {
                     throw CameraError.disconnected
                 }
                 try installIfRequested(camera)
+                // With the Webcam USB choice, leave the camera alone when it
+                // connects as MTP or Storage, so it still works for photos
+                // and firmware updates.
+                if case .markOne(let revision) = firmware, revision >= 1,
+                   try Firmware.connectionType(camera) != Firmware.webcamConnection {
+                    report("Connected for photos (MTP). To use the camera as a webcam, choose Webcam on its screen when you connect it.", .waiting)
+                    while camera.connected && !stopRequested.value {
+                        if installImage.value != nil { try installIfRequested(camera) }
+                        Thread.sleep(forTimeInterval: 0.5)
+                    }
+                    throw CameraError.disconnected
+                }
                 report("Setting up the camera…")
                 try Firmware.prepare(camera)
                 Thread.sleep(forTimeInterval: 1)
@@ -249,9 +272,17 @@ final class Pipeline: ObservableObject {
             // so restart the recording to switch it right away. The picture
             // freezes for about a second.
             let restart = recording && applied.continuous != nil
-            if restart { try Firmware.setRecording(camera, false) }
-            try Firmware.setContinuousFocus(camera, continuous)
-            if restart { try Firmware.setRecording(camera, true) }
+            if restart {
+                setBusy(continuous ? "Turning on continuous autofocus…" : "Turning off continuous autofocus…")
+                try Firmware.setRecording(camera, false)
+            }
+            do {
+                try Firmware.setContinuousFocus(camera, continuous)
+                if restart { try Firmware.setRecording(camera, true) }
+            } catch {
+                if restart { setBusy(nil) }
+                throw error
+            }
             applied.continuous = continuous
         }
         if applied.brightness != brightness {
@@ -304,7 +335,8 @@ final class Pipeline: ObservableObject {
         var last: CVPixelBuffer?
         var decoded = false
         let focus = applied.focus
-        decoder.onFrame = { buffer in
+        decoder.onFrame = { [weak self] buffer in
+            if let self, self.clearBusyOnFrame.value { self.setBusy(nil) }
             focus.measure(buffer)
             sink.send(buffer)
             Preview.shared.show(buffer)
@@ -317,9 +349,11 @@ final class Pipeline: ObservableObject {
         var received = 0, failuresBefore = 0
         let capture = UserDefaults.standard.bool(forKey: "SaveCapture") ? Capture() : nil
         report("Starting to record…", .streaming)
+        setBusy("Starting the camera…")
         try Firmware.setScreen(camera, true)
         try Firmware.setRecording(camera, true)
         defer {
+            setBusy(nil)
             if camera.connected {
                 report("Stopping the recording…")
                 try? Firmware.setRecording(camera, false)

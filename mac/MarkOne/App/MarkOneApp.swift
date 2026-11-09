@@ -64,6 +64,7 @@ struct ContentView: View {
                 .font(.headline)
             PreviewView()
                 .frame(width: 288, height: 162)
+                .overlay { PreviewOverlay(busy: pipeline.busy, focusing: pipeline.focusing) }
                 .clipShape(RoundedRectangle(cornerRadius: 6))
             HStack {
                 Text("Brightness")
@@ -135,6 +136,40 @@ struct ContentView: View {
             }
         }
         .padding(16)
+    }
+}
+
+/// Dims the preview with a spinner while the picture freezes, and shows a
+/// small spinner while the camera focuses, so the picture stays visible.
+struct PreviewOverlay: View {
+    let busy: String?
+    let focusing: Bool
+
+    var body: some View {
+        ZStack {
+            if let busy {
+                Color.black.opacity(0.5)
+                VStack(spacing: 8) {
+                    ProgressView().controlSize(.small).tint(.white)
+                    Text(busy).font(.callout).foregroundStyle(.white)
+                }
+                .transition(.opacity)
+            } else if focusing {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.mini).tint(.white)
+                    Text("Focusing").font(.caption).foregroundStyle(.white)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(.black.opacity(0.5), in: Capsule())
+                .padding(8)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: busy)
+        .animation(.easeInOut(duration: 0.2), value: focusing)
+        .allowsHitTesting(false)
     }
 }
 
