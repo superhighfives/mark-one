@@ -320,6 +320,24 @@ struct FirmwareView: View {
                         Button("Done") { pipeline.install = nil; step = .start; closeWindow() }
                             .keyboardShortcut(.defaultAction)
                     }
+                } else if install.phase == .restartFirst {
+                    Text("Mark One was using the camera, so the install starts fresh.")
+                    numbered(1, "Check that the battery is charged.")
+                    numbered(2, "Switch the camera off and on again, and choose MTP or Webcam on its screen.")
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("The install starts as soon as the camera reconnects.").foregroundStyle(.secondary)
+                    }
+                } else if install.phase == .installing {
+                    Text("The camera has the firmware and is installing it.")
+                    numbered(1, "Wait. The camera's screen shows an update animation. Don't switch it off or unplug it.")
+                    numbered(2, "When the screen shows OK, the install is done. Switch the camera off and on.")
+                    numbered(3, action == .restore ? "Connect the camera to your Mac again."
+                                                   : "Connect the camera to your Mac again and choose Webcam on its screen.")
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("Mark One carries on when it sees the camera.").foregroundStyle(.secondary)
+                    }
                 } else {
                     ProgressView(value: install.fraction) { Text(install.text) }
                     Label("Don't switch off or unplug the camera.", systemImage: "exclamationmark.triangle.fill")

@@ -458,7 +458,8 @@ def update(cam, path):
         time.sleep(1)
     code, params, _ = cam.transact(START_UPDATE)
     print(f'start: {code:#06x} {params}')
-    print('The camera is installing. Leave it alone until it shows OK or restarts.')
+    print('The camera is installing. Its screen shows an animation, then OK.')
+    print('When it shows OK, switch the camera off and on.')
 
 
 def main():

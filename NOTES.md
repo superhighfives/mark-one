@@ -776,7 +776,7 @@ Workspace needs a kernel extension there.
 
 The camera's own version check (same version or newer) applies here too.
 
-### Doing it from Mark One (built, untested on the camera)
+### Doing it from Mark One (working, 2026-11-08)
 
 The firmup commands are registered only for connection modes 0 and 5,
 not MTP (mode 4). The dispatcher looks 0x9xxx commands up in the
@@ -794,6 +794,13 @@ without the marker has a build from before revisions (0).
 
 `scripts/ptp.py versions` sends 0x911c and 0x9120, and `ptp.py update
 FILE` runs the whole sequence over MTP.
+
+Tested on the camera: `ptp.py update` reinstalled revision 1 over MTP,
+on a camera freshly switched on (not in Mark One's shooting setup). The
+status poll answered (1, 0) for about 30 s, then (2, 0), and 0x9123
+started the install. The camera showed its update animation, then OK;
+switched off and on, it reported revision 1. Installs mid-session, after
+Mark One's setup, are untried, so the app asks for a restart first.
 
 Mark One's setup:
 

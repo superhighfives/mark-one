@@ -65,6 +65,15 @@ final class Pipeline: ObservableObject {
         var error: String?
         /// What the camera should report once the install is done.
         var expected: CameraFirmware?
+        var phase = Phase.sending
+
+        enum Phase: Equatable {
+            /// Waiting for the camera to be switched off and on before starting.
+            case restartFirst
+            case sending
+            /// The camera has the firmware and is installing it by itself.
+            case installing
+        }
     }
     /// A USB firmware install, while one runs and after it ends.
     @Published var install: InstallProgress?
@@ -166,7 +175,7 @@ final class Pipeline: ObservableObject {
                 // restart, so start there: the install runs as soon as the
                 // camera reconnects, before Mark One sets it up.
                 installProgress(InstallProgress(text: "Switch the camera off and on again. The install starts as soon as it reconnects.",
-                                                fraction: 0, expected: installExpected))
+                                                fraction: 0, expected: installExpected, phase: .restartFirst))
                 report("Switch the camera off and on again to start the install.", .waiting)
                 while camera.connected && !stopRequested.value { Thread.sleep(forTimeInterval: 0.5) }
             } catch {
@@ -208,8 +217,7 @@ final class Pipeline: ObservableObject {
             throw error
         }
         let expected: CameraFirmware = image.revision == 0 ? .stock : .markOne(image.revision)
-        installProgress(InstallProgress(text: "The camera is installing the firmware. Leave it on and connected until it restarts.",
-                                        fraction: 0.5, expected: expected))
+        installProgress(InstallProgress(text: "The camera is installing.", fraction: 0.5, expected: expected, phase: .installing))
         // The camera drops off USB while it installs and comes back as
         // itself once it's done.
         while camera.connected && !stopRequested.value { Thread.sleep(forTimeInterval: 0.5) }
