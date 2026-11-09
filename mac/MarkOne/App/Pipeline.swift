@@ -91,7 +91,7 @@ final class Pipeline: ObservableObject {
     }
     private let whiteBalanceWanted = Locked(WhiteBalance.auto.rawValue)
 
-    @Published var pictureMode = PictureMode(rawValue: UInt32(UserDefaults.standard.object(forKey: "PictureMode") as? Int ?? 1)) ?? .natural {
+    @Published var pictureMode = UInt32(exactly: UserDefaults.standard.object(forKey: "PictureMode") as? Int ?? 1).flatMap { PictureMode(rawValue: $0) } ?? .natural {
         didSet {
             UserDefaults.standard.set(Int(pictureMode.rawValue), forKey: "PictureMode")
             pictureModeWanted.value = pictureMode.rawValue
