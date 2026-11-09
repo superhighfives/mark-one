@@ -688,8 +688,8 @@ isn't needed for it. The computer can tell Webcam from MTP by reading
   of 1695 pointers to UTF-16 strings, relative to 0xbff3d020; region 8 is
   English. This is the first image that changes block 0101.
 - Version: the main block head's version word (0x10, `00 23`) sets the
-  displayed version (setting 0xc082) at boot; the PTP DeviceInfo version
-  has a hardcoded 0x2300 at 0x7f0dd970. The card updater won't install a
+  displayed version (setting 0xc082) at boot; the body version that
+  GetVersions (0x9120) reports has a hardcoded 0x2300 at 0x7f0dd970. The card updater won't install a
   lower version than the one on the camera: `patched/version-test`
   (usb-tools with version 1.0 and nothing else) went to a fast-flashing
   light with no solid phase, and the camera stayed on 2.3 (2026-11-08).

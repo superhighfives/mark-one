@@ -138,8 +138,8 @@ def version_patch(name):
     """`version=X.Y`: the version the camera reports, one digit each side.
 
     The main block head's version word sets the displayed version (setting
-    0xc082) at boot, and the PTP DeviceInfo version string has the stock
-    0x2300 hardcoded at 0x7f0dd970 (`mov 0x2300,d2`).
+    0xc082) at boot, and the body version that GetVersions (0x9120) reports
+    has the stock 0x2300 hardcoded at 0x7f0dd970 (`mov 0x2300,d2`).
     """
     major, minor = name.split('=')[1].split('.')
     assert major.isdigit() and minor.isdigit() and len(major) == len(minor) == 1, name
