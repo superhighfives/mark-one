@@ -127,6 +127,8 @@ private struct CameraSettings: View {
 }
 
 private struct AboutSettings: View {
+    @State private var showLicense = false
+
     private var version: String {
         let info = Bundle.main.infoDictionary
         let short = info?["CFBundleShortVersionString"] as? String ?? "?"
@@ -148,18 +150,19 @@ private struct AboutSettings: View {
                 Section("Acknowledgements") {
                     LabeledContent {
                         HStack(spacing: 12) {
-                            Link("Source", destination: URL(string: "https://ffmpeg.org/download.html")!)
-                            Link("Licence", destination: URL(string: "https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html")!)
+                            Link("Source", destination: URL(string: "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz")!)
+                            Button("License") { showLicense = true }
+                                .buttonStyle(.link)
                         }
                     } label: {
-                        Text("FFmpeg (libavcodec)")
-                        Text("Decodes the camera’s video. LGPL 2.1, shipped unmodified.")
+                        Text("FFmpeg 9.0.2 (libavcodec, libavutil)")
+                        Text("Decodes the camera’s video. LGPL 2.1, built from the unmodified source and shipped as separate libraries.")
                     }
                 }
             }
             .formStyle(.grouped)
             .scrollDisabled(true)
-            .frame(height: 110)
+            .frame(height: 130)
             Text("Made by Charlie Gleason. Olympus and OM-D are trademarks of OM Digital Solutions. Mark One isn’t affiliated with or endorsed by them.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -168,5 +171,31 @@ private struct AboutSettings: View {
                 .padding(.horizontal, 24)
         }
         .padding(.vertical, 20)
+        .sheet(isPresented: $showLicense) { LicenseSheet() }
+    }
+}
+
+/// FFmpeg's license, from the copy that ships in the app.
+private struct LicenseSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    private let text = Bundle.main.url(forResource: "COPYING", withExtension: "LGPLv2.1")
+        .flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? "The license text is missing from this copy of Mark One."
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("GNU Lesser General Public License, version 2.1").font(.headline)
+            ScrollView {
+                Text(text)
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            HStack {
+                Spacer()
+                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 560, height: 480)
     }
 }

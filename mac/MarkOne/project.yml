@@ -17,7 +17,11 @@ targets:
   MarkOne:
     type: application
     platform: macOS
-    sources: [App]
+    sources:
+      - App
+      # FFmpeg's license, which has to ship with its libraries
+      - path: Vendor/ffmpeg/COPYING.LGPLv2.1
+        buildPhase: resources
     settings:
       base:
         PRODUCT_NAME: Mark One

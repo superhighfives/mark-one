@@ -1091,6 +1091,28 @@ stays here for reference, untested.
    that nothing is written to the card. See "Recording time limit".
 3. Try a USB install on a camera Mark One has already set up. If it
    works, the app can drop its "switch the camera off and on" step.
-4. App Store: FFmpeg credit and the LGPL text, drop the Downloads
-   entitlement (only debug captures use it), and check review of the
-   camera extension and USB access.
+4. App Store: done on the app's side; see "App Store". Open: whether
+   review accepts installing modified camera firmware.
+
+## App Store (prep, 2026-11-09)
+
+- FFmpeg: Settings > About credits FFmpeg 9.0.2 (libavcodec, libavutil),
+  links the exact source release, and shows the LGPL 2.1 text from the
+  copy in the app (`Vendor/ffmpeg/COPYING.LGPLv2.1`, a resource in
+  `project.yml`). The libraries are built from unmodified source with
+  `scripts/build-libavcodec.sh` and ship as separate dynamic libraries,
+  which LGPL relinking needs.
+- Entitlements are sandbox, camera, USB, network client (Olympus's
+  update server), user-selected files (the SD card, through an open
+  panel) and the system extension install. The Downloads entitlement is
+  gone: debug captures (`SaveCapture`) go to the container's Caches.
+- Camera extensions are an App Store delivery method (WWDC 2022 session
+  10022). `com.apple.developer.system-extension.install` needs a
+  provisioning profile that grants it.
+- Review risks that no code change settles: guideline 2.5.2 bars
+  downloading code that changes the app, and says nothing about
+  firmware for an accessory. Mark One also modifies Olympus's firmware,
+  whose license (shown by the update server) forbids modifying it.
+  Mark One ships only its own edits and downloads the firmware from
+  Olympus, but review may still object. Outside the App Store (Developer
+  ID and notarization) neither applies.
