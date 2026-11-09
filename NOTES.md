@@ -1117,8 +1117,16 @@ and restores over USB, and 1080p video from the movie recorder. HDMI
 through a capture card is no longer the plan; the hdmi-liveview patch
 stays here for reference, untested.
 
+0. The Mark One camera disappeared after the version change to 1.0 (build
+   1, from 0.1 build 2). `systemextensionsctl list` shows 1.0/1 activated
+   and enabled, with 0.1/1 and 0.1/2 waiting to uninstall on reboot, but
+   no Mark One device appears (`system_profiler SPCameraDataType`), the
+   extension process isn't running, and the app's CameraSink reports "not
+   installed". Reinstall didn't help. Check after a Mac restart; if it's
+   still missing, look at the build number (1 is lower than the 2 it
+   replaced) and the extension's logs.
 1. Unplugging in webcam mode: fixed in Mark One (see "Unplugging in
-   webcam mode"). Check a real unplug mid-call.
+   webcam mode"). Check a real unplug mid-call, then plugging back in.
 2. Record past 30 minutes to confirm the time limit change holds, and
    that nothing is written to the card. See "Recording time limit".
 3. Done (2026-11-09): a USB install works on a camera Mark One has set
