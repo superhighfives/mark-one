@@ -109,6 +109,9 @@ enum Firmware {
     static let whiteBalance = UInt32(0x0B)             // see Pipeline.WhiteBalance
     static let pictureMode = UInt32(0xAC)              // see Pipeline.PictureMode
     static let facePriority = UInt32(0x172)            // 0 off, 1 faces, 2-4 faces and eyes
+    /// 0 Full HD Fine, 1 Full HD Normal, 2 HD Fine, 3 HD Normal, 4-5 AVI.
+    static let movieQuality = UInt32(0x43)
+    static let fullHDFine = UInt32(0)
 
     /// Camera settings Mark One changes and puts back afterwards.
     struct Saved {
@@ -116,6 +119,7 @@ enum Firmware {
         var whiteBalance: UInt32
         var pictureMode: UInt32
         var facePriority: UInt32
+        var movieQuality: UInt32
     }
 
     static func readSetting(_ camera: Camera, _ setting: UInt32) throws -> UInt32 {
@@ -147,7 +151,11 @@ enum Firmware {
         let saved = Saved(movieAFMode: try readSetting(camera, movieAFMode),
                           whiteBalance: try readSetting(camera, whiteBalance),
                           pictureMode: try readSetting(camera, pictureMode),
-                          facePriority: try readSetting(camera, facePriority))
+                          facePriority: try readSetting(camera, facePriority),
+                          movieQuality: try readSetting(camera, movieQuality))
+        // The stream Mark One decodes is 1080p; the camera reads this when a
+        // recording starts.
+        try writeSetting(camera, movieQuality, fullHDFine)
         try writeSetting(camera, movieAFMode, 0)
         return saved
     }
@@ -171,6 +179,7 @@ enum Firmware {
         try writeSetting(camera, whiteBalance, saved.whiteBalance)
         try writeSetting(camera, pictureMode, saved.pictureMode)
         try writeSetting(camera, facePriority, saved.facePriority)
+        try writeSetting(camera, movieQuality, saved.movieQuality)
         let word = try camera.run(read32, 0, 0, dialOverride).0
         try camera.run(write32, word & 0xFFFF_0000, 0, dialOverride)
         try setScreen(camera, true)

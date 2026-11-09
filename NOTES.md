@@ -554,8 +554,29 @@ seconds of "0".
   recording, though the camera shows no value on screen), AF target
   0x79 (1 to 35, by columns on the 7x5 grid: 18 is the center, 31 the
   top right), movie AF mode 0x1b2 (0 single, 1 continuous, 2 manual),
-  picture mode 0x136, USB mode 0x76 (0xff is Auto), sleep 0x2f, auto
-  power off 0xb2, backlit LCD 0xfe.
+  USB mode 0x76 (0xff is Auto), sleep 0x2f, auto power off 0xb2,
+  backlit LCD 0xfe. 0x136 has the first six picture mode values but
+  isn't the picture mode.
+- More setting IDs, found by reading every setting before and after a
+  change on the camera (2026-11-08):
+  - White balance 0x0b: Auto 0, Sunny 6, Shade 8, Cloudy 7, Incandescent 1,
+    Fluorescent 3, Underwater 18, Flash 17, One-touch 13 and 14, Custom 9.
+  - Picture mode 0xac: i-Enhance 7, Vivid 0, Natural 1, Muted 2, Portrait 5,
+    Monotone 3, Custom 6, e-Portrait 8, then the art filters 9-18.
+  - Face priority 0x172: off 0, faces 1, then the three eye options 2-4.
+  - Movie quality 0x43: Full HD Fine 0, Full HD Normal 1, HD Fine 2,
+    HD Normal 3, AVI 4 and 5. The camera reads it when a recording starts.
+  White balance, picture mode and face priority take effect at once in
+  shooting mode.
+- Every setting has a 20-byte descriptor: {u16 id, u16 flags, value
+  pointer, pointer to the allowed values, u16 count × 64, ...}. The
+  descriptors hang off a hash table of 128 buckets at 0x605ca034 (nodes
+  {descriptor, next}). The allowed values come in the order the camera's
+  menu lists them, which is how the names above were matched. Read values
+  through getSetting and the read32 helper. Peeking the out word misses
+  writes still in the cache.
+- Battery: the standard PTP property 0x5001 (uint8, 1-100), which the
+  camera lists in its device info.
 - The camera reads the movie AF mode when a recording starts. Changing
   it mid-recording does nothing until the next one, so Mark One restarts
   the recording when the setting changes.
