@@ -124,7 +124,8 @@ enum Firmware {
 
     /// Sets the camera up the same way every time: movie mode whatever the
     /// mode dial says, the center focus point, and single autofocus, so the
-    /// camera focuses only when asked instead of hunting mid-call. Run after
+    /// camera focuses only when asked instead of hunting mid-call (the
+    /// panel's "Continuous autofocus" switches it back). Run after
     /// `prepare`; the camera takes a moment to switch to shooting. Returns
     /// the settings to restore with `releasePresets`.
     static func applyPresets(_ camera: Camera) throws -> Saved {
@@ -198,6 +199,11 @@ enum Firmware {
         let state = try camera.run(read32, 0, 0, shutterState).0
         try camera.run(write32, state | halfPressHeld, 0, shutterState)
         try camera.run(buttonStub, 0x0200_0000 | halfPressKey)
+    }
+
+    /// Switches movie autofocus between continuous and single (Focus only).
+    static func setContinuousFocus(_ camera: Camera, _ on: Bool) throws {
+        try writeSetting(camera, movieAFMode, on ? 1 : 0)
     }
 
     static func endFocus(_ camera: Camera) throws {

@@ -64,8 +64,12 @@ struct ContentView: View {
                     .font(.callout.monospacedDigit())
                     .frame(width: 34, alignment: .trailing)
             }
-            Button(pipeline.focusing ? "Focusing…" : "Focus") { pipeline.focus() }
-                .disabled(pipeline.state != .streaming || pipeline.focusing)
+            HStack {
+                Button(pipeline.focusing ? "Focusing…" : "Focus") { pipeline.focus() }
+                    .disabled(pipeline.state != .streaming || pipeline.focusing || pipeline.continuousFocus)
+                Spacer()
+                Toggle("Continuous autofocus", isOn: $pipeline.continuousFocus)
+            }
             Text(pipeline.status)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

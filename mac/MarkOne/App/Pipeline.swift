@@ -36,6 +36,16 @@ final class Pipeline: ObservableObject {
         }
     }
     private let brightnessWanted = Locked(0)
+
+    /// Whether the camera keeps refocusing by itself while recording,
+    /// rather than only when asked to with Focus.
+    @Published var continuousFocus = UserDefaults.standard.bool(forKey: "ContinuousAutofocus") {
+        didSet {
+            UserDefaults.standard.set(continuousFocus, forKey: "ContinuousAutofocus")
+            continuousWanted.value = continuousFocus
+        }
+    }
+    private let continuousWanted = Flag()
     private let focusRequested = Flag()
     @Published private(set) var focusing = false
 
@@ -60,6 +70,7 @@ final class Pipeline: ObservableObject {
         guard thread == nil else { return }
         lockWanted.value = lockControls
         brightnessWanted.value = brightness
+        continuousWanted.value = continuousFocus
         let thread = Thread { [weak self] in self?.loop() }
         thread.qualityOfService = .userInteractive
         thread.start()
@@ -117,29 +128,41 @@ final class Pipeline: ObservableObject {
     private struct Applied {
         var locked: Bool?
         var brightness: Int?
-        var focusUntil: Date?
+        var continuous: Bool?
+        let focus = FocusWatch()
     }
 
     /// Sends the panel's controls to the camera when they change.
-    private nonisolated func updateControls(_ camera: Camera, _ applied: inout Applied) throws {
-        let locked = lockWanted.value, brightness = brightnessWanted.value
+    private nonisolated func updateControls(_ camera: Camera, _ applied: inout Applied, recording: Bool = false) throws {
+        let locked = lockWanted.value, brightness = brightnessWanted.value, continuous = continuousWanted.value
         if applied.locked != locked {
             try Firmware.setControlsLocked(camera, locked)
             applied.locked = locked
+        }
+        if applied.continuous != continuous {
+            // The camera reads the autofocus mode when a recording starts,
+            // so restart the recording to switch it right away. The picture
+            // freezes for about a second.
+            let restart = recording && applied.continuous != nil
+            if restart { try Firmware.setRecording(camera, false) }
+            try Firmware.setContinuousFocus(camera, continuous)
+            if restart { try Firmware.setRecording(camera, true) }
+            applied.continuous = continuous
         }
         if applied.brightness != brightness {
             try Firmware.setBrightness(camera, brightness)
             applied.brightness = brightness
         }
-        // Focus holds the shutter button half down for two seconds, long
-        // enough for the camera to finish focusing, and keeps streaming
-        // meanwhile.
+        // Focus holds the shutter button half down until the picture
+        // settles, and keeps streaming meanwhile.
         if focusRequested.value {
             focusRequested.value = false
-            if applied.focusUntil == nil { try Firmware.startFocus(camera) }
-            applied.focusUntil = Date() + 2
-        } else if let until = applied.focusUntil, Date() >= until {
-            applied.focusUntil = nil
+            if !applied.focus.active {
+                try Firmware.startFocus(camera)
+                applied.focus.start()
+            }
+        } else if applied.focus.active && applied.focus.done {
+            applied.focus.stop()
             try Firmware.endFocus(camera)
             Task { @MainActor in self.focusing = false }
         }
@@ -174,7 +197,9 @@ final class Pipeline: ObservableObject {
         var shown = 0
         var last: CVPixelBuffer?
         var decoded = false
+        let focus = applied.focus
         decoder.onFrame = { buffer in
+            focus.measure(buffer)
             sink.send(buffer)
             Preview.shared.show(buffer)
             last = buffer
@@ -207,7 +232,7 @@ final class Pipeline: ObservableObject {
                 if !decoded, let last { sink.send(last) }
             }
             if frames.isEmpty { Thread.sleep(forTimeInterval: 0.003) }
-            try updateControls(camera, &applied)
+            try updateControls(camera, &applied, recording: true)
             if Date().timeIntervalSince(lastChecked) >= 0.5 {
                 lastChecked = Date()
                 if wanted() { lastUsed = lastChecked }
@@ -275,5 +300,73 @@ final class Capture {
             try? stream.close()
             try? log.write(to: folder.appendingPathComponent("markone-capture.txt"), atomically: true, encoding: .utf8)
         }
+    }
+}
+
+/// Tells when the camera has finished focusing. The camera doesn't say so
+/// while recording, so this watches the picture instead: sharpness in the
+/// middle of the frame falls while the lens searches, then rises and
+/// holds once it's found focus. Lives on the worker thread.
+final class FocusWatch {
+    /// The longest the shutter button stays half pressed.
+    static let limit: TimeInterval = 5
+    /// The search takes a moment to start after the press.
+    static let minimum: TimeInterval = 0.8
+
+    private(set) var active = false
+    private var started = Date.distantPast
+    private var best = 0.0
+    private var recent: [Double] = []
+
+    func start() {
+        active = true
+        started = Date()
+        best = 0
+        recent = []
+    }
+
+    func stop() { active = false }
+
+    /// Settled: the last quarter second of frames agree within 8 percent,
+    /// near the sharpest picture seen since the press.
+    var done: Bool {
+        let elapsed = Date().timeIntervalSince(started)
+        if elapsed >= FocusWatch.limit { return true }
+        guard elapsed >= FocusWatch.minimum, recent.count == 8,
+              let low = recent.min(), let high = recent.max() else { return false }
+        return high - low <= 0.08 * high && recent.last! >= 0.7 * best
+    }
+
+    func measure(_ buffer: CVPixelBuffer) {
+        guard active else { return }
+        let value = FocusWatch.sharpness(buffer)
+        best = max(best, value)
+        recent.append(value)
+        if recent.count > 8 { recent.removeFirst() }
+    }
+
+    /// The spread of a simple edge filter over the middle of the brightness
+    /// plane: high when the picture is sharp.
+    static func sharpness(_ buffer: CVPixelBuffer) -> Double {
+        CVPixelBufferLockBaseAddress(buffer, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
+        guard let base = CVPixelBufferGetBaseAddressOfPlane(buffer, 0) else { return 0 }
+        let pixels = base.assumingMemoryBound(to: UInt8.self)
+        let width = CVPixelBufferGetWidthOfPlane(buffer, 0), height = CVPixelBufferGetHeightOfPlane(buffer, 0)
+        let stride = CVPixelBufferGetBytesPerRowOfPlane(buffer, 0)
+        let size = min(400, width - 2, height - 2), left = (width - size) / 2, top = (height - size) / 2
+        var sum = 0.0, squares = 0.0, count = 0.0
+        for y in Swift.stride(from: top + 1, to: top + size - 1, by: 2) {
+            let row = pixels + y * stride
+            for x in Swift.stride(from: left + 1, to: left + size - 1, by: 2) {
+                let edge = 4 * Double(row[x]) - Double(row[x - 1]) - Double(row[x + 1])
+                    - Double(row[x - stride]) - Double(row[x + stride])
+                sum += edge
+                squares += edge * edge
+                count += 1
+            }
+        }
+        let mean = sum / count
+        return squares / count - mean * mean
     }
 }
