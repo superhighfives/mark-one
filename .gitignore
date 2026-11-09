@@ -27,3 +27,6 @@ mac/MarkOne/MarkOne.xcodeproj/
 mac/MarkOne/build/
 /build/
 mac/MarkOne/Vendor/
+
+# USB recordings; they contain firmware.
+captures/
