@@ -100,7 +100,7 @@ private struct CameraSettings: View {
                 }
             }
             Section {
-                Link("Firmware guide and help", destination: URL(string: "https://superhighfives.com/markone/help")!)
+                Link("Firmware guide and help", destination: URL(string: "https://superhighfives.com/mark-one/help")!)
             }
         }
         .formStyle(.grouped)

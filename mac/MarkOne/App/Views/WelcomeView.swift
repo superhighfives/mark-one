@@ -231,7 +231,7 @@ struct WelcomeView: View {
                             .font(.callout)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
-                        Link("Read the steps", destination: URL(string: "https://superhighfives.com/markone/help")!)
+                        Link("Read the steps", destination: URL(string: "https://superhighfives.com/mark-one/help")!)
                             .font(.callout)
                     }
                 }
