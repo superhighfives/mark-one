@@ -782,13 +782,18 @@ doesn't make this change.
 
 Next:
 
-1. Trace it without pulling the cable. Load `ptp.py trace`, set the
-   camera up as Mark One does, then post the unplug event with the cable
-   still in: call 0x7edd910c with d1 = 9 and a0 = the mode manager object
-   it was registered with (fn_7edd8fd1, called from 0x7edc71ff with
-   `(52,a0)` of the app changer). Read the ring afterwards. A real unplug
-   leaves nothing to read, since the camera drops off USB and a battery
-   pull clears RAM.
+1. Trace it without pulling the cable: `scripts/unplug.py` (ready, not
+   yet run). It sets the camera up as Mark One does (shooting, movie
+   dial, locked controls, recording), starts the trace logger, calls
+   0x7edd910c with d1 = 9 and a0 = the mode manager object it was
+   registered with, and prints the log. That object is `(52,a0)` of the
+   app changer (fn_7edd8fd1, from 0x7edc71ff); the app changer is
+   temporary and nothing keeps a pointer to it, so `--find-only` searches
+   RAM (0x60000000-0x60800000) for the registered callback and shows the
+   words around it, and `--context` takes the one to use. The callback
+   builds its own frame (`movm`, `add -28,sp`), so `run` can call it. A
+   real unplug leaves nothing to read, since the camera drops off USB and
+   a battery pull clears RAM.
 2. From the trace, find where it stops: the shooting sub-app's end, mode
    change 6 refused (the release permission flag at 0x602b1f20 is 1 in PC
    shooting; see "Objects and settings"), or something else.

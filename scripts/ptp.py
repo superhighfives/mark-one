@@ -348,13 +348,8 @@ CURRENT_REQUEST = 0x602B4A90        # the mode manager's last mode change reques
 FIRMWARE = range(0x7E421020, 0x7F200000)
 
 
-def trace(cam, seconds):
-    """Print the mode manager's log messages as they happen.
-
-    Shows every state handler, mode change request, refusal and incoming
-    system event (with its number), which tells what the camera does with
-    an event such as the power switch. Stays until the camera restarts.
-    """
+def install_trace(cam):
+    """Start recording the mode manager's log messages. Returns the count so far."""
     install_helpers(cam)
     if cam.transact(PEEK, (uncached(TRACE), len(TRACE_CODE)))[2] != TRACE_CODE:
         poke(cam, TRACE_COUNT, bytes(4), quiet=True)
@@ -365,6 +360,19 @@ def trace(cam, seconds):
             poke(cam, address, bytes.fromhex(patched), quiet=True)
         elif current != patched:
             sys.exit(f'unexpected code at {address:#010x}: {current}')
+    return struct.unpack('<I', cam.transact(PEEK, (uncached(TRACE_COUNT), 4))[2])[0]
+
+
+def trace(cam, seconds, since=None):
+    """Print the mode manager's log messages as they happen.
+
+    Shows every state handler, mode change request, refusal and incoming
+    system event (with its number), which tells what the camera does with
+    an event such as the power switch. Stays until the camera restarts.
+    `since` starts from an earlier count from install_trace, so messages
+    logged in between are printed too.
+    """
+    installed = install_trace(cam)
     names = {}
 
     def name(address):
@@ -378,7 +386,7 @@ def trace(cam, seconds):
     def count():
         return struct.unpack('<I', cam.transact(PEEK, (uncached(TRACE_COUNT), 4))[2])[0]
 
-    seen = count()
+    seen = installed if since is None else since
     request = read32(cam, CURRENT_REQUEST)
     print(f'tracing; mode change request {request}')
     deadline = time.monotonic() + seconds
