@@ -709,6 +709,66 @@ for n in prompt ok select mode; do
 done
 ```
 
+## Installing firmware over USB (research, 2026-11-08)
+
+Goal: Mark One installs the webcam firmware itself, with no SD card.
+Nothing here is tested on the wire yet.
+
+### In the camera
+
+The camera has a firmware update protocol over PTP, separate from the
+card update (`tpc_ptp_fwup_op.c`, log prefix `[TPCFirmup]`). The handlers
+are registered around 0x7f0d49a4, in the command list my earlier notes
+put at connection modes 0 and 5 (0x7f0e0773), not in MTP (mode 4):
+
+| Opcode | Handler | Name in the log | Data |
+| --- | --- | --- | --- |
+| 0x911c | 0x7f0dd2be | GetFirmwareUpdateMode | none |
+| 0x9122 | 0x7f0dd2e2 | second entry into GetFirmwareUpdateMode | none |
+| 0x9120 | 0x7f0dd36f | GetVersions | to the computer |
+| 0x9124 | 0x7f0dd3e4 | GetLanguageCode | to the computer |
+| 0x9125 | 0x7f0dd773 | SendFirmDataInfo | from the computer |
+| 0x9119 | 0x7f0dd4d8 | SendObjectSplit | from the computer |
+| 0x9121 | 0x7f0dd586 | FirmwareCheck | none |
+| 0x9123, 0x9117 | 0x7f0dd6cb | UpdateInitiate | none |
+
+SendFirmDataInfo compares the response against 0x2001 and the values
+0xb001, 0xb011, 0xb021 and checks a 0x1ca66100 constant; not traced
+further.
+
+### Olympus's side
+
+- OM Workspace (macOS and Windows, 2.5) replaced Olympus Digital Camera
+  Updater. Its procedure: take the card out, connect USB, choose
+  Storage on the camera, then Camera > Update, and wait for "OK" on the
+  camera. https://support.jp.omsystem.com/en/support/imsg/digicamera/qa/contents/ow/ow_a2.html
+- Firmware comes from a POST of `<firmware_demand>` XML to
+  `https://fw01.om-digitalsolutions.net/ww_inform/fcache.do` (User-Agent
+  `Olympus`, `<hard_code>OLY{E097}...` for this model, presumably), which
+  answers with a signed download URL for the latest version only.
+  Documented for the E-M10 in github.com/matozoid/em10_1
+  (`docs/firmware/update-server.md`); not tried for E-097.
+- The same project decompiled OM Workspace's OlyCameraLib.dll
+  (`docs/usb-protocol/firmware-update.md`, unverified on the wire): 0x9125
+  starts a transfer with a 0x3c-byte ObjectInfo-like dataset (StorageID
+  0x80000001), 0x9119 sends 0xf800-byte chunks with (offset, length),
+  then 0x9123 starts the update and the host polls 0x9122 while the
+  camera reboots into its updater. OlyGin.dll has ChangePid and
+  RebootCamera, so the camera may switch USB product ID to update.
+  libgphoto2's ptp.h has only commented guesses for 0x911c-0x9126.
+- Olympus says firmware can't be reverted, and the server only offers
+  the latest version. Whether the camera itself refuses a lower version
+  is unknown; see the version test under "Webcam USB choice".
+
+### Next
+
+Record a real update: with the camera on a version below 2.3 (the 1.0
+version test), OM Workspace should offer stock 2.3. Capture that session
+(USB capture on the Mac or in a Windows VM, or log incoming PTP commands
+on the camera with a hook like `asm/trace.s`) to confirm the opcodes,
+parameters, chunk size and how the camera enters update mode. That run
+also proves the way back to stock.
+
 ## Recording time limit (patch ready, untested)
 
 0x7e7bbe71 works out how long a movie may run and logs "MAX Time" (what
