@@ -809,7 +809,9 @@ Mark One's setup:
   changes as byte edits (`mac/MarkOne/App/Resources/webcam-firmware.json`,
   from `scripts/build.py --edits`, so the app ships no Olympus code),
   writes `DCOLYMP/E0972300.BIN` to the card and ejects it, then shows the
-  steps on the camera.
+  steps on the camera. The sandbox only allows writing to a volume the
+  user picks, so Mark One finds the card and opens a panel pointed at it
+  for one click of Use This Card.
 - A camera with an older revision gets the update over USB, after Mark
   One stops recording.
 

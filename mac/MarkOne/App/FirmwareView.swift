@@ -264,14 +264,21 @@ struct FirmwareView: View {
 
     private var cameraSteps: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("The card is ready and ejected. Now, on the camera:")
-            VStack(alignment: .leading, spacing: 8) {
-                numbered(1, "Put the card in the camera. Unplug the USB cable, and check that the battery is charged.")
-                numbered(2, "Hold down OK and switch the camera on. The screen stays dark. Let go of OK when the orange light on the front comes on.")
-                numbered(3, "Wait. The light stays on for about a minute while the camera installs. Don't switch it off or open the battery door.")
-                numbered(4, "When the light starts blinking, the camera is done. Take the battery out, put it back, and switch the camera on.")
-                numbered(5, "Connect the camera to your Mac and choose Webcam on its screen.")
+            Text("The card is ready and ejected. Now install from it on the camera.")
+            VStack(alignment: .leading, spacing: 10) {
+                numbered(1, "Put the card in the camera and unplug the USB cable. Check that the battery is charged.")
+                numbered(2, "Switch the camera off.")
+                numbered(3, "Press and hold OK, the button in the middle of the arrow pad on the back.")
+                numbered(4, "Keep holding OK, and switch the camera on. The screen stays dark; that's expected.")
+                numbered(5, "When the orange light on the front comes on, let go of OK.")
+                numbered(6, "Wait about a minute while the light stays on. The camera is installing, so don't switch it off or open the battery door.")
+                numbered(7, "When the light starts blinking, it's done. Take the battery out, put it back, and switch the camera on as usual.")
+                numbered(8, "Connect the camera to your Mac and choose Webcam on its screen.")
             }
+            Text("If the light doesn't come on, switch the camera off and start again from step 3. If the camera starts normally instead, it missed the card; the firmware is still on it, so just try again.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
                 Text("Mark One carries on when it sees the camera.").foregroundStyle(.secondary)
@@ -279,13 +286,31 @@ struct FirmwareView: View {
         }
     }
 
+    /// Asks for the card in an open panel: the sandbox only lets Mark One
+    /// write to a volume the user picks.
     private func write(_ volume: URL) {
         guard let image else { return }
+        let panel = NSOpenPanel()
+        panel.message = "Mark One needs your permission to write to the card. Choose the card, then click Use This Card."
+        panel.prompt = "Use This Card"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = false
+        panel.directoryURL = volume
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK, let chosen = panel.url else { return }
+        // Access covers the folder chosen, so it has to be the card itself.
+        guard chosen.standardizedFileURL.path == volume.standardizedFileURL.path else {
+            error = "Choose the card itself, \(volume.lastPathComponent), not a folder on it or another drive."
+            return
+        }
         error = nil
         step = .writing
         Task.detached {
+            let access = chosen.startAccessingSecurityScopedResource()
+            defer { if access { chosen.stopAccessingSecurityScopedResource() } }
             do {
-                try FirmwareInstall.writeToCard(volume, image)
+                try FirmwareInstall.writeToCard(chosen, image)
                 await MainActor.run { step = .camera }
             } catch {
                 await MainActor.run {
