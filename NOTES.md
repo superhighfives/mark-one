@@ -891,7 +891,7 @@ on a camera freshly switched on (not in Mark One's shooting setup). The
 status poll answered (1, 0) for about 30 s, then (2, 0), and 0x9123
 started the install. The camera showed its update animation, then OK;
 switched off and on, it reported revision 1. Installs mid-session, after
-Mark One's setup, are untried, so the app asks for a restart first.
+Mark One's setup, work too (see "Next", item 3).
 
 Connected as Webcam (type 7), 0x911c and 0x9120 answer the same as over
 MTP, so the webcam connection gets the update commands too.
@@ -1094,8 +1094,12 @@ stays here for reference, untested.
    path. See "Unplugging in webcam mode".
 2. Record past 30 minutes to confirm the time limit change holds, and
    that nothing is written to the card. See "Recording time limit".
-3. Try a USB install on a camera Mark One has already set up. If it
-   works, the app can drop its "switch the camera off and on" step.
+3. Done (2026-11-09): a USB install works on a camera Mark One has set
+   up (shooting mode, movie dial, a recording started and stopped, keys
+   reset). The check took about 43 s instead of 30. While it installs,
+   the screen flickers between the update icons and the last live view
+   frame left in the display buffers; the install itself is fine. The app
+   now installs straight away instead of asking for a restart.
 4. App Store: done on the app's side; see "App Store" and
    `appstore/README.md`. Before launch: settle the content rights answer
    (Olympus's firmware license forbids modifying it), whether review

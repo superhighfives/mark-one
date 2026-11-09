@@ -144,8 +144,6 @@ final class Pipeline: ObservableObject {
         var phase = Phase.sending
 
         enum Phase: Equatable {
-            /// Waiting for the camera to be switched off and on before starting.
-            case restartFirst
             case sending
             /// The camera has the firmware and is installing it by itself.
             case installing
@@ -154,9 +152,6 @@ final class Pipeline: ObservableObject {
     /// A USB firmware install, while one runs and after it ends.
     @Published var install: InstallProgress?
     private let installImage = Locked<FirmwareImage?>(nil)
-    private nonisolated var installExpected: CameraFirmware? {
-        installImage.value.map { $0.revision == 0 ? .stock : .markOne($0.revision) }
-    }
 
     /// Installs Mark One's firmware over USB. The camera has to have Mark
     /// One's firmware already; recording stops first.
@@ -297,15 +292,11 @@ final class Pipeline: ObservableObject {
                 defer { if camera.connected { try? Firmware.releasePresets(camera, saved) } }
                 try serve(camera)
             } catch PipelineInterrupt.install {
-                // Recording has stopped and the camera's settings are back,
-                // but it's still in the shooting mode Mark One set up.
-                // Installs have only been tried on a camera fresh from a
-                // restart, so start there: the install runs as soon as the
-                // camera reconnects, before Mark One sets it up.
-                installProgress(InstallProgress(text: "Switch the camera off and on again. The install starts as soon as it reconnects.",
-                                                fraction: 0, expected: installExpected, phase: .restartFirst))
-                report("Switch the camera off and on again to start the install.", .waiting)
-                while camera.connected && !stopRequested.value { Thread.sleep(forTimeInterval: 0.5) }
+                // Recording has stopped and the camera's settings are back.
+                // Installing from here, in the shooting mode Mark One set
+                // up, works; the camera's screen just flickers between the
+                // update icons and the last live picture while it installs.
+                try? installIfRequested(camera)
             } catch {
                 if !stopRequested.value {
                     report(error.localizedDescription, .waiting)
