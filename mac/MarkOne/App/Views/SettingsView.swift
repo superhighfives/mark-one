@@ -20,10 +20,23 @@ struct SettingsView: View {
 }
 
 private struct GeneralSettings: View {
+    @ObservedObject private var planned = Planned.shared
+
     var body: some View {
         Form {
             Section {
                 OpenAtLoginToggle()
+                Toggle("Show in the Dock", isOn: $planned.showInDock)
+                Toggle("Tell me when the camera turns off", isOn: $planned.notifyWhenOff)
+            }
+            Section("Recording") {
+                Picker(selection: $planned.grace) {
+                    ForEach(Planned.Grace.allCases) { Text($0.label).tag($0) }
+                } label: {
+                    Text("Stop after the call ends")
+                    Text("A short wait lets you switch apps without the camera restarting.")
+                }
+                Toggle("Mirror the preview", isOn: $planned.mirrorPreview)
             }
             Section {
                 LabeledContent("Setup") {
@@ -43,13 +56,29 @@ private struct GeneralSettings: View {
 private struct CameraSettings: View {
     @ObservedObject var installer: ExtensionInstaller
     @ObservedObject var pipeline: Pipeline
+    @ObservedObject private var planned = Planned.shared
     @State private var confirmRemove = false
 
     var body: some View {
         Form {
+            Section("This camera") {
+                LabeledContent("Camera", value: "OM-D E-M5")
+                LabeledContent("Firmware", value: planned.firmware)
+                LabeledContent("Video", value: "1080p, 30 fps, H.264")
+                if let battery = planned.battery {
+                    LabeledContent("Battery") { BatteryLevel(level: battery) }
+                }
+            }
             Section("Picture") {
                 BrightnessControl(pipeline: pipeline)
+                Picker("White balance", selection: $planned.whiteBalance) {
+                    ForEach(Planned.WhiteBalance.allCases) { Text($0.rawValue).tag($0) }
+                }
+                Picker("Picture mode", selection: $planned.pictureMode) {
+                    ForEach(Planned.PictureMode.allCases) { Text($0.rawValue).tag($0) }
+                }
                 Toggle("Continuous autofocus", isOn: $pipeline.continuousFocus)
+                Toggle("Focus on faces", isOn: $planned.faceFocus)
             }
             Section {
                 Toggle("Lock camera controls", isOn: $pipeline.lockControls)

@@ -5,6 +5,7 @@ import SwiftUI
 struct MenuView: View {
     @ObservedObject var installer: ExtensionInstaller
     @ObservedObject var pipeline: Pipeline
+    @ObservedObject private var planned = Planned.shared
     @Environment(\.openSettings) private var openSettings
 
     private enum Mode { case install, waiting, off, firmware, connected }
@@ -63,6 +64,9 @@ struct MenuView: View {
                 Text(String(format: "%.0f fps", pipeline.framesPerSecond))
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
+            }
+            if mode == .connected || mode == .firmware, let battery = planned.battery {
+                BatteryLevel(level: battery)
             }
         }
     }
@@ -166,14 +170,30 @@ struct MenuView: View {
                             .foregroundStyle(.white.opacity(0.8))
                     }
                 }
-            Text(live ? "Choose **Mark One** as the camera in any video app. Nothing is saved to the card."
-                      : "Choose **Mark One** as the camera in FaceTime, Zoom or any video app. Mark One presses REC for you.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 2) {
+                if live, let app = planned.activeApp {
+                    Text("In use by \(app)").fontWeight(.semibold)
+                }
+                Text(live ? "Nothing is saved to the card. Recording stops 5 seconds after the call ends."
+                          : "Choose **Mark One** as the camera in FaceTime, Zoom or any video app. Mark One presses REC for you.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Card {
                 VStack(alignment: .leading, spacing: 12) {
                     BrightnessControl(pipeline: pipeline)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("White balance")
+                        Picker("White balance", selection: $planned.whiteBalance) {
+                            ForEach(Planned.WhiteBalance.allCases) { Text($0.rawValue).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                    }
+                    Picker("Picture mode", selection: $planned.pictureMode) {
+                        ForEach(Planned.PictureMode.allCases) { Text($0.rawValue).tag($0) }
+                    }
                     HStack {
                         Button(pipeline.focusing ? "Focusing…" : "Focus") { pipeline.focus() }
                             .disabled(!live || pipeline.focusing || pipeline.continuousFocus)

@@ -58,6 +58,13 @@ struct WelcomeView: View {
     let done: () -> Void
     @ObservedObject private var installer = ExtensionInstaller.shared
     @ObservedObject private var pipeline = Pipeline.shared
+    @ObservedObject private var planned = Planned.shared
+
+    private var connectedDetail: String {
+        var parts = ["Firmware \(planned.firmware)"]
+        if let battery = planned.battery { parts.append("Battery \(battery)%") }
+        return parts.joined(separator: " · ")
+    }
 
     init(start: Step = .welcome, done: @escaping () -> Void) {
         _step = State(initialValue: start)
@@ -267,7 +274,9 @@ struct WelcomeView: View {
                     if pipeline.state != .waiting {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("E-M5 connected").fontWeight(.semibold)
-                            Text("Ready for video apps.").font(.callout).foregroundStyle(.secondary)
+                            Text(connectedDetail)
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
                         }
                         Spacer()
                         Image(systemName: "checkmark.circle.fill").font(.title2).foregroundStyle(.green)
