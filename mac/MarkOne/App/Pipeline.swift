@@ -19,6 +19,10 @@ final class Pipeline: ObservableObject {
     @Published private(set) var status = "Starting…"
     @Published private(set) var framesPerSecond = 0.0
 
+    /// Why Mark One is waiting, when it's something the user can fix.
+    enum Problem { case cameraOff, wrongFirmware }
+    @Published private(set) var problem: Problem?
+
     /// Whether the camera's buttons are locked while Mark One uses it.
     @Published var lockControls = UserDefaults.standard.object(forKey: "LockCameraControls") as? Bool ?? true {
         didSet {
@@ -93,12 +97,17 @@ final class Pipeline: ObservableObject {
         }
     }
 
+    private nonisolated func note(_ problem: Problem?) {
+        Task { @MainActor in self.problem = problem }
+    }
+
     private nonisolated func loop() {
         while !stopRequested.value {
             let camera = Camera()
             report("Waiting for the camera. Connect it by USB and switch it on.", .waiting)
             do {
                 try camera.connect { !self.stopRequested.value }
+                note(nil)
                 report("Setting up the camera…")
                 try Firmware.prepare(camera)
                 Thread.sleep(forTimeInterval: 1)
@@ -106,7 +115,10 @@ final class Pipeline: ObservableObject {
                 defer { if camera.connected { try? Firmware.releasePresets(camera, saved) } }
                 try serve(camera)
             } catch {
-                if !stopRequested.value { report(error.localizedDescription, .waiting) }
+                if !stopRequested.value {
+                    report(error.localizedDescription, .waiting)
+                    note(Problem(error))
+                }
                 // Wait for the camera to go away before trying it again, so a
                 // camera Mark One can't use doesn't get set up over and over.
                 if case CameraError.disconnected = error {} else {
@@ -368,5 +380,15 @@ final class FocusWatch {
         }
         let mean = sum / count
         return squares / count - mean * mean
+    }
+}
+
+private extension Pipeline.Problem {
+    init?(_ error: Error) {
+        switch error {
+        case CameraError.disconnected: self = .cameraOff
+        case FirmwareError.unexpected: self = .wrongFirmware
+        default: return nil
+        }
     }
 }
