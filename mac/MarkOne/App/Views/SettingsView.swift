@@ -57,13 +57,21 @@ private struct CameraSettings: View {
     @ObservedObject var installer: ExtensionInstaller
     @ObservedObject var pipeline: Pipeline
     @ObservedObject private var planned = Planned.shared
+    @Environment(\.openWindow) private var openWindow
     @State private var confirmRemove = false
 
     var body: some View {
         Form {
             Section("This camera") {
                 LabeledContent("Camera", value: "OM-D E-M5")
-                LabeledContent("Firmware", value: planned.firmware)
+                LabeledContent("Firmware") {
+                    HStack {
+                        Text(pipeline.firmware?.label ?? "Not connected")
+                        Button(pipeline.firmware?.updateAvailable == true ? "Update…" : "Manage…") {
+                            openWindow.firmware()
+                        }
+                    }
+                }
                 LabeledContent("Video", value: "1080p, 30 fps, H.264")
                 if let battery = planned.battery {
                     LabeledContent("Battery") { BatteryLevel(level: battery) }

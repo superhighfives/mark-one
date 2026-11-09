@@ -20,10 +20,6 @@ final class Planned: ObservableObject {
     /// STUB: the camera extension would need to find out which app it is.
     @Published var activeApp: String? = "FaceTime"
 
-    /// The camera's firmware, as shown in Settings.
-    /// STUB: report what Firmware.prepare found.
-    @Published var firmware = "2.3 + Mark One"
-
     // MARK: Picture
 
     enum WhiteBalance: String, CaseIterable, Identifiable {

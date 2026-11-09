@@ -7,6 +7,7 @@ struct MenuView: View {
     @ObservedObject var pipeline: Pipeline
     @ObservedObject private var planned = Planned.shared
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.openWindow) private var openWindow
 
     private enum Mode { case install, waiting, off, firmware, connected }
 
@@ -15,6 +16,7 @@ struct MenuView: View {
         switch pipeline.state {
         case .ready, .streaming: return .connected
         case .waiting:
+            if pipeline.firmware == .stock { return .firmware }
             switch pipeline.problem {
             case .wrongFirmware: return .firmware
             case .cameraOff: return .off
@@ -147,7 +149,7 @@ struct MenuView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            Button("Set Up Firmware…") { WelcomeWindow.show(at: .firmware) }
+            Button("Set Up Camera…") { openWindow.firmware() }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .frame(maxWidth: .infinity)
@@ -179,6 +181,14 @@ struct MenuView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+            if pipeline.firmware?.updateAvailable == true {
+                HStack {
+                    Label("New camera firmware", systemImage: "arrow.down.circle")
+                    Spacer()
+                    Button("Update Camera…") { openWindow.firmware() }
+                }
+                .font(.callout)
             }
             Card {
                 VStack(alignment: .leading, spacing: 12) {

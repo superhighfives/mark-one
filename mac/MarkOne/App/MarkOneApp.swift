@@ -20,6 +20,11 @@ struct MarkOneApp: App {
         Settings {
             SettingsView(installer: installer, pipeline: pipeline)
         }
+
+        Window("Camera Firmware", id: "firmware") {
+            FirmwareView(pipeline: pipeline)
+        }
+        .windowResizability(.contentSize)
     }
 }
 

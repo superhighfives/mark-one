@@ -10,6 +10,8 @@ Set the camera's USB mode to MTP (Custom menu, USB Mode), connect it, then:
   uv run scripts/ptp.py shoot                     # live view with USB connected
   uv run scripts/ptp.py output evf                # 800x600 live view instead of 568x480
   uv run scripts/ptp.py trace                     # print what the mode manager logs
+  uv run scripts/ptp.py versions                  # firmware versions (needs the webcam patch)
+  uv run scripts/ptp.py update E0972300.BIN       # install firmware over USB
 
 `peek`, `poke` and `run` need the usb-tools patch (commands 0x9484-0x9486).
 USB transfers only reach the uncached view of RAM, so addresses in
@@ -124,7 +126,7 @@ class Camera:
     def open(self):
         try:
             code, _, _ = self.transact(OPEN_SESSION, (1,))
-        except usb.core.USBTimeoutError:
+        except (usb.core.USBTimeoutError, usb.core.USBError):
             # A transfer cut off halfway (a killed script, for example)
             # leaves the camera mid-command. Read and drop whatever it still
             # wants to send, then try again. Don't reset the device: in
@@ -405,6 +407,61 @@ def run(cam, function, args):
     print(f'd0 = {params[0]:#010x}  a0 = {params[1]:#010x}')
 
 
+GET_UPDATE_MODE, GET_VERSIONS, FIRM_INFO, SEND_PIECE, CHECK_FIRM, UPDATE_STATUS, START_UPDATE = (
+    0x911C, 0x9120, 0x9125, 0x9119, 0x9121, 0x9122, 0x9123)
+PIECE = 0xF800
+
+
+def versions(cam):
+    """Print the update mode and the body and lens versions (read only)."""
+    code, params, _ = cam.transact(GET_UPDATE_MODE)
+    print(f'update mode: {code:#06x} {[hex(p) for p in params]}')
+    code, _, data = cam.transact(GET_VERSIONS)
+    if code != OK:
+        sys.exit(f'GetVersions failed: {code:#06x}')
+    (n,), off = struct.unpack_from('<I', data), 4
+    for _ in range(n):
+        s, off = ptp_string(data, off)
+        print(s)
+
+
+def update(cam, path):
+    """Install a firmware file over USB, the way OM Workspace does."""
+    firm = open(path, 'rb').read()
+    code, params, _ = cam.transact(GET_UPDATE_MODE)
+    if code != OK or params[:1] != (1,):
+        sys.exit(f'The camera is not ready to update: {code:#06x} {params}')
+    info = struct.pack('<IHHI', 0x80000001, 0xB001, 0, len(firm)) + bytes(48)
+    code, params, _ = cam.transact(FIRM_INFO, (0x80000001,), data_out=info)
+    if code != OK:
+        sys.exit(f'SendFirmDataInfo failed: {code:#06x} {params}')
+    for offset in range(0, len(firm), PIECE):
+        piece = firm[offset:offset + PIECE]
+        code, _, _ = cam.transact(SEND_PIECE, (offset, len(piece)), data_out=piece)
+        if code != OK:
+            sys.exit(f'sending failed at {offset:#x}: {code:#06x}')
+        print(f'\rsent {offset + len(piece)} of {len(firm)} bytes', end='', flush=True)
+    print()
+    code, params, _ = cam.transact(CHECK_FIRM)
+    if code != OK:
+        sys.exit(f'FirmwareCheck failed: {code:#06x} {params}')
+    deadline = time.monotonic() + 180
+    while True:
+        code, params, _ = cam.transact(UPDATE_STATUS)
+        print(f'status {code:#06x} {params}')
+        if code != OK or params[:1] not in ((1,), (2,)):
+            sys.exit('The camera rejected the firmware. Nothing was installed.')
+        if params[0] == 2:
+            break
+        if time.monotonic() > deadline:
+            sys.exit('The camera never finished checking the firmware. Nothing was installed.')
+        time.sleep(1)
+    code, params, _ = cam.transact(START_UPDATE)
+    print(f'start: {code:#06x} {params}')
+    print('The camera is installing. Its screen shows an animation, then OK.')
+    print('When it shows OK, switch the camera off and on.')
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest='cmd', required=True)
@@ -421,10 +478,18 @@ def main():
     out.add_argument('name', choices=sorted(OUTPUTS))
     tr = sub.add_parser('trace', help="print the mode manager's log messages")
     tr.add_argument('seconds', type=float, nargs='?', default=120)
+    sub.add_parser('versions', help='print the firmware versions the camera reports (read only)')
+    up = sub.add_parser('update', help='install a firmware file over USB')
+    up.add_argument('file')
+    up.add_argument('--yes', action='store_true', help="don't ask before installing")
     ru = sub.add_parser('run')
     ru.add_argument('function', type=lambda s: int(s, 0))
     ru.add_argument('args', nargs='*', type=lambda s: int(s, 0), help='d0, d1, a0, a1')
     args = p.parse_args()
+    if args.cmd == 'update' and not args.yes:
+        print('This rewrites the camera\'s firmware. If it stops partway, the camera may not start.')
+        if input('Type "install" to go ahead: ') != 'install':
+            sys.exit('Cancelled.')
 
     cam = Camera()
     cam.open()
@@ -439,13 +504,21 @@ def main():
             trace(cam, args.seconds)
         elif args.cmd == 'output':
             output(cam, args.name)
+        elif args.cmd == 'versions':
+            versions(cam)
+        elif args.cmd == 'update':
+            update(cam, args.file)
+            return
         elif args.cmd == 'poke':
             data = open(args.data, 'rb').read() if os.path.exists(args.data) else bytes.fromhex(args.data)
             poke(cam, args.address, data)
         else:
             run(cam, args.function, args.args[:4])
     finally:
-        cam.close()
+        try:
+            cam.close()
+        except usb.core.USBError:
+            pass  # the camera restarts to install an update
 
 
 if __name__ == '__main__':

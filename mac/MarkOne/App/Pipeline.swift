@@ -59,6 +59,54 @@ final class Pipeline: ObservableObject {
         focusRequested.value = true
     }
 
+    /// Which firmware the connected camera has, once Mark One has checked.
+    @Published private(set) var firmware: CameraFirmware?
+
+    struct InstallProgress: Equatable {
+        var text: String
+        var fraction: Double
+        var finished = false
+        var error: String?
+        /// What the camera should report once the install is done.
+        var expected: CameraFirmware?
+        var phase = Phase.sending
+
+        enum Phase: Equatable {
+            /// Waiting for the camera to be switched off and on before starting.
+            case restartFirst
+            case sending
+            /// The camera has the firmware and is installing it by itself.
+            case installing
+        }
+    }
+    /// A USB firmware install, while one runs and after it ends.
+    @Published var install: InstallProgress?
+    private let installImage = Locked<FirmwareImage?>(nil)
+    private nonisolated var installExpected: CameraFirmware? {
+        installImage.value.map { $0.revision == 0 ? .stock : .markOne($0.revision) }
+    }
+
+    /// Installs Mark One's firmware over USB. The camera has to have Mark
+    /// One's firmware already; recording stops first.
+    func installOverUSB(_ image: FirmwareImage) {
+        let expected: CameraFirmware = image.revision == 0 ? .stock : .markOne(image.revision)
+        install = InstallProgress(text: "Getting the camera ready…", fraction: 0, expected: expected)
+        installImage.value = image
+    }
+
+    /// Makes the camera report firmware 1.0 until it's switched off, so
+    /// Olympus's OM Workspace offers to install 2.3 on it.
+    func reportOlderVersion() {
+        olderVersionRequested.value = true
+    }
+    private let olderVersionRequested = Flag()
+    /// Whether the camera reports 1.0 now.
+    @Published private(set) var reportsOlderVersion = false
+
+    private nonisolated func installProgress(_ progress: InstallProgress) {
+        Task { @MainActor in self.install = progress }
+    }
+
     private var thread: Thread?
     private let stopRequested = Flag()
     private var onStopped: [() -> Void] = []
@@ -108,12 +156,37 @@ final class Pipeline: ObservableObject {
             do {
                 try camera.connect { !self.stopRequested.value }
                 note(nil)
+                let firmware = try Firmware.identify(camera)
+                Task { @MainActor in
+                    self.firmware = firmware
+                    // The camera is back after an install.
+                    if let install = self.install, install.error == nil, !install.finished,
+                       self.installImage.value == nil, install.expected == firmware {
+                        self.install = InstallProgress(text: "Installed.", fraction: 1, finished: true, expected: firmware)
+                    }
+                }
+                if firmware == .stock {
+                    report("This camera still has Olympus's firmware. Choose Set Up Camera to add Mark One's.", .waiting)
+                    while camera.connected && !stopRequested.value { Thread.sleep(forTimeInterval: 0.5) }
+                    throw CameraError.disconnected
+                }
+                try installIfRequested(camera)
                 report("Setting up the camera…")
                 try Firmware.prepare(camera)
                 Thread.sleep(forTimeInterval: 1)
                 let saved = try Firmware.applyPresets(camera)
                 defer { if camera.connected { try? Firmware.releasePresets(camera, saved) } }
                 try serve(camera)
+            } catch PipelineInterrupt.install {
+                // Recording has stopped and the camera's settings are back,
+                // but it's still in the shooting mode Mark One set up.
+                // Installs have only been tried on a camera fresh from a
+                // restart, so start there: the install runs as soon as the
+                // camera reconnects, before Mark One sets it up.
+                installProgress(InstallProgress(text: "Switch the camera off and on again. The install starts as soon as it reconnects.",
+                                                fraction: 0, expected: installExpected, phase: .restartFirst))
+                report("Switch the camera off and on again to start the install.", .waiting)
+                while camera.connected && !stopRequested.value { Thread.sleep(forTimeInterval: 0.5) }
             } catch {
                 if !stopRequested.value {
                     report(error.localizedDescription, .waiting)
@@ -128,12 +201,39 @@ final class Pipeline: ObservableObject {
             let closed = DispatchSemaphore(value: 0)
             camera.disconnect { closed.signal() }
             closed.wait()
+            Task { @MainActor in
+                self.firmware = nil
+                self.reportsOlderVersion = false
+            }
         }
         Task { @MainActor in
             self.thread = nil
             self.onStopped.forEach { $0() }
             self.onStopped = []
         }
+    }
+
+    /// Runs a requested USB install. Once the camera starts installing it
+    /// restarts by itself, so the session ends here either way.
+    private nonisolated func installIfRequested(_ camera: Camera) throws {
+        guard let image = installImage.value else { return }
+        installImage.value = nil
+        report("Installing Mark One's firmware…", .waiting)
+        do {
+            try FirmwareInstall.overUSB(camera, image) { text, fraction in
+                installProgress(InstallProgress(text: text, fraction: fraction))
+            }
+        } catch {
+            installProgress(InstallProgress(text: "", fraction: 0, finished: true, error: error.localizedDescription,
+                                            expected: nil))
+            throw error
+        }
+        let expected: CameraFirmware = image.revision == 0 ? .stock : .markOne(image.revision)
+        installProgress(InstallProgress(text: "The camera is installing.", fraction: 0.5, expected: expected, phase: .installing))
+        // The camera drops off USB while it installs and comes back as
+        // itself once it's done.
+        while camera.connected && !stopRequested.value { Thread.sleep(forTimeInterval: 0.5) }
+        throw CameraError.disconnected
     }
 
     /// The controls last sent to the camera.
@@ -146,6 +246,11 @@ final class Pipeline: ObservableObject {
 
     /// Sends the panel's controls to the camera when they change.
     private nonisolated func updateControls(_ camera: Camera, _ applied: inout Applied, recording: Bool = false) throws {
+        if olderVersionRequested.value {
+            olderVersionRequested.value = false
+            try Firmware.reportVersion(camera, major: 1, minor: 0)
+            Task { @MainActor in self.reportsOlderVersion = true }
+        }
         let locked = lockWanted.value, brightness = brightnessWanted.value, continuous = continuousWanted.value
         if applied.locked != locked {
             try Firmware.setControlsLocked(camera, locked)
@@ -195,6 +300,7 @@ final class Pipeline: ObservableObject {
             try Firmware.setScreen(camera, false)
             while !wanted() {
                 if stopRequested.value { return }
+                if installImage.value != nil { throw PipelineInterrupt.install }
                 if !camera.connected { throw CameraError.disconnected }
                 try updateControls(camera, &applied)
                 Thread.sleep(forTimeInterval: 0.25)
@@ -232,6 +338,7 @@ final class Pipeline: ObservableObject {
             }
         }
         while !stopRequested.value {
+            if installImage.value != nil { throw PipelineInterrupt.install }
             let frames = try streamer.poll()
             received += frames.count
             for frame in frames {
@@ -267,6 +374,11 @@ final class Pipeline: ObservableObject {
             }
         }
     }
+}
+
+/// Unwinds the camera session so something else can use the camera.
+enum PipelineInterrupt: Error {
+    case install
 }
 
 /// A value shared between threads.

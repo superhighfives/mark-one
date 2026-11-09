@@ -638,7 +638,12 @@ $T/mn10300-elf-ld -Ttext=0x7eaaf5e0 --defsym key_task_send=0x7e9df69d \
 $T/mn10300-elf-objcopy -O binary asm/button.elf asm/button.bin
 ```
 
-## Webcam USB choice (built, not flashed)
+## Webcam USB choice (working)
+
+Flashed 2026-11-08 at version 2.3. Custom menu > USB Mode lists Webcam
+after MTP, the USB prompt lists Storage, MTP, Webcam, Print, Exit, and
+choosing Webcam connects like MTP with 0x605f0d14 reading 7.
+
 
 The `webcam` patch set in `scripts/build.py` adds a "Webcam" choice to the
 camera's USB prompt (Storage, MTP, Webcam, Print, Exit) and to Custom
@@ -647,7 +652,7 @@ sets the version the camera reports. Build it on top of usb-tools:
 
 ```sh
 uv run scripts/build.py fw/OLY_E_097_2300_0000_0000.BIN \
-  patched/usb-tools+webcam/E0972300.BIN usb-tools webcam version=1.0
+  patched/usb-tools+webcam/E0972300.BIN usb-tools webcam
 ```
 
 How a USB connection picks its type: the type lives at 0x605f0d14.
@@ -683,12 +688,19 @@ isn't needed for it. The computer can tell Webcam from MTP by reading
   of 1695 pointers to UTF-16 strings, relative to 0xbff3d020; region 8 is
   English. This is the first image that changes block 0101.
 - Version: the main block head's version word (0x10, `00 23`) sets the
-  displayed version (setting 0xc082) at boot; the PTP DeviceInfo version
-  has a hardcoded 0x2300 at 0x7f0dd970. A version below 2.3 keeps
-  Olympus's updater willing to install stock 2.3 over it. Whether the card
-  updater accepts a lower version than the one installed is untested;
-  `patched/version-test` (usb-tools with version 1.0 and nothing else)
-  tests it.
+  displayed version (setting 0xc082) at boot; the body version that
+  GetVersions (0x9120) reports has a hardcoded 0x2300 at 0x7f0dd970. The card updater won't install a
+  lower version than the one on the camera: `patched/version-test`
+  (usb-tools with version 1.0 and nothing else) went to a fast-flashing
+  light with no solid phase, and the camera stayed on 2.3 (2026-11-08).
+  The webcam image at 1.0 was refused the same way, both as
+  `E0972300.BIN` and renamed to `E0971000.BIN`, so the file name isn't
+  what it checks. The updater reads the version word at file offset 0x10
+  (the main block head) and compares it with the installed version.
+  Equal versions pass, so never build above 2.3: a camera on 2.4 would
+  refuse stock 2.3 and have no way back.
+  Same-version images install fine, so build at 2.3 and use the stock 2.3
+  image on the card to go back.
 
 Build the patches:
 
@@ -709,65 +721,106 @@ for n in prompt ok select mode; do
 done
 ```
 
-## Installing firmware over USB (research, 2026-11-08)
+## Installing firmware over USB (recorded, 2026-11-08)
 
 Goal: Mark One installs the webcam firmware itself, with no SD card.
-Nothing here is tested on the wire yet.
 
-### In the camera
+### How the update was recorded
 
-The camera has a firmware update protocol over PTP, separate from the
-card update (`tpc_ptp_fwup_op.c`, log prefix `[TPCFirmup]`). The handlers
-are registered around 0x7f0d49a4, in the command list my earlier notes
-put at connection modes 0 and 5 (0x7f0e0773), not in MTP (mode 4):
+OM Workspace only offers an update to a camera that reports an older
+version, and it reads the version with GetVersions (0x9120). That
+handler builds the body version string (`OLYE0970000000000-00002300-…`)
+from the `mov 0x2300,d2` at 0x7f0dd970, not from the block head. With
+usb-tools in MTP mode, writing `00 10` at 0x7e421010 and `10 f2` at
+0x7f0dd972 makes the camera report 1.0 until it restarts. The camera
+was then moved, still on, to a Windows PC in Storage mode, where OM
+Workspace offered 2.3 and installed it. USBPcap recorded the session;
+the recording is `captures/om-workspace-update-2.3.pcap` (gitignored,
+135 MB, the camera is device 13).
 
-| Opcode | Handler | Name in the log | Data |
-| --- | --- | --- | --- |
-| 0x911c | 0x7f0dd2be | GetFirmwareUpdateMode | none |
-| 0x9122 | 0x7f0dd2e2 | second entry into GetFirmwareUpdateMode | none |
-| 0x9120 | 0x7f0dd36f | GetVersions | to the computer |
-| 0x9124 | 0x7f0dd3e4 | GetLanguageCode | to the computer |
-| 0x9125 | 0x7f0dd773 | SendFirmDataInfo | from the computer |
-| 0x9119 | 0x7f0dd4d8 | SendObjectSplit | from the computer |
-| 0x9121 | 0x7f0dd586 | FirmwareCheck | none |
-| 0x9123, 0x9117 | 0x7f0dd6cb | UpdateInitiate | none |
+### Transport
 
-SendFirmDataInfo compares the response against 0x2001 and the values
-0xb001, 0xb011, 0xb021 and checks a 0x1ca66100 constant; not traced
-further.
+In Storage mode (USB product ID 0x012e) the PTP containers travel inside
+vendor SCSI commands on the mass storage bulk pipes. Each CDB is 16
+bytes, with the transfer length at bytes 9-12 big-endian:
 
-### Olympus's side
+| CDB | Direction | Carries |
+| --- | --- | --- |
+| c0 | out, 64 bytes | the command container |
+| c1 | out | a data container (12-byte header, then data) |
+| c4 | in, 64 bytes | the coming data phase's header (its length) |
+| c2 | in | a data container |
+| c3 | in, 64 bytes | the response container |
 
-- OM Workspace (macOS and Windows, 2.5) replaced Olympus Digital Camera
-  Updater. Its procedure: take the card out, connect USB, choose
-  Storage on the camera, then Camera > Update, and wait for "OK" on the
-  camera. https://support.jp.omsystem.com/en/support/imsg/digicamera/qa/contents/ow/ow_a2.html
-- Firmware comes from a POST of `<firmware_demand>` XML to
-  `https://fw01.om-digitalsolutions.net/ww_inform/fcache.do` (User-Agent
-  `Olympus`, `<hard_code>OLY{E097}...` for this model, presumably), which
-  answers with a signed download URL for the latest version only.
-  Documented for the E-M10 in github.com/matozoid/em10_1
-  (`docs/firmware/update-server.md`); not tried for E-097.
-- The same project decompiled OM Workspace's OlyCameraLib.dll
-  (`docs/usb-protocol/firmware-update.md`, unverified on the wire): 0x9125
-  starts a transfer with a 0x3c-byte ObjectInfo-like dataset (StorageID
-  0x80000001), 0x9119 sends 0xf800-byte chunks with (offset, length),
-  then 0x9123 starts the update and the host polls 0x9122 while the
-  camera reboots into its updater. OlyGin.dll has ChangePid and
-  RebootCamera, so the camera may switch USB product ID to update.
-  libgphoto2's ptp.h has only commented guesses for 0x911c-0x9126.
-- Olympus says firmware can't be reverted, and the server only offers
-  the latest version. Whether the camera itself refuses a lower version
-  is unknown; see the version test under "Webcam USB choice".
+macOS gives mass storage devices to its own driver, which is why OM
+Workspace needs a kernel extension there.
 
-### Next
+### The update, as OM Workspace runs it
 
-Record a real update: with the camera on a version below 2.3 (the 1.0
-version test), OM Workspace should offer stock 2.3. Capture that session
-(USB capture on the Mac or in a Windows VM, or log incoming PTP commands
-on the camera with a hook like `asm/trace.s`) to confirm the opcodes,
-parameters, chunk size and how the camera enters update mode. That run
-also proves the way back to stock.
+1. OpenSession, GetFirmwareUpdateMode (0x911c, answers 1), GetVersions
+   (0x9120, body then lens), GetLanguageCode (0x9124 with 1, then
+   0x8000), CloseSession. Then OpenSession again once the user starts
+   the update.
+2. 0x911c again (answers 1).
+3. SendFirmDataInfo (0x9125, param 0x80000001) with 60 bytes of data:
+   words 0x80000001, 0xb001, the file size (0x02c70000), then zeros.
+   Response params 0x80000001, 0, 0xfffffff9.
+4. SendObjectSplit (0x9119, params offset and length) 734 times, 0xf800
+   bytes each and 0xe800 for the last, about 5 s in all. The pieces are
+   the stock `.BIN` file unchanged (sha256 cb158dbd…).
+5. FirmwareCheck (0x9121).
+6. 0x9122 once a second. It answers (1, 0) while the camera checks the
+   file and (2, 0) when it's ready, about 30 s later.
+7. UpdateInitiate (0x9123). The camera then installs on its own and
+   shows "OK".
+
+The camera's own version check (same version or newer) applies here too.
+
+### Doing it from Mark One (working, 2026-11-08)
+
+The firmup commands are registered only for connection modes 0 and 5,
+not MTP (mode 4). The dispatcher looks 0x9xxx commands up in the
+registered list only (0x7f0d9fcd, else 0x2005), so registering them is
+enough. In the webcam patch, MTP's setup (0x7f0d4a5b) ends with a jump
+to `asm/firmup.s` at 0x7eab0400 instead of its last `call register` and
+`ret [],4`. The stub makes that registration, calls the update block of
+modes 0 and 5's setup (0x7f0d49a4, which ends `ret [a2],8`), and returns
+for the setup function.
+
+The webcam patch also writes "MARK" and a revision number
+(`WEBCAM_REVISION` in `scripts/build.py`) at 0x7eab0414. Mark One reads
+it: a camera that refuses the read (0x2005) has stock firmware, one
+without the marker has a build from before revisions (0).
+
+`scripts/ptp.py versions` sends 0x911c and 0x9120, and `ptp.py update
+FILE` runs the whole sequence over MTP.
+
+Tested on the camera: `ptp.py update` reinstalled revision 1 over MTP,
+on a camera freshly switched on (not in Mark One's shooting setup). The
+status poll answered (1, 0) for about 30 s, then (2, 0), and 0x9123
+started the install. The camera showed its update animation, then OK;
+switched off and on, it reported revision 1. Installs mid-session, after
+Mark One's setup, are untried, so the app asks for a restart first.
+
+Mark One's setup:
+
+- A stock camera gets its first install from the card. Mark One
+  downloads stock 2.3 from Olympus's server, checks its hash, applies its
+  changes as byte edits (`mac/MarkOne/App/Resources/webcam-firmware.json`,
+  from `scripts/build.py --edits`, so the app ships no Olympus code),
+  writes `DCOLYMP/E0972300.BIN` to the card and ejects it, then shows the
+  steps on the camera. The sandbox only allows writing to a volume the
+  user picks, so Mark One finds the card and opens a panel pointed at it
+  for one click of Use This Card.
+- A camera with an older revision gets the update over USB, after Mark
+  One stops recording.
+
+Firmware comes from a POST of `<firmware_demand>` XML to
+`https://fw01.om-digitalsolutions.net/ww_inform/fcache.do`, documented
+for the E-M10 in github.com/matozoid/em10_1
+(`docs/firmware/update-server.md`); not tried for E-097. The same
+project's decompile of OM Workspace's Windows library matches the
+recorded sequence.
 
 ## Recording time limit (patch ready, untested)
 

@@ -59,9 +59,10 @@ struct WelcomeView: View {
     @ObservedObject private var installer = ExtensionInstaller.shared
     @ObservedObject private var pipeline = Pipeline.shared
     @ObservedObject private var planned = Planned.shared
+    @Environment(\.openWindow) private var openWindow
 
     private var connectedDetail: String {
-        var parts = ["Firmware \(planned.firmware)"]
+        var parts = [pipeline.firmware.map { "Firmware: \($0.label)" } ?? "Checking the firmware…"]
         if let battery = planned.battery { parts.append("Battery \(battery)%") }
         return parts.joined(separator: " · ")
     }
@@ -231,23 +232,17 @@ struct WelcomeView: View {
                             .font(.callout)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
-                        Link("Read the steps", destination: URL(string: "https://superhighfives.com/mark-one/help")!)
-                            .font(.callout)
+                        HStack {
+                            Button("Set Up Camera…") { openWindow.firmware() }
+                            Link("Read the steps", destination: URL(string: "https://superhighfives.com/mark-one/help")!)
+                        }
+                        .font(.callout)
                     }
                 }
                 Card(padding: 14) {
                     VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Text("Over USB").fontWeight(.semibold).foregroundStyle(.secondary)
-                            Spacer()
-                            Text("COMING LATER")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(.quaternary, in: RoundedRectangle(cornerRadius: 5))
-                        }
-                        Text("Install straight from Mark One, no card needed.")
+                        Text("Updates over USB").fontWeight(.semibold)
+                        Text("Once the camera has Mark One’s firmware, later versions install straight from Mark One, with no card.")
                             .font(.callout)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -271,7 +266,15 @@ struct WelcomeView: View {
                 HStack(spacing: 14) {
                     CameraSketch(lit: pipeline.state == .streaming)
                         .frame(width: 72, height: 48)
-                    if pipeline.state != .waiting {
+                    if pipeline.firmware == .stock || pipeline.problem == .wrongFirmware {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("This camera needs the Mark One firmware").fontWeight(.semibold)
+                            Text(pipeline.status).font(.callout).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer()
+                        Button("Set Up Camera…") { openWindow.firmware() }
+                    } else if pipeline.state != .waiting {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("E-M5 connected").fontWeight(.semibold)
                             Text(connectedDetail)
@@ -280,14 +283,6 @@ struct WelcomeView: View {
                         }
                         Spacer()
                         Image(systemName: "checkmark.circle.fill").font(.title2).foregroundStyle(.green)
-                    } else if pipeline.problem == .wrongFirmware {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("This camera needs the Mark One firmware").fontWeight(.semibold)
-                            Text(pipeline.status).font(.callout).foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        Spacer()
-                        Button("Firmware Steps") { step = .firmware }
                     } else {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Looking for the camera…").fontWeight(.semibold)
