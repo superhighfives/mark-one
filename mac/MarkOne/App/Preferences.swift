@@ -78,7 +78,7 @@ final class Preferences: NSObject, ObservableObject {
     private func postCameraOff() {
         let content = UNMutableNotificationContent()
         content.title = "Camera off"
-        content.body = "The E-M5 was switched off or unplugged, so video apps aren’t getting its picture. Switch it back on and Mark One sets it up again."
+        content.body = "The E-M5 (Mark I) was switched off or unplugged, so video apps aren’t getting its picture. Switch it back on and Mark One sets it up again."
         content.sound = .default
         let request = UNNotificationRequest(identifier: "camera-off", content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request)

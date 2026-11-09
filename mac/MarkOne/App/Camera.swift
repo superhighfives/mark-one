@@ -14,7 +14,7 @@ enum CameraError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .notFound: "No E-M5 found. Connect it by USB and choose MTP on the camera."
+        case .notFound: "No E-M5 (Mark I) found. Connect it by USB and choose Webcam on the camera."
         case .disconnected: "The camera was turned off or unplugged."
         case .session(let error): "Couldn't open the camera: \(error?.localizedDescription ?? "unknown error")."
         case .command(let code, let name): "The camera refused \(name) (\(String(format: "0x%04x", code)))."

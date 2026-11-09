@@ -277,7 +277,7 @@ enum FirmwareError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unexpected(let name):
-            "The camera's firmware isn't the one Mark One expects (\(name)). It needs E-M5 firmware 2.3 with the usb-tools patch."
+            "The camera's firmware isn't the one Mark One expects (\(name)). It needs Mark One's firmware on an E-M5 (Mark I)."
         case .recording(let on):
             on ? "The camera didn't start recording. Check that it shows live view, then try again."
                : "The camera didn't stop recording. Press its REC button to stop."

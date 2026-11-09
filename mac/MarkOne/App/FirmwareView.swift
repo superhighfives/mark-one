@@ -162,7 +162,7 @@ struct FirmwareView: View {
 
     private var setUpIntro: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Mark One needs its own firmware on your E-M5. It's Olympus's firmware 2.3 with a few changes that let the camera work as a webcam. Mark One downloads Olympus's firmware, adds its changes, and puts the result on your SD card. You install it from the card once; later updates happen over USB.")
+            Text("Mark One needs its own firmware on your E-M5 (Mark I). It's Olympus's firmware 2.3 with a few changes that let the camera work as a webcam. Mark One downloads Olympus's firmware, adds its changes, and puts the result on your SD card. You install it from the card once; later updates happen over USB.")
                 .fixedSize(horizontal: false, vertical: true)
             HStack {
                 Spacer()

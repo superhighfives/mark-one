@@ -125,7 +125,7 @@ struct CameraSketch: View {
             }
         }
         .opacity(faded ? 0.45 : 1)
-        .accessibilityLabel(lit ? "E-M5 camera, live" : "E-M5 camera")
+        .accessibilityLabel(lit ? "E-M5 (Mark I) camera, live" : "E-M5 (Mark I) camera")
     }
 }
 

@@ -104,7 +104,7 @@ struct MenuView: View {
     private var waiting: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Connect your E-M5").font(.title3.weight(.semibold))
+                Text("Connect your E-M5 (Mark I)").font(.title3.weight(.semibold))
                 Text("Mark One sets the camera up as soon as it sees it.").foregroundStyle(.secondary)
             }
             Card {

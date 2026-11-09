@@ -49,7 +49,7 @@ private struct GeneralSettings: View {
                     Button("Show Welcome Window…") { WelcomeWindow.show() }
                 }
             } footer: {
-                Text("Walks through allowing the camera, the firmware and connecting the E-M5.")
+                Text("Walks through allowing the camera, the firmware and connecting the E-M5 (Mark I).")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -68,7 +68,7 @@ private struct CameraSettings: View {
     var body: some View {
         Form {
             Section("This camera") {
-                LabeledContent("Camera", value: "OM-D E-M5")
+                LabeledContent("Camera", value: "OM-D E-M5 (Mark I)")
                 LabeledContent("Firmware") {
                     HStack {
                         Text(pipeline.firmware?.label ?? "Not connected")

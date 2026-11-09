@@ -169,9 +169,9 @@ struct WelcomeView: View {
                 .resizable()
                 .frame(width: 96, height: 96)
                 .accessibilityHidden(true)
-            Text("Your E-M5, on every call")
+            Text("Your E-M5 (Mark I), on every call")
                 .font(.largeTitle.weight(.bold))
-            Text("Mark One turns an OM-D E-M5 into a webcam over one USB cable, with the camera’s own lens, sensor and colour. Setup takes three steps, and you only do it once.")
+            Text("Mark One turns an OM-D E-M5 (Mark I) into a webcam over one USB cable, with the camera’s own lens, sensor and colour. Setup takes three steps, and you only do it once.")
                 .font(.title3)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -220,7 +220,7 @@ struct WelcomeView: View {
     private var firmware: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Put the Mark One firmware on the camera").font(.title.weight(.bold))
-            Text("Out of the box, the E-M5 only sends files over USB. Mark One needs firmware 2.3 with one small change that lets it read the camera’s video. Switching the camera off undoes everything else Mark One does.")
+            Text("Out of the box, the E-M5 (Mark I) only sends files over USB. Mark One needs its firmware 2.3 with a few changes that let it send video. Mark One builds that firmware from Olympus’s and puts it on your SD card. Switching the camera off undoes everything else Mark One does.")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(alignment: .top, spacing: 10) {
@@ -275,7 +275,7 @@ struct WelcomeView: View {
                         Button("Set Up Camera…") { openWindow.firmware() }
                     } else if pipeline.state != .waiting {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("E-M5 connected").fontWeight(.semibold)
+                            Text("E-M5 (Mark I) connected").fontWeight(.semibold)
                             Text(connectedDetail)
                                 .font(.caption.monospaced())
                                 .foregroundStyle(.secondary)
@@ -293,7 +293,7 @@ struct WelcomeView: View {
                     }
                 }
             }
-            Text("The E-M5 runs on its battery, even over USB. For long calls, a dummy battery with a power adapter keeps it going.")
+            Text("The E-M5 (Mark I) runs on its battery, even over USB. For long calls, a dummy battery with a power adapter keeps it going.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
