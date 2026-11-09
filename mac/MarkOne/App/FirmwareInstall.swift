@@ -27,6 +27,16 @@ extension Firmware {
         return .markOne(Int(marker.le(UInt32.self, at: 4)))
     }
 
+    /// Makes the camera report another firmware version until it's switched
+    /// off, in the two places the firmware keeps it: the main block's head
+    /// (shown in the menus) and the `mov 0x2300,d2` that GetVersions builds
+    /// its answer from, which is what Olympus's updater reads.
+    static func reportVersion(_ camera: Camera, major: Int, minor: Int) throws {
+        let digits = UInt8(major << 4 | minor)
+        try camera.poke(0x7E42_1010, Data([0x00, digits]))
+        try camera.poke(0x7F0D_D972, Data([digits, 0xF2]))
+    }
+
     /// Whether this firmware build lets MTP use the update commands.
     static func canUpdateOverUSB(_ firmware: CameraFirmware) -> Bool {
         if case .markOne(let revision) = firmware { return revision >= 1 }

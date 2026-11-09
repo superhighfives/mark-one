@@ -120,8 +120,8 @@ struct ContentView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    Button("Set up a camera…") { showFirmware() }
-                    Text("Puts Mark One's firmware on an E-M5 from its SD card.")
+                    Button("Camera firmware…") { showFirmware() }
+                    Text("Set up a camera, update or reinstall Mark One's firmware, or put Olympus's back.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Button("Remove camera") { installer.deactivate() }

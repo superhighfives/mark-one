@@ -1,33 +1,43 @@
-// The Camera Firmware window: puts Mark One's firmware on the camera, from
-// the SD card the first time and over USB after that.
+// The Camera Firmware window. A camera with Olympus's firmware gets Mark
+// One's from the SD card. One with Mark One's firmware can update or
+// reinstall it over USB, go back to Olympus's firmware over USB, or report
+// an older version so Olympus's OM Workspace offers to reinstall 2.3.
 
 import Combine
 import SwiftUI
 
 struct FirmwareView: View {
     @ObservedObject var pipeline: Pipeline
-    @State private var step = Step.intro
+    @State private var step = Step.start
+    @State private var action = Action.setUp
     @State private var understood = false
     @State private var image: FirmwareImage?
     @State private var downloaded = 0.0
     @State private var cards: [URL] = []
     @State private var error: String?
 
-    enum Step { case intro, preparing, card, writing, camera, usb }
+    enum Step { case start, confirm, preparing, card, writing, camera, ready, usb, omWorkspace }
+
+    enum Action {
+        /// Mark One's firmware onto a stock camera, from the SD card.
+        case setUp
+        /// Mark One's firmware over USB, newer or the same.
+        case update
+        /// Olympus's firmware over USB.
+        case restore
+    }
 
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
-    /// Whether this camera takes updates over USB, so the card isn't needed.
-    private var overUSB: Bool { pipeline.firmware.map(Firmware.canUpdateOverUSB) ?? false }
-    private var upToDate: Bool {
-        if case .markOne(let revision) = pipeline.firmware { return revision >= FirmwareImage.bundledRevision }
-        return false
+    private var revision: Int? {
+        if case .markOne(let revision) = pipeline.firmware { return revision }
+        return nil
     }
+    private var overUSB: Bool { pipeline.firmware.map(Firmware.canUpdateOverUSB) ?? false }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(overUSB ? "Update your camera" : "Set up your camera")
-                .font(.title2.bold())
+            Text(title).font(.title2.bold())
             content
             if let error {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
@@ -38,43 +48,157 @@ struct FirmwareView: View {
         .padding(24)
         .frame(width: 460)
         .onReceive(tick) { _ in if step == .card { cards = FirmwareInstall.cards() } }
+        .onChange(of: pipeline.firmware) { _, firmware in
+            // The camera is back with Mark One's firmware after a card install.
+            if step == .camera, case .markOne = firmware { step = .ready }
+        }
+    }
+
+    private var title: String {
+        switch step {
+        case .start where overUSB, .omWorkspace: "Camera firmware"
+        case .confirm, .preparing, .usb:
+            switch action {
+            case .setUp: "Set up your camera"
+            case .update: "Install Mark One's firmware"
+            case .restore: "Restore Olympus's firmware"
+            }
+        default: "Set up your camera"
+        }
     }
 
     @ViewBuilder private var content: some View {
-        if upToDate && step != .usb {
-            done
-        } else {
-            switch step {
-            case .intro: intro
-            case .preparing: preparing
-            case .card: card
-            case .writing: ProgressView("Writing to the card…")
-            case .camera: cameraSteps
-            case .usb: usb
+        switch step {
+        case .start:
+            // A Mark One build from before USB updates reinstalls from the card.
+            if overUSB { manage } else { setUpIntro }
+        case .ready: ready
+        case .confirm: confirm
+        case .preparing: preparing
+        case .card: card
+        case .writing: ProgressView("Writing to the card…")
+        case .camera: cameraSteps
+        case .usb: usb
+        case .omWorkspace: omWorkspace
+        }
+    }
+
+
+    private var manage: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            let current = revision ?? 0
+            let bundled = FirmwareImage.bundledRevision
+            Label(current >= bundled ? "Mark One's firmware, up to date (revision \(current))"
+                                     : "Mark One's firmware, revision \(current). Revision \(bundled) is ready.",
+                  systemImage: current >= bundled ? "checkmark.circle.fill" : "arrow.down.circle.fill")
+                .foregroundStyle(current >= bundled ? .green : .accentColor)
+                .fixedSize(horizontal: false, vertical: true)
+            choice(current < bundled ? "Update" : "Reinstall",
+                   current < bundled ? "Install revision \(bundled) over USB."
+                                     : "Install the same firmware again over USB, if something seems wrong.") {
+                begin(.update)
+            }
+            choice("Restore Olympus's firmware",
+                   "Put Olympus's own firmware 2.3 back over USB. Mark One stops working with the camera until you set it up again.") {
+                begin(.restore)
+            }
+            choice("Prepare for OM Workspace",
+                   "Make the camera report firmware 1.0 until it's switched off, so Olympus's OM Workspace offers to install 2.3. Changes nothing permanent.") {
+                pipeline.reportOlderVersion()
+                step = .omWorkspace
+            }
+            HStack {
+                Spacer()
+                Button("Close") { closeWindow() }.keyboardShortcut(.cancelAction)
             }
         }
     }
 
-    private var intro: some View {
+    private func choice(_ title: String, _ detail: String, _ action: @escaping () -> Void) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.headline)
+                Text(detail).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+            Button(title, action: action).labelsHidden()
+        }
+    }
+
+    private var omWorkspace: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(overUSB
-                 ? "A newer version of Mark One's camera firmware is ready. Mark One sends it to the camera over USB, and the camera installs it."
-                 : "Mark One needs its own firmware on your E-M5. It's Olympus's firmware 2.3 with a few changes that let the camera work as a webcam. Mark One downloads Olympus's firmware, adds its changes, and puts the result on your SD card. You install it from the card once; later updates happen over USB.")
+            if pipeline.reportsOlderVersion {
+                Label("The camera now reports firmware 1.0", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                VStack(alignment: .leading, spacing: 8) {
+                    numbered(1, "Keep the camera switched on from now on. Switching it off undoes this.")
+                    numbered(2, "Quit Mark One, unplug the camera, and connect it to the computer with OM Workspace. Choose Storage on the camera.")
+                    numbered(3, "In OM Workspace, choose Camera › Update. It offers firmware 2.3. Follow its steps, and leave the camera alone until it's done.")
+                }
+                Text("OM Workspace on a Mac needs a system extension and lowered security settings, so a Windows PC is the easier choice. Restore Olympus's Firmware here does the same job without OM Workspace.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("Changing the version the camera reports…")
+                }
+            }
+            HStack {
+                Spacer()
+                Button("Done") { step = .start; closeWindow() }.keyboardShortcut(.defaultAction)
+            }
+        }
+    }
+
+
+    private func begin(_ action: Action) {
+        self.action = action
+        understood = false
+        error = nil
+        step = .confirm
+    }
+
+    private var setUpIntro: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Mark One needs its own firmware on your E-M5. It's Olympus's firmware 2.3 with a few changes that let the camera work as a webcam. Mark One downloads Olympus's firmware, adds its changes, and puts the result on your SD card. You install it from the card once; later updates happen over USB.")
                 .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Spacer()
+                Button("Continue") { begin(.setUp) }.keyboardShortcut(.defaultAction)
+            }
+        }
+    }
+
+    private var confirm: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            switch action {
+            case .setUp: EmptyView()
+            case .update:
+                Text("Mark One sends its firmware to the camera over USB, and the camera checks it and installs it. It takes about two minutes.")
+                    .fixedSize(horizontal: false, vertical: true)
+            case .restore:
+                Text("Mark One downloads Olympus's firmware 2.3 and sends it to the camera over USB, unchanged. Afterward the camera is as it came from Olympus, and Mark One can set it up again from the card.")
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             GroupBox {
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Installing firmware has a risk", systemImage: "exclamationmark.triangle.fill")
                         .font(.headline)
                         .foregroundStyle(.orange)
-                    Text("This is unofficial firmware, not made or supported by Olympus or OM System. If the camera loses power or is disconnected while it installs, it may not turn on again, and you could lose the camera. A charged battery and an undisturbed camera make that very unlikely, and so far Olympus's own firmware has always gone back on from the card. Only continue if you accept the risk.")
+                    Text(action == .restore
+                         ? "If the camera loses power or is disconnected while it installs, it may not turn on again, and you could lose the camera. Use a charged battery and leave the camera alone until it's done."
+                         : "This is unofficial firmware, not made or supported by Olympus or OM System. If the camera loses power or is disconnected while it installs, it may not turn on again, and you could lose the camera. Use a charged battery and leave the camera alone until it's done. Only continue if you accept the risk.")
                         .fixedSize(horizontal: false, vertical: true)
                     Toggle("I understand, and I accept the risk", isOn: $understood)
                 }
                 .padding(4)
             }
             HStack {
+                Button("Cancel") { step = .start }.keyboardShortcut(.cancelAction)
                 Spacer()
-                Button(overUSB ? "Update camera" : "Continue") { prepare() }
+                Button(action == .setUp ? "Continue" : action == .restore ? "Restore" : "Install") { prepare() }
                     .keyboardShortcut(.defaultAction)
                     .disabled(!understood)
             }
@@ -83,12 +207,38 @@ struct FirmwareView: View {
 
     private var preparing: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ProgressView(value: downloaded) { Text("Downloading Olympus's firmware…") }
-            Text("About 47 MB, from Olympus's update server.")
+            ProgressView(value: downloaded) { Text("Getting Olympus's firmware…") }
+            Text("About 47 MB from Olympus's update server, the first time only.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
     }
+
+    private func prepare() {
+        error = nil
+        downloaded = 0
+        step = .preparing
+        let action = action
+        Task {
+            do {
+                let progress: @Sendable (Double) -> Void = { fraction in Task { @MainActor in downloaded = fraction } }
+                let built = action == .restore ? try await FirmwareImage.olympus(progress: progress)
+                                               : try await FirmwareImage.make(progress: progress)
+                image = built
+                if action == .setUp {
+                    cards = FirmwareInstall.cards()
+                    step = .card
+                } else {
+                    step = .usb
+                    pipeline.installOverUSB(built)
+                }
+            } catch {
+                self.error = error.localizedDescription
+                step = .confirm
+            }
+        }
+    }
+
 
     private var card: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -129,71 +279,6 @@ struct FirmwareView: View {
         }
     }
 
-    private var usb: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if let install = pipeline.install {
-                if let failure = install.error {
-                    Text(failure).fixedSize(horizontal: false, vertical: true)
-                    HStack {
-                        Spacer()
-                        Button("Close") { pipeline.install = nil; step = .intro; closeWindow() }
-                    }
-                } else if install.finished {
-                    done
-                } else {
-                    ProgressView(value: install.fraction) { Text(install.text) }
-                    Label("Don't switch off or unplug the camera.", systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
-                }
-            }
-        }
-    }
-
-    private var done: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Your camera is ready", systemImage: "checkmark.circle.fill")
-                .font(.headline)
-                .foregroundStyle(.green)
-            Text("When you connect the camera, choose Webcam on its screen. Then pick “Mark One” as the camera in any video app.")
-                .fixedSize(horizontal: false, vertical: true)
-            HStack {
-                Spacer()
-                Button("Done") { pipeline.install = nil; step = .intro; closeWindow() }
-                    .keyboardShortcut(.defaultAction)
-            }
-        }
-    }
-
-    private func numbered(_ n: Int, _ text: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("\(n)").font(.headline.monospacedDigit()).frame(width: 16)
-            Text(text).fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    private func prepare() {
-        error = nil
-        step = .preparing
-        Task {
-            do {
-                let built = try await FirmwareImage.make { fraction in
-                    Task { @MainActor in downloaded = fraction }
-                }
-                image = built
-                if overUSB {
-                    step = .usb
-                    pipeline.installOverUSB(built)
-                } else {
-                    cards = FirmwareInstall.cards()
-                    step = .card
-                }
-            } catch {
-                self.error = error.localizedDescription
-                step = .intro
-            }
-        }
-    }
-
     private func write(_ volume: URL) {
         guard let image else { return }
         error = nil
@@ -208,6 +293,60 @@ struct FirmwareView: View {
                     step = .card
                 }
             }
+        }
+    }
+
+
+    private var usb: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let install = pipeline.install {
+                if let failure = install.error {
+                    Text(failure).fixedSize(horizontal: false, vertical: true)
+                    HStack {
+                        Spacer()
+                        Button("Close") { pipeline.install = nil; step = .start; closeWindow() }
+                    }
+                } else if install.finished {
+                    Label(action == .restore ? "Olympus's firmware is back on the camera" : "Your camera is ready",
+                          systemImage: "checkmark.circle.fill")
+                        .font(.headline)
+                        .foregroundStyle(.green)
+                    Text(action == .restore
+                         ? "To use the camera with Mark One again, choose Set Up Camera."
+                         : "Choose Webcam on the camera when you connect it, then pick “Mark One” as the camera in any video app.")
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack {
+                        Spacer()
+                        Button("Done") { pipeline.install = nil; step = .start; closeWindow() }
+                            .keyboardShortcut(.defaultAction)
+                    }
+                } else {
+                    ProgressView(value: install.fraction) { Text(install.text) }
+                    Label("Don't switch off or unplug the camera.", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                }
+            }
+        }
+    }
+
+    private var ready: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Your camera is ready", systemImage: "checkmark.circle.fill")
+                .font(.headline)
+                .foregroundStyle(.green)
+            Text("When you connect the camera, choose Webcam on its screen. Then pick “Mark One” as the camera in any video app. Later updates install over USB from this window.")
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Spacer()
+                Button("Done") { step = .start; closeWindow() }.keyboardShortcut(.defaultAction)
+            }
+        }
+    }
+
+    private func numbered(_ n: Int, _ text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("\(n)").font(.headline.monospacedDigit()).frame(width: 16)
+            Text(text).fixedSize(horizontal: false, vertical: true)
         }
     }
 

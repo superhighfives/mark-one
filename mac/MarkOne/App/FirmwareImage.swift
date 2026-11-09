@@ -51,6 +51,12 @@ struct FirmwareImage {
     /// The revision this app installs.
     static var bundledRevision: Int { edits.revision }
 
+    /// Olympus's own firmware 2.3, unchanged, for putting the camera back
+    /// to stock. Its revision is 0.
+    static func olympus(progress: @escaping @Sendable (Double) -> Void) async throws -> FirmwareImage {
+        FirmwareImage(revision: 0, data: try await stockFirmware(progress: progress))
+    }
+
     /// Downloads stock firmware (or uses the copy from last time) and builds
     /// Mark One's firmware from it. `progress` gets 0 to 1 during the download.
     static func make(progress: @escaping @Sendable (Double) -> Void) async throws -> FirmwareImage {
