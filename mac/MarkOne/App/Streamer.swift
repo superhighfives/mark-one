@@ -96,11 +96,15 @@ final class Streamer {
     private var sent: [UInt32: Data] = [:]
     private var sentOrder: [UInt32] = []
     private var lastFrame = Date()
+    /// USB reads and bytes in the last poll, for logging slow ones.
+    private(set) var lastReads = 0, lastBytes = 0
 
     init(camera: Camera) { self.camera = camera }
 
     /// Frames that are ready, oldest first; empty if none are yet.
     func poll() throws -> [Data] {
+        lastReads = 0
+        lastBytes = 0
         let hints = try sizes()
         var starts = header == nil ? Array(hints.order.suffix(20).reversed()) : [end, Streamer.ringLow]
         var frames: [Data] = []
@@ -132,6 +136,8 @@ final class Streamer {
     private func sizes() throws -> (sizes: [UInt32: Int], order: [UInt32]) {
         let start = Streamer.table - 52
         let raw = try camera.peek(start, Streamer.entries * Streamer.entrySize + 52)
+        lastReads += 1
+        lastBytes += raw.count
         var found: [(number: UInt32, address: UInt32, size: Int)] = []
         for k in 0..<Streamer.entries {
             let base = 52 + k * Streamer.entrySize
@@ -150,6 +156,8 @@ final class Streamer {
         let start = address & ~1
         let length = (Int(address - start) + size + 1) & ~1
         let data = try camera.peek(start, length)
+        lastReads += 1
+        lastBytes += data.count
         let offset = Int(address - start)
         return data.subdata(in: offset..<min(data.count, offset + size))
     }

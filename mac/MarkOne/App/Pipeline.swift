@@ -508,7 +508,9 @@ final class Pipeline: ObservableObject {
         }
         while !stopRequested.value {
             if installImage.value != nil { throw PipelineInterrupt.install }
+            let started = Date()
             let frames = try streamer.poll()
+            let polled = Date()
             received += frames.count
             if !frames.isEmpty {
                 // Apps fill gaps with the last picture, then a gray one after
@@ -529,6 +531,7 @@ final class Pipeline: ObservableObject {
                 // last picture so apps see a short freeze, not a gap.
                 if !decoded, let last { sink.send(last) }
             }
+            let decodedAt = Date()
             if frames.isEmpty { Thread.sleep(forTimeInterval: 0.003) }
             // A recording that reaches the movie writer's limits (2 hours
             // with Mark One's patch, and perhaps 4 GB) hangs the camera's
@@ -554,7 +557,17 @@ final class Pipeline: ObservableObject {
                     recordedBytes = 0
                 }
             }
+            let checkedAt = Date()
             try updateControls(camera, &applied, recording: true)
+            let controlledAt = Date()
+            defer {
+                // Log any slow pass through the loop, to find the gaps' cause.
+                let total = Date().timeIntervalSince(started)
+                if total > 0.15 {
+                    let ms = { (a: Date, b: Date) in Int(b.timeIntervalSince(a) * 1000) }
+                    log.notice("Slow pass: \(Int(total * 1000), privacy: .public) ms (poll \(ms(started, polled), privacy: .public) ms, \(streamer.lastReads, privacy: .public) reads, \(streamer.lastBytes / 1024, privacy: .public) KB; decode \(frames.count, privacy: .public) frames \(ms(polled, decodedAt), privacy: .public) ms; recording check \(ms(decodedAt, checkedAt), privacy: .public) ms; controls \(ms(checkedAt, controlledAt), privacy: .public) ms; rest \(ms(controlledAt, Date()), privacy: .public) ms)")
+                }
+            }
             if Date().timeIntervalSince(lastChecked) >= 0.5 {
                 lastChecked = Date()
                 if wanted() { lastUsed = lastChecked }
