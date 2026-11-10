@@ -156,11 +156,19 @@ struct MenuView: View {
     }
 
     private var noCard: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Put a card in the camera").font(.title3.weight(.semibold))
-            Text("The camera only records with a memory card in. Mark One doesn't save anything to it.")
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Put a card in the camera").font(.title3.weight(.semibold))
+                Text("The camera only records with a memory card in. Mark One doesn't save anything to it. With Mark One's latest camera firmware, it doesn't need one.")
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if pipeline.firmware?.updateAvailable == true {
+                Button("Update Camera…") { openWindow.firmware() }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity)
+            }
         }
     }
 

@@ -286,13 +286,17 @@ final class Pipeline: ObservableObject {
                     }
                     throw CameraError.disconnected
                 }
-                // The camera only records with a card in, though Mark One
-                // never writes to it. Wait for one.
-                if try !Firmware.hasCard(camera) {
-                    report("There's no card in the camera. It needs one to record, though Mark One doesn't save anything to it.", .waiting)
+                // Before revision 2 of Mark One's firmware, the camera only
+                // records with a card in, though Mark One never writes to
+                // it. Wait for one.
+                let cardless: Bool
+                if case .markOne(let revision) = firmware, revision >= 2 { cardless = true } else { cardless = false }
+                if !cardless, try !Firmware.hasCard(camera) {
+                    report("There's no card in the camera. It needs one to record, though Mark One doesn't save anything to it. Updating the camera's firmware removes the need for one.", .waiting)
                     note(.noCard)
                     while try !Firmware.hasCard(camera) {
                         if !camera.connected || stopRequested.value { throw CameraError.disconnected }
+                        if installImage.value != nil { try installIfRequested(camera) }
                         Thread.sleep(forTimeInterval: 1)
                     }
                     note(nil)
