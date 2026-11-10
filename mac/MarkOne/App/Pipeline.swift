@@ -633,8 +633,7 @@ extension Locked where Value == Bool {
 /// Saves the first 1800 frames (one minute), with a list of the frames the
 /// decoder rejected, for looking into decoding failures. Turn it on with
 /// `defaults write com.superhighfives.markone SaveCapture -bool YES`. The
-/// files go in the app's sandbox container, in
-/// ~/Library/Containers/com.superhighfives.markone/Data/Library/Caches.
+/// files go in ~/Library/Caches.
 final class Capture {
     private let stream: FileHandle?
     private var log = ""

@@ -6,7 +6,7 @@ Turns an original Olympus OM-D E-M5 (Mark I, 2012) into a Mac webcam over a sing
 
 Mark One works end to end, with nothing to click. It sits in the menu bar and can open at login. Plug in the camera with its USB Mode set to MTP, switch it on, and open a video app. Mark One:
 
-1. connects through ImageCaptureCore, which works inside the App Store sandbox
+1. connects through ImageCaptureCore, which shares the camera with macOS's camera service
 2. switches the camera to live view with USB connected, so movies don't write to the card and have no time limit (that last part is still untested)
 3. presses the camera's REC button for you when an app starts using the Mark One camera
 4. follows the camera's 1080p, 30 frames per second H.264 movie stream straight out of its memory

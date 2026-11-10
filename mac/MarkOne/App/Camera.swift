@@ -3,8 +3,8 @@
 // The firmware adds three PTP commands (see asm/usb.s): 0x9484 reads camera
 // memory, 0x9485 writes it, and 0x9486 calls a function. ImageCaptureCore
 // passes raw PTP commands to the camera with requestSendPTPCommand, which
-// works in a sandboxed app and shares the camera with macOS's camera
-// service instead of fighting it for the USB interface.
+// shares the camera with macOS's camera service instead of fighting it for
+// the USB interface.
 
 import Foundation
 import ImageCaptureCore

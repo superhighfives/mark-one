@@ -53,9 +53,6 @@ lifts the time limits (see "Recording without a card" in `NOTES.md`).
 
 ### Direct distribution
 
-- [ ] **Drop the sandbox.** Mark One then writes the firmware to the card
-  itself, with macOS's one-time removable volume prompt instead of the
-  "Use This Card" panel. Debug captures can go anywhere.
 - [ ] **Developer ID build** with the system extension entitlement,
   notarized.
 - [ ] **Updates** with Sparkle.
@@ -91,6 +88,8 @@ lifts the time limits (see "Recording without a card" in `NOTES.md`).
 
 ## Done recently
 
+- No sandbox: Mark One writes the firmware to the card itself, with no
+  file panel (2026-11-09).
 - Recording with no card, no empty movie files and no time limits in
   webcam mode: firmware revision 2 (2026-11-09).
 - Battery shown as full, low or empty (2026-11-09).

@@ -286,31 +286,15 @@ struct FirmwareView: View {
         }
     }
 
-    /// Asks for the card in an open panel: the sandbox only lets Mark One
-    /// write to a volume the user picks.
+    /// Writes the firmware to the card. macOS asks once whether Mark One may
+    /// use removable volumes.
     private func write(_ volume: URL) {
         guard let image else { return }
-        let panel = NSOpenPanel()
-        panel.message = "Mark One needs your permission to write to the card. Choose the card, then click Use This Card."
-        panel.prompt = "Use This Card"
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.canCreateDirectories = false
-        panel.directoryURL = volume
-        NSApp.activate(ignoringOtherApps: true)
-        guard panel.runModal() == .OK, let chosen = panel.url else { return }
-        // Access covers the folder chosen, so it has to be the card itself.
-        guard chosen.standardizedFileURL.path == volume.standardizedFileURL.path else {
-            error = "Choose the card itself, \(volume.lastPathComponent), not a folder on it or another drive."
-            return
-        }
         error = nil
         step = .writing
         Task.detached {
-            let access = chosen.startAccessingSecurityScopedResource()
-            defer { if access { chosen.stopAccessingSecurityScopedResource() } }
             do {
-                try FirmwareInstall.writeToCard(chosen, image)
+                try FirmwareInstall.writeToCard(volume, image)
                 await MainActor.run { step = .camera }
             } catch {
                 await MainActor.run {
