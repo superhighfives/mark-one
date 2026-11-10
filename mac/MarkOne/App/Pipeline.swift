@@ -496,6 +496,7 @@ final class Pipeline: ObservableObject {
             shown += 1
         }
         let streamer = Streamer(camera: camera)
+        streamer.onLostTrack = { log.notice("\($0, privacy: .public)") }
         var since = Date(), lastUsed = Date(), lastChecked = Date()
         var received = 0, failuresBefore = 0
         var lastReceived = Date(), lastRecordingCheck = Date()

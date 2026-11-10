@@ -97,6 +97,10 @@ final class Streamer {
     private var sent: [UInt32: Data] = [:]
     private var sentOrder: [UInt32] = []
     private var lastFrame = Date()
+    /// How the last frame's end was found, for logging when Mark One loses
+    /// track: "table", "delimiter" or "wrap", and its length.
+    private var lastHow = "", lastLength = 0
+    var onLostTrack: ((String) -> Void)?
     /// USB reads and bytes in the last poll, for logging slow ones.
     private(set) var lastReads = 0, lastBytes = 0
 
@@ -120,6 +124,11 @@ final class Streamer {
         if !frames.isEmpty {
             lastFrame = Date()
         } else if header != nil, Date().timeIntervalSince(lastFrame) > 1 {
+            if let report = onLostTrack {
+                let bytes = (try? read(end, 32))?.map { String(format: "%02x", $0) }.joined() ?? "?"
+                report(String(format: "Lost track at %x after a %@ frame of %d bytes (cpb %d num %d); there: %@", end, lastHow,
+                              lastLength, header?.cpb ?? -1, header?.frameNum ?? -1, bytes))
+            }
             header = nil                               // a new recording, or we lost track
         }
         return frames
@@ -218,6 +227,7 @@ final class Streamer {
             for (next, head) in candidates {
                 let bytes = try head ?? read(next, Streamer.head)
                 if let after = newHeader(next, bytes), after.follows(header) {
+                    lastHow = "table"; lastLength = hint
                     return (start, data.prefix(hint), header)
                 }
             }
@@ -245,13 +255,16 @@ final class Streamer {
             // every second or two.
             if data.count >= available,
                let low = newHeader(Streamer.ringLow, try read(Streamer.ringLow, Streamer.head)), low.follows(header) {
-                return (start, data.prefix(wrapLength(start, data)), header)
+                let length = wrapLength(start, data)
+                lastHow = "wrap"; lastLength = length
+                return (start, data.prefix(length), header)
             }
             return nil
         }
         let offset = range.lowerBound - data.startIndex
         let next = start + UInt32(offset)
         if let after = newHeader(next, data.subdata(in: offset..<min(data.count, offset + Streamer.head))), after.follows(header) {
+            lastHow = "delimiter"; lastLength = offset
             return (start, data.prefix(offset), header)
         }
         return nil
