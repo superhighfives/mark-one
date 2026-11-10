@@ -1160,6 +1160,68 @@ webcam, ImageCaptureCore's `requestSendPTPCommand` (ICCameraDevice) can send
 any PTP command, so a small app can poll 0x9484 and publish frames through
 a CoreMediaIO camera extension.
 
+## Recording without a card (revision 2, working 2026-11-09)
+
+Revision 2 of Mark One's firmware (`asm/nocard.s`, in build.py's `webcam`
+patches) records in webcam mode with no card, never creates a movie file,
+and lifts the time limits, all only while the connection type
+(0x605f0d14) is 7. It stays 7 in shooting mode with USB connected. With
+a card in, nothing is written: no new P101xxxx.MOV after hooked sessions.
+
+Thirteen hooks, each a 5-byte jump (plus nops) to a stub over the
+console-only `sdk api` EV_* dump at 0x7eaaf760 (780 bytes; free to
+0x7eaafbb3). Outside webcam mode each stub runs the instruction it
+replaced. See the header of `asm/nocard.s` for the list. What it took:
+
+- REC with no card is refused silently by the shooting app's movie start
+  check (movie_record_start, 0x7eb7185e, line 7910): the media state for
+  movies (0x7ea7fcd1 with d0 = 4) is 0x1001 with no card and must be
+  0xf000. S13 reports 0xf000 to that check only. Every refusal there goes
+  through the logger 0x7eb6b884 (d0 = line, a1 = tag); `asm/refusal.s`
+  records them, which is how line 7910 was found.
+- The recorder needs a nonzero limit (S1 sets +32/+36/+40 of its state),
+  no TIME_LIMIT check (S2) and the muxer's 2-hour maximum (S3).
+- QuickTime file task commands (open, seek, tell, read) are faked as an
+  empty file would answer. Each fake must clear the busy flag at
+  0xa0785940 (0x7e7a62d9): the requester waits for it.
+- IMDF 50 (0x7e7a792e) reserves the file number through a synchronous
+  file-dispatcher call (0x7e7ac1eb). Besides creating the file entry on
+  the card, it fills in the recorder's +172/+176 (0x40210000) and points
+  +180 at the movie's file entry (name P101xxxx MOV, pointing to the
+  100OLYMP folder entry), and writes the path to 0x605b52dc. The muxer's
+  start (MOV_AVCHD command 2, AVSCA start 0x7e5497ed) reads +180 and
+  crashes on a null one, which is what +180 is after a restart until the
+  first real reservation. S9 skips the call and fills these in from
+  stand-ins copied from a real reservation.
+- MOV_FILE's open and write (S4), record_end (S10), cancel (S11) and
+  QT remove (S12) are skipped.
+
+Testing hooks at run time:
+
+- RAM, code included, survives switching the camera off; only a crash
+  (or a battery pull) reloads the firmware. Old hooks from an earlier
+  session stay live, so restore them before overwriting the code they
+  jump to.
+- The CPU keeps stale code in its instruction cache. Code poked over
+  code that has already run (a probe, then new stubs in the same place)
+  crashed the camera. Hook only code that hasn't run since the CPU last
+  reset (switching off and on resets it), and don't reuse space.
+- The first REC key press after setting up is often ignored; press again.
+- A crash shows up as the camera dropping off USB and returning to the
+  USB menu.
+
+Mark One's firmware is built from `usb-tools` and `webcam` together:
+`scripts/build.py --edits mac/MarkOne/App/Resources/webcam-firmware.json
+fw/OLY_E_097_2300_0000_0000.BIN patched/E0972300.BIN usb-tools webcam`.
+A first revision 2 built from `webcam` alone installed fine but left the
+camera without peek/poke/run, so Mark One saw it as stock; the card
+install (Set Up Camera) put the right one on. Check a new build against
+the last: rebuilding the previous revision with the old build.py should
+reproduce the shipped edits exactly.
+
+After a USB install the camera goes back to the picture it showed, still
+running the old firmware from RAM, until it's switched off and on.
+
 ## Where it stands
 
 Mark One works end to end over USB: firmware setup from the card, updates

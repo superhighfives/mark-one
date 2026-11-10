@@ -29,25 +29,36 @@ Mark One.
   `NOTES.md`). Give the extension its own version so app-only updates
   don't replace it, and if the Mark One device doesn't appear after an
   update, say a restart is needed.
-- [ ] **Battery level.** The camera reports few steps: it read 100% for
-  45 minutes, then 50% while its own icon flashed empty, then it died.
-  Record which values it sends, then show the camera's levels (full,
-  low, empty) instead of a percentage, and warn when it's low.
+- [ ] **Battery steps.** Mark One shows full, low or empty and logs each
+  new reading ("Camera battery reads"). So far: 100, then 50 once the
+  camera's icon flashes empty. Check the thresholds against a full
+  discharge.
 
 ### Webcam firmware
 
-Move what Mark One patches into camera memory each session into the
-firmware itself, active only in webcam mode, so normal movies still go
-to the card.
+Revision 2 records in webcam mode with no card, creates no movie file and
+lifts the time limits (see "Recording without a card" in `NOTES.md`).
 
-- [ ] **Webcam mode switch.** A flag Mark One sets when it connects,
-  which the patched code checks.
-- [ ] **No SD card.** Record without a card in. Today the camera won't
-  start recording without one, though nothing is written to it.
-- [ ] **No empty movie files.** Each session leaves a 0-byte movie on the
-  card (91 so far), and the camera's file numbering stops at 9999.
-- [ ] **Card writes and time limits** in webcam mode only, replacing the
-  runtime patches.
+- [ ] **Restart after a USB install.** The camera goes back to its old
+  picture, still running the old firmware, until it's switched off and
+  on. Find the firmware's restart routine and have Mark One call it when
+  the install finishes, then say "it'll restart, then choose Webcam".
+- [ ] **Long session with no card.** Stream for more than 30 minutes
+  with no card, and past Mark One's first scheduled restart.
+- [ ] **Drop the runtime patches on revision 2.** Mark One still applies
+  'card writes', 'time limit' and 'muxer time limit' each session; on
+  revision 2 they're redundant.
+- [ ] **Remove the empty movie files** that earlier sessions left on
+  cards (96 on the test card), or tell users they can delete them.
+
+### Direct distribution
+
+- [ ] **Drop the sandbox.** Mark One then writes the firmware to the card
+  itself, with macOS's one-time removable volume prompt instead of the
+  "Use This Card" panel. Debug captures can go anywhere.
+- [ ] **Developer ID build** with the system extension entitlement,
+  notarized.
+- [ ] **Updates** with Sparkle.
 
 ### Release
 
@@ -80,6 +91,9 @@ to the card.
 
 ## Done recently
 
+- Recording with no card, no empty movie files and no time limits in
+  webcam mode: firmware revision 2 (2026-11-09).
+- Battery shown as full, low or empty (2026-11-09).
 - The 30-minute stop, the Mach port leak, QuickTime failing on repeated
   timestamps, gray frames, and asking for a missing card (2026-11-09).
 - Unplugging mid-call leaves the camera usable, and plugging back in
