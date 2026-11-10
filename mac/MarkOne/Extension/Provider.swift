@@ -40,6 +40,10 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
     /// as each disconnects from the provider.
     private var clientPIDs: [pid_t] = []
     private var sinkClient: CMIOExtensionClient?
+    /// Whether the loop that takes frames from Mark One is running. It runs
+    /// only while an app uses the camera: each ask is a round trip to Mark
+    /// One, and asking with nothing to take kept both busy.
+    private var pulling = false
     private var lastSinkFrame = Date.distantPast
     /// The latest frame from Mark One, repeated through short gaps in its feed.
     private var lastSample: CMSampleBuffer?
@@ -110,6 +114,7 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
         queue.async { [self] in
             sourceClients += 1
             if sourceClients == 1 { notifyInUse(true) }
+            pull()
             if let pid {
                 clientPIDs.removeAll { $0 == pid }
                 clientPIDs.append(pid)
@@ -189,7 +194,7 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
     func startSink(client: CMIOExtensionClient) {
         queue.async { [self] in
             sinkClient = client
-            consume(from: client)
+            pull()
         }
     }
 
@@ -200,8 +205,20 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
         }
     }
 
+    /// Starts taking frames, if an app is using the camera. Call on `queue`.
+    private func pull() {
+        guard !pulling, sourceClients > 0, let sinkClient else { return }
+        pulling = true
+        consume(from: sinkClient)
+    }
+
+    /// Call on `queue`.
     private func consume(from client: CMIOExtensionClient) {
-        guard sinkClient === client else { return }
+        guard sinkClient === client, sourceClients > 0 else {
+            pulling = false
+            pull()  // a new sink client may be waiting
+            return
+        }
         sink.stream.consumeSampleBuffer(from: client) { [weak self] sample, sequence, _, _, error in
             guard let self else { return }
             self.queue.async {
@@ -213,12 +230,15 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
                     let output = CMIOExtensionScheduledOutput(sequenceNumber: sequence,
                                                               hostTimeInNanoseconds: UInt64(now.seconds * Double(NSEC_PER_SEC)))
                     self.sink.stream.notifyScheduledOutputChanged(output)
+                    // Each ask is a round trip to Mark One, and the next frame
+                    // is about 33 ms away, so wait most of that first.
+                    self.queue.asyncAfter(deadline: .now() + 0.026) { self.consume(from: client) }
                 } else if error != nil {
                     // Nothing queued yet; ask again shortly.
-                    self.queue.asyncAfter(deadline: .now() + 0.005) { self.consume(from: client) }
-                    return
+                    self.queue.asyncAfter(deadline: .now() + 0.004) { self.consume(from: client) }
+                } else {
+                    self.consume(from: client)
                 }
-                self.consume(from: client)
             }
         }
     }

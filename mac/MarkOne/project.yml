@@ -61,6 +61,10 @@ targets:
         CODE_SIGN_ENTITLEMENTS: Extension/MarkOneCamera.entitlements
         INFOPLIST_FILE: Extension/Info.plist
         SKIP_INSTALL: YES
+        # The extension's own build number. Change it only when the
+        # extension changes: replacing it can lose the camera until the
+        # Mac restarts (see "Camera extension updates" in NOTES.md).
+        CURRENT_PROJECT_VERSION: "4"
   markone-feed:
     type: tool
     platform: macOS
