@@ -53,9 +53,38 @@ lifts the time limits (see "Recording without a card" in `NOTES.md`).
 
 ### Direct distribution
 
-- [ ] **Developer ID build** with the system extension entitlement,
-  notarized.
-- [ ] **Updates** with Sparkle.
+```
+```
+
+**In the app**
+
+- [x] **Sparkle** 2.10 through Swift Package Manager (2026-11-10).
+  `App/Updater.swift`, with "Check for Updates…" under Settings > About
+  and the automatic check under Settings > General. Scheduled checks
+  wait while the camera is streaming, so an update prompt never lands
+  mid-call. `SUFeedURL` and `SUPublicEDKey` are in `App/Info.plist`. The
+  key is Mark One's own, in the login keychain under the account
+  `mark-one`.
+- [ ] **Back up the Sparkle key**: `generate_keys --account mark-one -x
+  <file>` (in `build/SourcePackages/artifacts/sparkle/Sparkle/bin`), and
+  keep the file in a password manager. Losing it means no more updates
+  for existing copies.
+- [ ] **Updates and the camera extension.** Sparkle only replaces the
+  app. The extension changes only when Mark One asks the system to
+  activate it, so updates that keep the extension's build number are
+  safe. Release notes for updates that change the extension should say a
+  restart may be needed (see "Extension updates" above).
+- [x] **Release script** (`scripts/release.sh`, 2026-11-10): archives,
+  exports with Developer ID, notarizes and staples the app, makes and
+  signs the DMG, notarizes and staples that, signs it for Sparkle,
+  uploads it to R2 with `--upload`, and prints the front matter for the
+  changelog entry. Tested up to notarization.
+
+**On superhighfives.com**
+
+- [x] **Appcast:** `changelog/mark-one/<version>.md`, in the same format
+  as Pika's, and `/releases/mark-one/feed`. `generateAppcast.ts` now
+  takes settings per app, and Pika's feeds are unchanged.
 
 ### Release
 
