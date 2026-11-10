@@ -1249,6 +1249,14 @@ logs ("No video from the camera", "Slow pass", "Lost track",
 - Tried and reverted: always checking the start of the ring for the next
   frame (not only within 1 MB of the end). It matched stale frames and
   lost track every few seconds.
+- A 56-second QuickTime clip of the result was frozen 11% of the time
+  (27 freezes of 0.1 s or more, the longest 0.9 s): lost track about
+  every 10-15 s, plus single-frame decode failures that break the frames
+  that refer to them until the next keyframe.
+- Next idea: stop guessing. Find where the encoder reports a finished
+  frame (the recorder's table at 0xA07E5180 gets its sizes from there,
+  half a second late), hook it in the webcam firmware, and keep a ring of
+  {address, size} for Mark One to read.
 
 ## Where it stands
 
