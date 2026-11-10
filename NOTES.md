@@ -1253,10 +1253,47 @@ logs ("No video from the camera", "Slow pass", "Lost track",
   (27 freezes of 0.1 s or more, the longest 0.9 s): lost track about
   every 10-15 s, plus single-frame decode failures that break the frames
   that refer to them until the next keyframe.
-- Next idea: stop guessing. Find where the encoder reports a finished
-  frame (the recorder's table at 0xA07E5180 gets its sizes from there,
-  half a second late), hook it in the webcam firmware, and keep a ring of
-  {address, size} for Mark One to read.
+
+### Exact frame boundaries (revision 3, tested in RAM 2026-11-09)
+
+Why the recorder's table lags: its entries are the Video Encode plug-in's
+sample objects (60 of 244 bytes, made with `new[]` at 0x7e5269a5; table
++4 is object +80), written through the CPU cache. USB reads RAM directly,
+so each entry shows up only when its cache line happens to be written
+back. Reading the same entries through the cache (read32) while recording
+gave newer frame numbers and final sizes where the uncached view still
+had old frames or the placeholder: 249 of 506 reads differed in 10 s. The
+table's size (object +28) is the frame's byte count plus 1, rounded to
+the buffer alignment, so table-sized frames carry one extra byte, and the
+next frame starts a byte after the previous one ends.
+
+Where a frame becomes final: the plug-in's event handler (fn_7e5304c6, in
+its task, once per video frame, never for audio) asks the encoder for the
+result (bytes at (24,sp), offset at (28,sp)), then at 0x7e5307b9 calls
+0x7e5277ea, a leaf that stores the offset at object +96, the byte count at
++100 and 1 at +104. The buffer address is at +88 (uncached, 0xa52b...), the
+90 kHz timestamp at +24. The encoder's done callback (0x7e530fc7) only
+posts event 0x0b000001; the hardware's result registers are at
+0x99404000-0x99404010 (not read: side effects unknown).
+
+`asm/frames.s` replaces that call with a jump to a stub over console-only
+`sdk api` commands (getDisplayDeviceState from 0x7eaaab8e; it and the
+commands after it, to 0x7eaab024, are pointed to only from the console's
+command table at 0x7ecda9f8). The stub does the leaf's stores and, in
+webcam mode, adds {address, bytes, timestamp, number} to a 64-entry list
+at 0x7eaaac10 with a count at 0x7eaaac00, written through the uncached
+mirror so USB sees it at once. Number is written last; an entry is valid
+when its number is the one expected.
+
+Tested by poking it into RAM after a power cycle (revision 2 camera,
+before recording): 29.92 frames/s, every listed frame starts with a
+delimiter, timestamps 3003 apart. A 20-second capture copied by the list
+alone: 599 frames, none missed, and from the first keyframe on 585 frames
+decode with no errors under `-err_detect +crccheck+bitstream+buffer+explode`.
+
+Mark One on revision 3 reads the list (`Streamer.pollList`), skips to the
+newest frame if it falls 30 frames behind (the ring holds about 45), and
+starts at a keyframe. Older revisions keep the stream follower.
 
 ## Where it stands
 

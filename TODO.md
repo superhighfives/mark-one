@@ -20,10 +20,11 @@ Mark One.
   frames a minute fail to decode. See "Video pauses" in `NOTES.md` for
   what's known and what was tried. A 56-second clip (2026-11-09) was
   frozen 11% of the time: 27 freezes, the longest 0.9 s.
-  **Next: exact frame boundaries from the firmware (revision 3).** Hook
-  where the encoder finishes a frame and have the camera list each
-  frame's address and size, so Mark One copies frames instead of
-  guessing their ends from the ring and the lagging table.
+  **Revision 3 lists each frame's address and size** (`asm/frames.s`):
+  tested in RAM, 20 s with no missed frames and no decode errors. Built
+  into `webcam-firmware.json`, and Mark One reads the list on revision 3.
+  Next: install revision 3, then run a long session with Mark One and
+  check the "No video", "Skipped ahead" and "failed to decode" logs.
 - [ ] **Hard freeze at 21.6 minutes** (2026-11-09, revision 2, card in):
   the camera froze mid-stream and needed a battery pull. A 26-minute run
   afterwards didn't freeze. Watch for it in long sessions.
