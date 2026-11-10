@@ -108,7 +108,8 @@ final class Pipeline: ObservableObject {
     }
     private let faceWanted = Flag()
 
-    /// The camera's battery level, 1 to 100, while it's connected.
+    /// The camera's battery level while it's connected: nominally 1 to 100,
+    /// but only a few steps in practice (see CameraBattery).
     @Published private(set) var battery: Int?
 
     private let focusRequested = Flag()
@@ -424,7 +425,11 @@ final class Pipeline: ObservableObject {
         if Date().timeIntervalSince(applied.batteryChecked) >= 30 {
             applied.batteryChecked = Date()
             let level = try Firmware.battery(camera)
-            Task { @MainActor in self.battery = level }
+            Task { @MainActor in
+                // The camera only reports a few steps; log each new one.
+                if level != self.battery { log.notice("Camera battery reads \(level, privacy: .public)") }
+                self.battery = level
+            }
         }
         // Focus holds the shutter button half down until the picture
         // settles, and keeps streaming meanwhile.

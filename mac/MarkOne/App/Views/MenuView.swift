@@ -205,6 +205,13 @@ struct MenuView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            if let battery = pipeline.battery, CameraBattery(level: battery) != .full {
+                Label("The camera's battery is low. Charge it soon, or use a dummy battery with a power adapter.",
+                      systemImage: "battery.25percent")
+                    .font(.callout)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if pipeline.firmware?.updateAvailable == true {
                 HStack {
                     Label("New camera firmware", systemImage: "arrow.down.circle")

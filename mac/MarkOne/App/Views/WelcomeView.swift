@@ -62,7 +62,7 @@ struct WelcomeView: View {
 
     private var connectedDetail: String {
         var parts = [pipeline.firmware.map { "Firmware: \($0.label)" } ?? "Checking the firmware…"]
-        if let battery = pipeline.battery { parts.append("Battery \(battery)%") }
+        if let battery = pipeline.battery { parts.append("Battery \(CameraBattery(level: battery).label.lowercased())") }
         return parts.joined(separator: " · ")
     }
 

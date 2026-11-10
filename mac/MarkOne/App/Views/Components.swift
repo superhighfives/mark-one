@@ -207,28 +207,58 @@ struct PreviewOverlay: View {
     }
 }
 
-/// The camera's battery level, as a battery symbol and a percentage.
+/// The camera's battery in the steps it actually reports. It sends a
+/// percentage, but coarsely: 100 for most of a charge, then 50 once its
+/// own battery icon flashes empty (see NOTES.md, "Objects and settings").
+enum CameraBattery {
+    case full, low, empty
+
+    init(level: Int) {
+        switch level {
+        case 75...: self = .full
+        case 26...: self = .low
+        default: self = .empty
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .full: "Full"
+        case .low: "Low"
+        case .empty: "Empty"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .full: "battery.100percent"
+        case .low: "battery.25percent"
+        case .empty: "battery.0percent"
+        }
+    }
+
+    var color: Color? {
+        switch self {
+        case .full: nil
+        case .low: .orange
+        case .empty: .red
+        }
+    }
+}
+
+/// The camera's battery, as a battery symbol and a word.
 struct BatteryLevel: View {
     let level: Int
 
     var body: some View {
+        let battery = CameraBattery(level: level)
         HStack(spacing: 4) {
-            Image(systemName: symbol)
-            Text("\(level)%").monospacedDigit()
+            Image(systemName: battery.symbol)
+            Text(battery.label)
         }
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(battery.color.map { AnyShapeStyle($0) } ?? AnyShapeStyle(.secondary))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Camera battery \(level) percent")
-    }
-
-    private var symbol: String {
-        switch level {
-        case ..<13: "battery.0percent"
-        case ..<38: "battery.25percent"
-        case ..<63: "battery.50percent"
-        case ..<88: "battery.75percent"
-        default: "battery.100percent"
-        }
+        .accessibilityLabel("Camera battery \(battery.label.lowercased())")
     }
 }
