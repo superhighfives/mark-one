@@ -6,13 +6,6 @@ Mark One.
 
 ## Next
 
-- [ ] **Faster restarts.** Mark One's scheduled restart at 3.5 GB (about
-  every 31-33 minutes at 15-16 Mbps) freezes the picture for about 4.9 s,
-  almost all of it waiting for the camera to report it's recording again
-  (see "Exact frame boundaries" in `NOTES.md`). Restart less often if
-  the movie writer doesn't stop at 4 GB (see "Fewer restarts"), and
-  find out why the check takes nearly 5 s. Still to check in a long
-  session: whether the card's free space shrinks.
 - [x] **Video pauses.** Fixed by revision 3, which lists each frame's
   address and size (`asm/frames.s`). A 71-minute recording (2026-11-10)
   froze only at the two scheduled restarts and once for 0.43 s
@@ -77,9 +70,14 @@ lifts the time limits (see "Recording without a card" in `NOTES.md`).
 
 - [ ] **Power.** The E-M5 doesn't run from USB power. Try the dummy
   battery and power adapter (on order) for long calls.
-- [ ] **Fewer restarts.** If 4 GB isn't a limit, restart only near the
-  2-hour cap. Values above about 6.6 hours would likely overflow the
-  muxer's 90 kHz clock.
+- [ ] **Shorter, rarer restarts.** Mark One's scheduled restart at 3.5 GB
+  (about every 31-33 minutes at 15-16 Mbps) freezes the picture for
+  about 4.9 s, almost all of it waiting for the camera to report it's
+  recording again (see "Exact frame boundaries" in `NOTES.md`). Find
+  out why that check takes nearly 5 s. If 4 GB isn't a limit, restart
+  only near the 2-hour cap. Values above about 6.6 hours would likely
+  overflow the muxer's 90 kHz clock. Also check whether the card's free
+  space shrinks in a long session.
 - [ ] **Apple's video decoder.** Hardware decoding would use less CPU and
   battery than libavcodec, but Apple's hardware decoder rejects every
   frame of this stream and the software one about 1 in 100. Measure
