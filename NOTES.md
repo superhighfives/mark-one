@@ -4,13 +4,7 @@ Research notes for getting live video from an original Olympus OM-D E-M5
 into macOS as a webcam by patching the camera firmware. Everything here
 targets firmware 2.3, so update the camera to 2.3 before flashing anything.
 
-## To test when the camera is on
-
-- Time limit: run `ptp.py shoot`, record and stream past 30 minutes.
-  Watch for the recording stopping, or a hiccup around 27 minutes (4 GB
-  at 20 Mbps), when the QuickTime writer may split or stop the file.
-- Card space: after a long streamed recording, check that the card's
-  free space didn't shrink.
+Open work is in `TODO.md`.
 
 ## Stock behavior (dead ends without firmware changes)
 
@@ -576,7 +570,10 @@ seconds of "0".
   through getSetting and the read32 helper. Peeking the out word misses
   writes still in the cache.
 - Battery: the standard PTP property 0x5001 (uint8, 1-100), which the
-  camera lists in its device info.
+  camera lists in its device info. Its description (GetDevicePropDesc)
+  claims a range of 1-100 in steps of 1, but the value is coarse: 100
+  for the first 45 minutes of recording, then 50 while the camera's own
+  icon flashed empty, shortly before it died (2026-11-09).
 - The camera reads the movie AF mode when a recording starts. Changing
   it mid-recording does nothing until the next one, so Mark One restarts
   the recording when the setting changes.
@@ -919,7 +916,7 @@ on a camera freshly switched on (not in Mark One's shooting setup). The
 status poll answered (1, 0) for about 30 s, then (2, 0), and 0x9123
 started the install. The camera showed its update animation, then OK;
 switched off and on, it reported revision 1. Installs mid-session, after
-Mark One's setup, work too (see "Next", item 3).
+Mark One's setup, work too (see the end of this section).
 
 Connected as Webcam (type 7), 0x911c and 0x9120 answer the same as over
 MTP, so the webcam connection gets the update commands too.
@@ -943,6 +940,13 @@ for the E-M10 in github.com/matozoid/em10_1
 (`docs/firmware/update-server.md`); not tried for E-097. The same
 project's decompile of OM Workspace's Windows library matches the
 recorded sequence.
+
+A USB install works on a camera Mark One has set up (2026-11-09):
+shooting mode, movie dial, a recording started and stopped, keys reset.
+The check took about 43 s instead of 30. While it installs,
+the screen flickers between the update icons and the last live view
+frame left in the display buffers; the install itself is fine. The app
+now installs straight away instead of asking for a restart.
 
 ## Recording time limit
 
@@ -1156,56 +1160,38 @@ webcam, ImageCaptureCore's `requestSendPTPCommand` (ICCameraDevice) can send
 any PTP command, so a small app can poll 0x9484 and publish frames through
 a CoreMediaIO camera extension.
 
-## Next
+## Where it stands
 
 Mark One works end to end over USB: firmware setup from the card, updates
 and restores over USB, and 1080p video from the movie recorder. HDMI
 through a capture card is no longer the plan; the hdmi-liveview patch
-stays here for reference, untested.
+stays here for reference, untested. What's left is in `TODO.md`.
 
-0. Updating the camera extension can lose the Mark One camera until the
-   Mac restarts. Seen going 0.1/2 to 1.0/1 and again 1.0/1 to 1.0/2, so
-   it isn't the build number. The system log shows why: sysextd asks
-   registerassistantservice to stop the old extension (launchd remove,
-   EINPROGRESS), then 4 ms later to start the new one, which it skips
-   with "extension is already running" because the old process hasn't
-   exited yet. The new version is then activated and enabled but never
-   launched, and reopening Mark One only gets "alreadyActive". SIP blocks
-   `launchctl kickstart` on registerassistantservice, but killing it
-   works: `sudo kill -KILL $(pgrep -x com.apple.cmio.registerassistantservice)`.
-   launchd restarts it, it launches the new extension, and Mark One then
-   needs reopening. A Mac restart also fixes it. Others hit the same race
-   (kortexa-ai/aicamera#73, grahamgilbert/movembercam#6 and #9; Apple
-   forums thread 756234). To keep users clear of it:
-   - Give the extension its own version, and change it only when the
-     extension changes, so app-only updates don't replace it. Today it
-     inherits `CURRENT_PROJECT_VERSION`.
-   - After activating, check that the Mark One device appears. If it
-     doesn't, say a restart is needed to finish the update. movembercam
-     also recovers with deactivate, wait, activate, which costs the user
-     a second approval.
-1. Done (2026-11-09): unplugging mid-call leaves the camera usable, and
-   plugging it back in works. See "Unplugging in webcam mode".
-2. Record past 30 minutes to confirm the time limit change holds, and
-   that nothing is written to the card. See "Recording time limit".
-3. Done (2026-11-09): a USB install works on a camera Mark One has set
-   up (shooting mode, movie dial, a recording started and stopped, keys
-   reset). The check took about 43 s instead of 30. While it installs,
-   the screen flickers between the update icons and the last live view
-   frame left in the display buffers; the install itself is fine. The app
-   now installs straight away instead of asking for a restart.
-4. App Store: done on the app's side; see "App Store" and
-   `appstore/README.md`. Before launch: settle the content rights answer
-   (Olympus's firmware license forbids modifying it), whether review
-   accepts installing modified camera firmware, screenshots, a build
-   upload and the review video.
-5. Before launch: check the battery level. It still read 100% after about
-   45 minutes of recording. Mark One reads PTP property 0x5001 every 30 s,
-   but which values the camera actually reports is unknown; it may only
-   step like its own battery icon (100/66/33, say). Ask the camera with
-   GetDevicePropDesc (0x1014) for 0x5001's range or list of values, and
-   compare readings with the icon on the camera's screen during a long
-   session. If it's coarse, show bars instead of a percentage.
+## Camera extension updates (2026-11-09)
+
+Updating the camera extension can lose the Mark One camera until the
+Mac restarts. Seen going 0.1/2 to 1.0/1 and again 1.0/1 to 1.0/2, so
+it isn't the build number. The system log shows why: sysextd asks
+registerassistantservice to stop the old extension (launchd remove,
+EINPROGRESS), then 4 ms later to start the new one, which it skips
+with "extension is already running" because the old process hasn't
+exited yet. The new version is then activated and enabled but never
+launched, and reopening Mark One only gets "alreadyActive". SIP blocks
+`launchctl kickstart` on registerassistantservice, but killing it
+works: `sudo kill -KILL $(pgrep -x com.apple.cmio.registerassistantservice)`.
+launchd restarts it, it launches the new extension, and Mark One then
+needs reopening. A Mac restart also fixes it. Others hit the same race
+(kortexa-ai/aicamera#73, grahamgilbert/movembercam#6 and #9; Apple
+forums thread 756234). Mark One no longer replaces the extension with
+the same version. To keep users clear of it otherwise (in `TODO.md`):
+
+- Give the extension its own version, and change it only when the
+  extension changes, so app-only updates don't replace it. Today it
+  inherits `CURRENT_PROJECT_VERSION`.
+- After activating, check that the Mark One device appears. If it
+  doesn't, say a restart is needed to finish the update. movembercam
+  also recovers with deactivate, wait, activate, which costs the user
+  a second approval.
 
 ## App Store (prep, 2026-11-09)
 

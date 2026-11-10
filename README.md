@@ -19,32 +19,7 @@ All of this rests on one firmware change, `usb-tools`, which adds USB commands t
 
 ## What's left
 
-### Make webcam mode seamless
-
-The goal is software that feels like magic: plug in the camera, open a video call, and it works, with nothing to press on the camera or in Mark One.
-
-- **Webcam mode in the firmware.** Today Mark One rewrites camera memory every time it starts. A firmware build with webcam mode built in would be faster and sturdier: it would enter webcam mode by itself when Mark One connects, and skip card writes and the time limit only in that mode.
-- **Install the firmware from Mark One.** Olympus's own updater installs firmware over USB, so the camera has a USB update path. Work out its protocol, then let Mark One check the camera's firmware and offer to install the webcam firmware, with no SD card. Olympus's firmware can't be shipped in the app, so Mark One would download the stock file from Olympus (as `scripts/setup.sh` does), patch it on the Mac, and send it to the camera. This needs care: a failed flash can brick the camera, and App Review will want to see a clear explanation.
-- **Power.** The E-M5 doesn't run from USB power, so long calls drain the battery. Look at a dummy battery with a power adapter, and show the battery level in Mark One.
-- **Picture controls.** Exposure, white balance, picture mode and focus from Mark One, through the same camera API the firmware's own menus use.
-- **No SD card (stretch goal).** Mark One stops movies writing to the card, but the camera still needs one to record (it won't start without one, tested 2026-11-09): it creates an empty movie file each session and checks the card's free space. Webcam mode that records without a card would remove those empty files and any card-related limits, and save users a step.
-
-### Test
-
-- **Recording limit.** Stream for more than 30 minutes and check that the time-limit patch holds. Also check what happens around 27 minutes, when the movie writer would reach 4 GB even though nothing goes to the card.
-- **Card space.** After a long session, check that the card's free space didn't shrink.
-
-### Before the App Store
-
-- Credit FFmpeg in the app, link to its source and include the LGPL 2.1 text. Mark One ships libavcodec as separate, unmodified dynamic libraries for this reason.
-- Remove the Downloads entitlement, which only the debug capture uses (the `SaveCapture` default), or put the capture behind a debug build.
-- A Release build, screenshots and App Review notes that explain the firmware requirement.
-- Decide how people get the `usb-tools` firmware onto their camera until Mark One can install it itself.
-
-### Open questions
-
-- Why Apple's video decoders reject this stream. The hardware decoder rejects every frame and the software decoder about 1 in 100, while libavcodec decodes all of them. `NOTES.md` lists what has been ruled out.
-- `hdmi-liveview`, which should let the camera show live view over HDMI while shooting, is built but has never been tried on a camera. USB made it unnecessary for the webcam, but it would help anyone using a capture card.
+`TODO.md` lists everything left before launch, fast follows and longer-term ideas.
 
 ## Mark One
 
