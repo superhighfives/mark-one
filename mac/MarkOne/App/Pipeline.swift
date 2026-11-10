@@ -453,6 +453,12 @@ final class Pipeline: ObservableObject {
         }
     }
 
+    /// When to restart a recording: before the movie writer's 4 GB file
+    /// limit (if it enforces one; at about 21 Mbps it would be reached in
+    /// 27 minutes) and well before its 2-hour limit.
+    static let restartBytes = 3_758_096_384   // 3.5 GB
+    static let restartTime: TimeInterval = 100 * 60
+
     /// Records and streams until nothing has wanted video for `grace`.
     private nonisolated func stream(_ camera: Camera, to sink: CameraSink, applied: inout Applied) throws {
         let decoder = FrameDecoder()
@@ -472,13 +478,15 @@ final class Pipeline: ObservableObject {
         let streamer = Streamer(camera: camera)
         var since = Date(), lastUsed = Date(), lastChecked = Date()
         var received = 0, failuresBefore = 0
-        var lastReceived = Date()
+        var lastReceived = Date(), lastRecordingCheck = Date()
+        var recordedBytes = 0
         var client: pid_t?
         let capture = UserDefaults.standard.bool(forKey: "SaveCapture") ? Capture() : nil
         report("Starting to record…", .streaming)
         setBusy("Starting the camera…")
         try Firmware.setScreen(camera, true)
         try Firmware.setRecording(camera, true)
+        var recordingSince = Date()
         defer {
             setBusy(nil)
             showClient(nil)
@@ -501,6 +509,7 @@ final class Pipeline: ObservableObject {
                 lastReceived = Date()
             }
             for frame in frames {
+                recordedBytes += frame.count
                 let before = decoder.failures
                 decoded = false
                 decoder.decode(frame)
@@ -510,6 +519,30 @@ final class Pipeline: ObservableObject {
                 if !decoded, let last { sink.send(last) }
             }
             if frames.isEmpty { Thread.sleep(forTimeInterval: 0.003) }
+            // A recording that reaches the movie writer's limits (2 hours
+            // with Mark One's patch, and perhaps 4 GB) hangs the camera's
+            // recorder until it's switched off. Stop and start well before.
+            let recordedFor = Date().timeIntervalSince(recordingSince)
+            if recordedBytes >= Pipeline.restartBytes || recordedFor >= Pipeline.restartTime {
+                let rate = Double(recordedBytes) * 8 / recordedFor / 1_000_000
+                log.notice("Restarting the recording after \(recordedFor / 60, format: .fixed(precision: 1), privacy: .public) minutes and \(Double(recordedBytes) / 1_073_741_824, format: .fixed(precision: 2), privacy: .public) GB (\(rate, format: .fixed(precision: 1), privacy: .public) Mbps).")
+                try Firmware.setRecording(camera, false)
+                try Firmware.setRecording(camera, true)
+                recordingSince = Date()
+                recordedBytes = 0
+            }
+            // If video stops for anything else, such as the REC button,
+            // start recording again.
+            if Date().timeIntervalSince(lastReceived) > 2, Date().timeIntervalSince(lastRecordingCheck) > 2 {
+                lastRecordingCheck = Date()
+                if try !Firmware.isRecording(camera) {
+                    let minutes = Date().timeIntervalSince(recordingSince) / 60
+                    log.notice("The camera stopped recording after \(minutes, format: .fixed(precision: 2), privacy: .public) minutes. Starting again.")
+                    try Firmware.setRecording(camera, true)
+                    recordingSince = Date()
+                    recordedBytes = 0
+                }
+            }
             try updateControls(camera, &applied, recording: true)
             if Date().timeIntervalSince(lastChecked) >= 0.5 {
                 lastChecked = Date()

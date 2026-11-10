@@ -30,6 +30,7 @@ enum Firmware {
         ("card writes", 0x7E7C_04CA, StockCode(count: 8, sha256: "360186c7f9ecda61e3f9127d90ebc33fcee04c4315488f233438cb3d415b5be4"), "84cbcbcbcbcbcb82"),
         ("time limit", 0x7E7B_BF88, StockCode(count: 4, sha256: "9a53ef45d36df0fd6f90f388d1696df8db514faf8ce5f184d4e68ab561db3856"), "0427ff7f"),
         ("time limit", 0x7E7B_BFBC, StockCode(count: 12, sha256: "5c7993277f758597d2e77926f35759decab9140c60a08c80b6b1b227a5f73d6e"), "f1dc8283cbcbcbcbcbcbcb5c"),
+        ("muxer time limit", 0x7E7A_7C50, StockCode(count: 8, sha256: "888ec7b316e4e6c6f6e5ff6d577f4576949bf4ca7d79363ea7b74473d4853257"), "18fccc00dd6d00ca"),
     ]
 
     /// Puts the camera in shooting mode with USB connected, with movies that

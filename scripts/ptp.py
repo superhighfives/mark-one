@@ -271,6 +271,16 @@ RUNTIME_PATCHES = {
         0x7E7BBF88: ('0427cc06', '0427ff7f'),
         0x7E7BBFBC: ((12, '5c7993277f758597d2e77926f35759decab9140c60a08c80b6b1b227a5f73d6e'), 'f1dc8283cbcbcbcbcbcbcb5c'),
     },
+    # The QuickTime muxer has its own maximum, ulMaxRecTime, which rec_init
+    # sets to 1,800,000 ms for Full HD and HD (0x7e7a7c51: `mov 1800000,d0`)
+    # and 7,200,000 ms for SD. Once the app limit above is lifted, the muxer
+    # stops itself at 30 minutes, and the recorder then hangs waiting for a
+    # stop result that never comes: live view, REC ignored, until a restart.
+    # Use the SD value, 2 hours. Mark One also restarts recordings well
+    # before that.
+    'muxer time limit': {
+        0x7E7A7C50: ('18fccc40771b00ca', '18fccc00dd6d00ca'),
+    },
 }
 
 
