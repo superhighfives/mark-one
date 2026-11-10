@@ -3,6 +3,10 @@ options:
   bundleIdPrefix: com.superhighfives
   deploymentTarget:
     macOS: "14.0"
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.10.1"
 configFiles:
   Debug: Local.xcconfig
   Release: Local.xcconfig
@@ -29,6 +33,8 @@ targets:
         CODE_SIGN_ENTITLEMENTS: App/MarkOne.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: YES
+        # Sparkle's feed and public key, merged with the generated keys below
+        INFOPLIST_FILE: App/Info.plist
         INFOPLIST_KEY_CFBundleDisplayName: Mark One
         INFOPLIST_KEY_LSUIElement: YES
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.video
@@ -44,6 +50,7 @@ targets:
     dependencies:
       - target: MarkOneCamera
         embed: true
+      - package: Sparkle
       - framework: Vendor/ffmpeg/lib/libavcodec.63.dylib
         embed: true
         codeSign: true

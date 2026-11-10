@@ -22,6 +22,7 @@ struct SettingsView: View {
 private struct GeneralSettings: View {
     @ObservedObject var pipeline: Pipeline
     @ObservedObject private var preferences = Preferences.shared
+    @ObservedObject private var updater = Updater.shared
 
     var body: some View {
         Form {
@@ -43,6 +44,12 @@ private struct GeneralSettings: View {
                     Text("A short wait lets you switch apps without the camera restarting.")
                 }
                 Toggle("Mirror the preview", isOn: $preferences.mirrorPreview)
+            }
+            Section {
+                Toggle(isOn: $updater.checksAutomatically) {
+                    Text("Check for updates automatically")
+                    Text("Once a day, and never during a call.")
+                }
             }
             Section {
                 LabeledContent("Setup") {
@@ -127,6 +134,7 @@ private struct CameraSettings: View {
 }
 
 private struct AboutSettings: View {
+    @ObservedObject private var updater = Updater.shared
     @State private var showLicense = false
 
     private var version: String {
@@ -146,6 +154,8 @@ private struct AboutSettings: View {
                 Text("Mark One").font(.title2.weight(.bold))
                 Text(version).font(.callout).foregroundStyle(.secondary)
             }
+            Button("Check for Updates…") { updater.check() }
+                .disabled(!updater.canCheck)
             Form {
                 Section("Acknowledgements") {
                     LabeledContent {

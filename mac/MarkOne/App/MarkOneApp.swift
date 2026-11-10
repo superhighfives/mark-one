@@ -39,6 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Preferences.shared.start(Pipeline.shared)
             ExtensionInstaller.shared.activate()
             Pipeline.shared.run()
+            Updater.shared.start()
             if WelcomeWindow.needed { WelcomeWindow.show() }
         }
     }
