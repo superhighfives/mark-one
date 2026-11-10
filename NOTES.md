@@ -1295,6 +1295,22 @@ Mark One on revision 3 reads the list (`Streamer.pollList`), skips to the
 newest frame if it falls 30 frames behind (the ring holds about 45), and
 starts at a keyframe. Older revisions keep the stream follower.
 
+Installed over USB and tested 2026-11-10: a 71-minute QuickTime
+recording at 720p, 129,346 frames. Mark One logged no gaps, no skips, no
+bad entries and one decode error, besides the restarts. On revision 2 a
+56-second clip had 27 freezes. Scanning the file for frozen picture
+(ffmpeg `freezedetect`, 0.3 s or more) found only:
+
+- the two scheduled restarts at 3.5 GB (33.0 minutes at 15.2 Mbps, then
+  30.7 minutes at 16.3 Mbps). Each froze the picture for about 4.9 s,
+  almost all of it the recording check (about 4.8 s) waiting for the
+  camera to say it's recording again. Then the queued frames (17 and
+  18) arrive at once. The one decode error came 2 s after the second
+  restart.
+- one 0.43 s hitch at 52:46. Mark One logs any gap over 0.2 s from the
+  camera and logged nothing then, so frames reached Mark One on time;
+  the hitch was between the camera extension and QuickTime.
+
 ## Where it stands
 
 Mark One works end to end over USB: firmware setup from the card, updates

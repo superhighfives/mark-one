@@ -6,28 +6,22 @@ Mark One.
 
 ## Next
 
-- [ ] **Long session.** Stream for more than 30 minutes with a card in.
-  Check that Mark One's scheduled restart (at 3.5 GB of video or 100
-  minutes) is only a short freeze, that video carries on past 30
-  minutes, and the size and bitrate the restart logs. The same session
-  answers:
-  - whether the movie writer stops at 4 GB (if not, restart only near
-    the 2-hour limit)
-  - whether the card's free space shrinks
-  - what the "Slow pass" log says about the video pauses
-- [ ] **Video pauses.** Down from 15-25 a minute to about 4 with the wrap
-  fix, but Mark One still loses track about 3 times a minute and about 8
-  frames a minute fail to decode. See "Video pauses" in `NOTES.md` for
-  what's known and what was tried. A 56-second clip (2026-11-09) was
-  frozen 11% of the time: 27 freezes, the longest 0.9 s.
-  **Revision 3 lists each frame's address and size** (`asm/frames.s`):
-  tested in RAM, 20 s with no missed frames and no decode errors. Built
-  into `webcam-firmware.json`, and Mark One reads the list on revision 3.
-  Next: install revision 3, then run a long session with Mark One and
-  check the "No video", "Skipped ahead" and "failed to decode" logs.
+- [ ] **Faster restarts.** Mark One's scheduled restart at 3.5 GB (about
+  every 31-33 minutes at 15-16 Mbps) freezes the picture for about 4.9 s,
+  almost all of it waiting for the camera to report it's recording again
+  (see "Exact frame boundaries" in `NOTES.md`). Restart less often if
+  the movie writer doesn't stop at 4 GB (see "Fewer restarts"), and
+  find out why the check takes nearly 5 s. Still to check in a long
+  session: whether the card's free space shrinks.
+- [x] **Video pauses.** Fixed by revision 3, which lists each frame's
+  address and size (`asm/frames.s`). A 71-minute recording (2026-11-10)
+  froze only at the two scheduled restarts and once for 0.43 s
+  downstream of Mark One, against 27 freezes in 56 seconds on revision
+  2. See "Exact frame boundaries" in `NOTES.md`.
 - [ ] **Hard freeze at 21.6 minutes** (2026-11-09, revision 2, card in):
   the camera froze mid-stream and needed a battery pull. A 26-minute run
-  afterwards didn't freeze. Watch for it in long sessions.
+  afterwards didn't freeze, nor did a 71-minute run on revision 3
+  (2026-11-10). Watch for it in long sessions.
 
 ## Before launch
 
