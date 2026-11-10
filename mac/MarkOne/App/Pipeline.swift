@@ -291,6 +291,9 @@ final class Pipeline: ObservableObject {
                 // it. Wait for one.
                 let cardless: Bool
                 if case .markOne(let revision) = firmware, revision >= 2 { cardless = true } else { cardless = false }
+                // Revision 3 lists each frame's address and size.
+                let frameList: Bool
+                if case .markOne(let revision) = firmware, revision >= 3 { frameList = true } else { frameList = false }
                 if !cardless, try !Firmware.hasCard(camera) {
                     report("There's no card in the camera. It needs one to record, though Mark One doesn't save anything to it. Updating the camera's firmware removes the need for one.", .waiting)
                     note(.noCard)
@@ -310,7 +313,7 @@ final class Pipeline: ObservableObject {
                 Thread.sleep(forTimeInterval: 1)
                 let saved = try Firmware.applyPresets(camera)
                 defer { if camera.connected { try? Firmware.releasePresets(camera, saved) } }
-                try serve(camera, to: sink)
+                try serve(camera, to: sink, frameList: frameList)
             } catch PipelineInterrupt.install {
                 // Recording has stopped and the camera's settings are back.
                 // Installing from here, in the shooting mode Mark One set
@@ -457,7 +460,7 @@ final class Pipeline: ObservableObject {
     }
 
     /// Records while an app uses the Mark One camera, until the camera goes away.
-    private nonisolated func serve(_ camera: Camera, to sink: CameraSink) throws {
+    private nonisolated func serve(_ camera: Camera, to sink: CameraSink, frameList: Bool) throws {
         var applied = Applied()
         while !stopRequested.value {
             report("Ready. Pick “Mark One” as the camera in a video app.", .ready)
@@ -469,7 +472,7 @@ final class Pipeline: ObservableObject {
                 try updateControls(camera, &applied)
                 Thread.sleep(forTimeInterval: 0.25)
             }
-            try stream(camera, to: sink, applied: &applied)
+            try stream(camera, to: sink, frameList: frameList, applied: &applied)
         }
     }
 
@@ -480,7 +483,7 @@ final class Pipeline: ObservableObject {
     static let restartTime: TimeInterval = 100 * 60
 
     /// Records and streams until nothing has wanted video for `grace`.
-    private nonisolated func stream(_ camera: Camera, to sink: CameraSink, applied: inout Applied) throws {
+    private nonisolated func stream(_ camera: Camera, to sink: CameraSink, frameList: Bool, applied: inout Applied) throws {
         let decoder = FrameDecoder()
         var shown = 0
         var last: CVPixelBuffer?
@@ -495,7 +498,7 @@ final class Pipeline: ObservableObject {
             decoded = true
             shown += 1
         }
-        let streamer = Streamer(camera: camera)
+        let streamer = Streamer(camera: camera, frameList: frameList)
         streamer.onLostTrack = { log.notice("\($0, privacy: .public)") }
         var since = Date(), lastUsed = Date(), lastChecked = Date()
         var received = 0, failuresBefore = 0

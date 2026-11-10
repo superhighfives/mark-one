@@ -7,6 +7,10 @@
 // frame number must follow the previous frame's, it ends where the next
 // such header begins, and a frame identical to one already sent from the
 // same address is left over from an earlier lap of the ring.
+//
+// Revision 3 of Mark One's firmware lists each finished frame's address and
+// size as the encoder reports it (asm/frames.s), so on it the streamer just
+// copies the listed frames and none of the above is needed.
 
 import Foundation
 
@@ -91,7 +95,17 @@ final class Streamer {
     static let head = 1024                             // bytes of a frame that identify it
     static let wrapRoom = UInt32(0x10_0000)            // the encoder wraps with 0x95000-0xc4000 bytes left
 
+    /// Revision 3's list of finished frames: a count at 0x7eaaac00, then
+    /// 64 entries of {address, bytes, timestamp, number}, entry = number % 64.
+    static let list = UInt32(0x7EAA_AC00), listEntries = 64
+    /// How far behind the newest frame Mark One may fall before skipping
+    /// ahead: the ring holds about 45 frames, so older ones are overwritten.
+    static let listBehind = UInt32(30)
+
     private let camera: Camera
+    private let frameList: Bool
+    /// The number of the next listed frame to send.
+    private var next: UInt32?
     private var header: FrameHeader?
     private var end = UInt32(0)
     private var sent: [UInt32: Data] = [:]
@@ -104,12 +118,17 @@ final class Streamer {
     /// USB reads and bytes in the last poll, for logging slow ones.
     private(set) var lastReads = 0, lastBytes = 0
 
-    init(camera: Camera) { self.camera = camera }
+    /// `frameList`: the camera has revision 3 or later of Mark One's firmware.
+    init(camera: Camera, frameList: Bool) {
+        self.camera = camera
+        self.frameList = frameList
+    }
 
     /// Frames that are ready, oldest first; empty if none are yet.
     func poll() throws -> [Data] {
         lastReads = 0
         lastBytes = 0
+        if frameList { return try pollList() }
         let hints = try sizes()
         var starts = header == nil ? Array(hints.order.suffix(20).reversed()) : [end, Streamer.ringLow]
         var frames: [Data] = []
@@ -130,6 +149,48 @@ final class Streamer {
                               lastLength, header?.cpb ?? -1, header?.frameNum ?? -1, bytes))
             }
             header = nil                               // a new recording, or we lost track
+        }
+        return frames
+    }
+
+    /// Frames from the camera's list, from the first keyframe on.
+    private func pollList() throws -> [Data] {
+        let raw = try camera.peek(Streamer.list, 16 + 16 * Streamer.listEntries)
+        lastReads += 1
+        lastBytes += raw.count
+        let count = raw.le(UInt32.self, at: 0)
+        // Start from the newest frame, and again if the camera restarted
+        // (the count went back) or Mark One fell too far behind.
+        if let next, count >= next, count - next <= Streamer.listBehind {} else {
+            if next != nil, let report = onLostTrack {
+                report("Skipped ahead in the frame list: next \(next!), count \(count)")
+            }
+            next = count
+            header = nil
+        }
+        var frames: [Data] = []
+        while let number = next, number < count {
+            let at = 16 + 16 * Int(number % UInt32(Streamer.listEntries))
+            let address = raw.le(UInt32.self, at: at), size = Int(raw.le(UInt32.self, at: at + 4))
+            guard raw.le(UInt32.self, at: at + 12) == number,
+                  (Streamer.ringLow..<Streamer.ringHigh).contains(address),
+                  size > 0, size <= Int(Streamer.ringHigh - address) else {
+                onLostTrack?(String(format: "Frame %d in the list doesn't look right: %x, %d bytes", number, address, size))
+                next = nil
+                break
+            }
+            let data = try read(address, size)
+            next = number + 1
+            let frameHeader = FrameHeader(data)
+            // The decoder needs a keyframe first.
+            if header == nil, !frameHeader.idr { continue }
+            header = frameHeader
+            frames.append(data)
+        }
+        if !frames.isEmpty {
+            lastFrame = Date()
+        } else if header != nil, Date().timeIntervalSince(lastFrame) > 1 {
+            header = nil                               // a new recording; wait for its keyframe
         }
         return frames
     }
