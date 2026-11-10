@@ -22,13 +22,17 @@ Mark One.
 
 - [ ] **Extension updates.** Replacing the camera extension can leave no
   camera until the Mac restarts (see "Camera extension updates" in
-  `NOTES.md`). Give the extension its own version so app-only updates
-  don't replace it, and if the Mark One device doesn't appear after an
-  update, say a restart is needed.
+  `NOTES.md`). The extension now has its own build number in
+  `project.yml` (4), changed only when the extension changes; build 3
+  hit the race, build 4 didn't. Still to do: if the Mark One device
+  doesn't appear after an update, say a restart is needed, and retry
+  opening the camera's input instead of waiting for the camera to be
+  reconnected (seen once right after an update).
 - [ ] **Battery steps.** Mark One shows full, low or empty and logs each
-  new reading ("Camera battery reads"). So far: 100, then 50 once the
-  camera's icon flashes empty. Check the thresholds against a full
-  discharge.
+  new reading ("Camera battery reads"). A full discharge (2026-11-10)
+  read 100, then 50 once the camera's icon flashes empty, then 5 nine
+  seconds before the camera switched itself off. Check that Mark One's
+  full, low and empty match those readings.
 
 ### Webcam firmware
 
@@ -78,11 +82,13 @@ lifts the time limits (see "Recording without a card" in `NOTES.md`).
   only near the 2-hour cap. Values above about 6.6 hours would likely
   overflow the muxer's 90 kHz clock. Also check whether the card's free
   space shrinks in a long session.
-- [ ] **Apple's video decoder.** Hardware decoding would use less CPU and
-  battery than libavcodec, but Apple's hardware decoder rejects every
-  frame of this stream and the software one about 1 in 100. Measure
-  Mark One's CPU use first; explore only if it's significant.
-  `NOTES.md` lists what has been ruled out.
+- [ ] **Apple's video decoder.** Works on revision 3's exact frames:
+  hardware decoding of every frame, identical pictures, 0.74 ms a frame
+  against libavcodec's 4.5 ms (see "Apple's decoder on exact frames" in
+  `NOTES.md`). Mark One uses 29-41% of a core while streaming, mostly
+  libavcodec (see "CPU use" in `NOTES.md`). Decode with VideoToolbox on
+  revision 3, adding each new PPS to the format description, and keep
+  libavcodec for older revisions and as a fallback.
 - [ ] **HDMI live view (optional).** The `hdmi-liveview` patch is built
   but has never been tried on a camera. It would help anyone using a
   capture card.

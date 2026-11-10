@@ -368,6 +368,10 @@ keyframe every 15) decode fine. So it's something in the slice data.
 Frames end with a proper stop bit and no padding. The app needs a
 software H.264 decoder (libavcodec).
 
+Solved 2026-11-10 (see "Apple's decoder on exact frames" below): the
+frames were cut with the recorder's table size, one byte too long, and
+VideoToolbox rejects a frame with a nonzero byte after it.
+
 `stream.py` also rewrites the SPS to add bitstream restriction fields (no
 reordering, one-frame buffer); the camera's SPS leaves them out, so
 decoders may otherwise assume they need a 16-frame buffer.
@@ -422,7 +426,8 @@ neighbors apart from frame_num), no forbidden byte sequences, motion
 vectors in the normal range, and are ordinary P frames using the common
 PPS; giving the decoder all four PPSs up front doesn't help. x264 streams
 with the same features, even at QP 2, decode fine. So it's a VideoToolbox
-limitation with something in this encoder's slice data.
+limitation with something in this encoder's slice data. (Wrong: see
+"Apple's decoder on exact frames" below.)
 
 OpenH264 2.7 (BSD license) decodes every frame without error but not
 exactly: it matches libavcodec on Baseline streams, and differs on High
@@ -1311,12 +1316,71 @@ bad entries and one decode error, besides the restarts. On revision 2 a
   camera and logged nothing then, so frames reached Mark One on time;
   the hitch was between the camera extension and QuickTime.
 
+### Apple's decoder on exact frames (2026-11-10)
+
+With frames cut by revision 3's list, VideoToolbox's hardware decoder
+decodes the 20-second capture (585 frames from the first keyframe)
+with no errors, in 0.74 ms a frame (p95 2.9 ms), and its pictures are
+byte-for-byte identical to libavcodec's. Two things had broken it:
+
+- One extra byte per frame. The recorder's table size is the byte count
+  plus 1, so frames cut by it carried the byte after the frame. Adding
+  0x00 after every frame still decodes; 0x80 or 0xff makes the hardware
+  reject all 585 (-12909), which is what was seen before.
+- New PPSs between keyframes. Every frame carries its PPS, and the
+  encoder adds new ones mid-stream (IDs 1, then 0 at frame 320 when
+  the frame size jumped from 23 KB to 83 KB, then 2 at frame 344); IDs
+  are not reused with new contents. A session made with only the PPSs
+  seen so far rejects the first frame using a new one, then everything
+  until it's recreated at the next keyframe: the "1 in 100" failures.
+  Making a new format description with all PPSs seen so far and
+  attaching it to the following samples fixes it for the hardware
+  decoder (`VTDecompressionSessionCanAcceptFormatDescription` says yes,
+  no new session needed). The software decoder still rejects from that
+  frame until the next keyframe.
+
+Test: `vt.swift` (scratchpad, not kept), feeding each frame as AVCC
+with a 4-byte length, hardware required
+(`kVTVideoDecoderSpecification_RequireHardwareAcceleratedVideoDecoder`).
+
 ## Where it stands
 
 Mark One works end to end over USB: firmware setup from the card, updates
 and restores over USB, and 1080p video from the movie recorder. HDMI
 through a capture card is no longer the plan; the hdmi-liveview patch
 stays here for reference, untested. What's left is in `TODO.md`.
+
+## CPU use (2026-11-10)
+
+Measured with `top` on an M2, 100% = one core, QuickTime recording 720p.
+
+The extension asked Mark One for a frame (consumeSampleBuffer, a round
+trip between the processes) as soon as it had one, and every 5 ms while
+none was waiting: about 200 asks a second for 30 frames, and the same
+while no app used the camera, because Mark One keeps the sink open
+whenever the camera is connected. Most of the cost was kernel time
+(the extension had spent 80 minutes in the kernel and 35 in its own
+code). Now it asks 26 ms after each frame, then every 4 ms, and only
+while an app is using the camera.
+
+| | Before | After |
+|---|---|---|
+| Extension, recording | 33% | 7.5% |
+| Extension, idle | 32% | 0% |
+| Mark One, idle | 14% | about 5% |
+
+Mark One while recording measured 29% one morning and 37-41% that
+afternoon, both before and after the change. Its own busy time is
+decoding (libavcodec 73%, the NV12 interleave in vImage 9%), and a plain
+wall against a busy scene made no difference (37-40% either way), so
+the spread is unexplained; Apple's decoder should remove most of it.
+QuickTime went from 8% to 23% across the same runs, also unexplained
+(its preview window may have been hidden the first time).
+
+The first launch after installing extension build 4 failed with
+"Couldn't open the Mark One camera's input": Mark One found the device
+before the new extension was ready, and then waits for the camera to
+be reconnected. Reopening Mark One fixed it.
 
 ## Camera extension updates (2026-11-09)
 
