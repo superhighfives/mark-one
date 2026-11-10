@@ -86,7 +86,8 @@ final class Streamer {
     static let table = UInt32(0xA07E_5180), entries = 60, entrySize = 0xF4
     static let inProgress = 0xBF440                   // placeholder size while a frame is encoded
     static let ringLow = UInt32(0xA52B_1C00), ringHigh = UInt32(0xA561_1380)
-    static let scan = 0x60000                          // bytes to search for the end of a frame
+    static let scan = 0x60000                          // bytes to search for the end of a frame at a time
+    static let largestFrame = 0x180000                 // keyframes are about 170 KB
     static let head = 1024                             // bytes of a frame that identify it
     static let wrapRoom = UInt32(0x10_0000)            // the encoder wraps with 0x95000-0xc4000 bytes left
 
@@ -111,6 +112,7 @@ final class Streamer {
         while let (address, data, frameHeader) = try take(starts: starts, before: header, hints: hints.sizes) {
             header = frameHeader
             remember(address, data.prefix(Streamer.head))
+            see(address, data)
             end = address + UInt32(data.count)
             starts = [end, Streamer.ringLow]
             frames.append(data)
@@ -149,6 +151,39 @@ final class Streamer {
         }
         found.sort { $0.number < $1.number }
         return (Dictionary(found.map { ($0.address, $0.size) }, uniquingKeysWith: { $1 }), found.map(\.address))
+    }
+
+    /// What Mark One last saw in the ring, from every frame it read and every
+    /// read to the end of the ring, and which 1 KB pages of it are known.
+    private var shadow = Data(count: Int(Streamer.ringHigh - Streamer.ringLow))
+    private var known = [Bool](repeating: false, count: Int(Streamer.ringHigh - Streamer.ringLow) / 1024 + 1)
+
+    private func see(_ address: UInt32, _ data: Data) {
+        let offset = Int(address - Streamer.ringLow)
+        guard offset >= 0, offset + data.count <= shadow.count else { return }
+        shadow.replaceSubrange(offset..<offset + data.count, with: data)
+        // Mark only pages the data covers completely; the ring's last page is
+        // short.
+        let end = offset + data.count
+        let first = (offset + 1023) / 1024, last = end == shadow.count ? known.count : end / 1024
+        if first < last { for page in first..<last { known[page] = true } }
+    }
+
+    /// How long the last frame before a wrap is. What follows it is left
+    /// over from earlier laps and unchanged since Mark One last saw it, so
+    /// the frame ends at the last byte that differs from the shadow, or that
+    /// the shadow doesn't know (plus a little, as its last bytes can match
+    /// by chance; the decoder ignores a few extra bytes, not missing ones).
+    private func wrapLength(_ start: UInt32, _ data: Data) -> Int {
+        defer { see(start, data) }
+        let base = Int(start - Streamer.ringLow)
+        var k = data.count
+        data.withUnsafeBytes { (a: UnsafeRawBufferPointer) in
+            shadow.withUnsafeBytes { (b: UnsafeRawBufferPointer) in
+                while k > 0, known[(base + k - 1) / 1024], a[k - 1] == b[base + k - 1] { k -= 1 }
+            }
+        }
+        return min(data.count, k + 16)
     }
 
     /// Reads `size` bytes at a possibly odd address (USB transfers need even ones).
@@ -191,8 +226,29 @@ final class Streamer {
         // appear inside a frame. If the frame there doesn't follow this one,
         // the encoder hasn't written it yet and what's there is left over
         // from an earlier lap; searching further would find old frames.
-        let data = try read(start, min(Streamer.scan, Int(Streamer.ringHigh - start)))
-        guard let range = data.range(of: FrameHeader.aud, in: (data.startIndex + 5)..<data.endIndex) else { return nil }
+        // Keep reading until a delimiter turns up or the ring ends, which is
+        // how the last frame before a wrap shows itself.
+        let available = Int(Streamer.ringHigh - start)
+        var data = try read(start, min(Streamer.scan, available))
+        var range = data.range(of: FrameHeader.aud, in: (data.startIndex + 5)..<data.endIndex)
+        while range == nil, data.count < min(Streamer.largestFrame, available) {
+            let searched = data.count
+            data += try read(start + UInt32(searched), min(Streamer.scan, available - searched))
+            range = data.range(of: FrameHeader.aud, in: (data.startIndex + max(5, searched - 4))..<data.endIndex)
+        }
+        guard let range else {
+            // The last frame before the encoder went back to the start of
+            // the ring: after it is older data with no delimiter in it. When
+            // the next frame is at the start of the ring, this one is done;
+            // wrapLength works out where it ends. Waiting for the recorder's table
+            // instead held video up for half a second at every wrap, about
+            // every second or two.
+            if data.count >= available,
+               let low = newHeader(Streamer.ringLow, try read(Streamer.ringLow, Streamer.head)), low.follows(header) {
+                return (start, data.prefix(wrapLength(start, data)), header)
+            }
+            return nil
+        }
         let offset = range.lowerBound - data.startIndex
         let next = start + UInt32(offset)
         if let after = newHeader(next, data.subdata(in: offset..<min(data.count, offset + Streamer.head))), after.follows(header) {

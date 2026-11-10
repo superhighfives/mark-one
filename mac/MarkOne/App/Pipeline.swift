@@ -593,6 +593,9 @@ final class Pipeline: ObservableObject {
                 let live = streamer.streaming
                 let detail = String(format: "%.0f received, %d failed to decode", Double(received) / elapsed,
                                     decoder.failures - failuresBefore)
+                if decoder.failures > failuresBefore {
+                    log.notice("\(decoder.failures - failuresBefore, privacy: .public) frames failed to decode")
+                }
                 Task { @MainActor in
                     self.framesPerSecond = rate
                     self.status = live ? "Streaming (\(detail))." : "Waiting for video from the camera."
