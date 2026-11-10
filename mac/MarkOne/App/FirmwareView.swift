@@ -331,7 +331,8 @@ struct FirmwareView: View {
                     }
                 } else if install.phase == .installing {
                     Text("The camera has the firmware and is installing it.")
-                    numbered(1, "Wait. The camera's screen shows an update animation, or flickers between it and the last picture if Mark One was using the camera. Don't switch it off or unplug it.")
+                    CameraUpdateScreen().frame(maxWidth: .infinity)
+                    numbered(1, "Wait while the camera's screen shows this. If Mark One was using the camera, the screen flickers between this and the last picture. Don't switch the camera off or unplug it.")
                     numbered(2, "When the screen shows OK, or goes back to the picture it showed before, the install is done. The camera keeps running the old firmware until it restarts, so switch it off and on.")
                     numbered(3, action == .restore ? "Connect the camera to your Mac again."
                                                    : "Connect the camera to your Mac again and choose Webcam on its screen.")

@@ -267,3 +267,75 @@ struct BatteryLevel: View {
         .accessibilityLabel("Camera battery \(battery.label.lowercased())")
     }
 }
+
+/// A copy of what the camera's screen shows while it installs firmware: a
+/// "don't touch" and a "don't unplug" sign, with the update arrows above them
+/// switching on and off every second. The camera cuts between the two
+/// frames, so this does too.
+struct CameraUpdateScreen: View {
+    /// Draws one frame, for rendering a still.
+    var arrows: Bool? = nil
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private static let blue = Color(red: 0.70, green: 0.86, blue: 0.96)
+    private static let orange = Color(red: 0.98, green: 0.62, blue: 0.20)
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { timeline in
+            let second = Int(timeline.date.timeIntervalSinceReferenceDate)
+            screen(arrows: arrows ?? (reduceMotion || second.isMultiple(of: 2)))
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("The camera's screen shows signs saying not to touch it or unplug it, and an update symbol.")
+    }
+
+    private func screen(arrows: Bool) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .font(.system(size: 38, weight: .semibold))
+                .foregroundStyle(Self.blue)
+                .opacity(arrows ? 1 : 0)
+            HStack(spacing: 22) {
+                forbidden {
+                    Image(systemName: "hand.raised.fill")
+                        .font(.system(size: 32))
+                }
+                forbidden {
+                    VStack(spacing: 1) {
+                        Image(systemName: "arrow.left")
+                            .font(.system(size: 11, weight: .heavy))
+                        HStack(spacing: 2) {
+                            Image(systemName: "powerplug.fill")
+                                .font(.system(size: 13))
+                            Image(systemName: "camera.fill")
+                                .font(.system(size: 22))
+                        }
+                        .offset(x: 6)
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 18)
+        .frame(width: 200)
+        .background(.black, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .environment(\.colorScheme, .dark)
+    }
+
+    /// A sign inside an orange circle with a slash through it.
+    private func forbidden(@ViewBuilder _ sign: () -> some View) -> some View {
+        let size: CGFloat = 56
+        let line: CGFloat = 5
+        return ZStack {
+            sign()
+                .foregroundStyle(Self.blue)
+                .frame(width: size, height: size)
+                .clipShape(Circle())
+            Rectangle()
+                .fill(Self.orange)
+                .frame(width: size - line, height: line)
+                .rotationEffect(.degrees(40))
+            Circle().strokeBorder(Self.orange, lineWidth: line)
+        }
+        .frame(width: size, height: size)
+    }
+}
