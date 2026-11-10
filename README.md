@@ -27,6 +27,7 @@ The goal is software that feels like magic: plug in the camera, open a video cal
 - **Install the firmware from Mark One.** Olympus's own updater installs firmware over USB, so the camera has a USB update path. Work out its protocol, then let Mark One check the camera's firmware and offer to install the webcam firmware, with no SD card. Olympus's firmware can't be shipped in the app, so Mark One would download the stock file from Olympus (as `scripts/setup.sh` does), patch it on the Mac, and send it to the camera. This needs care: a failed flash can brick the camera, and App Review will want to see a clear explanation.
 - **Power.** The E-M5 doesn't run from USB power, so long calls drain the battery. Look at a dummy battery with a power adapter, and show the battery level in Mark One.
 - **Picture controls.** Exposure, white balance, picture mode and focus from Mark One, through the same camera API the firmware's own menus use.
+- **No SD card (stretch goal).** Mark One stops movies writing to the card, but the camera still needs one to record (it won't start without one, tested 2026-11-09): it creates an empty movie file each session and checks the card's free space. Webcam mode that records without a card would remove those empty files and any card-related limits, and save users a step.
 
 ### Test
 

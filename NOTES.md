@@ -944,7 +944,11 @@ for the E-M10 in github.com/matozoid/em10_1
 project's decompile of OM Workspace's Windows library matches the
 recorded sequence.
 
-## Recording time limit (patch ready, untested)
+## Recording time limit
+
+Tested 2026-11-09: with only the 'time limit' patch below, a webcam session
+stopped at exactly 30:00, and the camera then showed live view but ignored
+REC (from Mark One and the camera's own button) until it was switched off.
 
 0x7e7bbe71 works out how long a movie may run and logs "MAX Time" (what
 the card's free space allows, d3) and "Limte Time" (d2, the limit),
@@ -952,13 +956,55 @@ stored in frames at +32 and +40 of the recorder's state. The format
 maximum is 1740 s for MOV Full HD and HD (`mov 1740,a3` at 0x7e7bbf89),
 7200 s for SD, and the limit is the smaller of that and the card figure.
 `ptp.py shoot` now raises the maximum to 32767 s and uses it for both
-values (RUNTIME_PATCHES 'time limit'). Untested; also unknown is what the
+values (RUNTIME_PATCHES 'time limit'). Also unknown is what the
 QuickTime writer does at 4 GB ("[QT] AVSCA_INF_DIV_FILESIZE" and
 "REC_FILESIZE" are only logged at 0x7e7a85ee/0x7e7a85fc), which the
 muxer would reach after about 27 minutes at 20 Mbps even with card
 writes skipped.
 
-Next: test the time limit (record past 30 minutes).
+The second limit is the QuickTime muxer's (found in the code, not yet
+confirmed on the camera):
+
+- rec_init (`MovmidApi_cmd_rec_init`) builds the muxer's parameters at
+  every recording start (fn_7e7a7b8e). `0x7e7a7c51: mov 1800000,d0` sets
+  ulMaxRecTime (labelled at 0x7e7a8ae0) to 1,800,000 ms for qualities 3, 5
+  and 6 (Full HD and HD); SD gets 7,200,000 ms (0x7e7a7c59). It lands at
+  0x6072fc00. In stock firmware the 1740 s app limit fires first, so the
+  muxer's own stop is never used.
+- The same block has ulUpper 0 and ulLower 0xFFFFFFFF, probably a 64-bit
+  maximum file size of 4 GiB - 1. Full HD Fine is 20 Mbps video plus
+  1.536 Mbps PCM audio, about 26.6 minutes to 4 GiB. Today's run passed
+  30 minutes, so either the stream averaged under about 19 Mbps or the size
+  doesn't stop recording. Unconfirmed.
+- When the muxer stops itself, InputVideo "Term" (0x7e7a873d) sets
+  0x6072fe10 = 1 and every later frame is dropped. The recorder's stop
+  (user_stop, 0x7e7bc330) then sends RECORD_END and waits with no timeout
+  (0x7e7bc930, 0x7e7bc9d0). Likely chain: AVSCA_Stop fails on the stopped
+  muxer, "[QT] REC STOP Error" makes the MOV_AVCHD task exit (0x7e79e521),
+  the recorder waits forever, and the shooting app stays in SEQ 18
+  (0x7ec800a5), which ignores REC. No runtime way out found; switch the
+  camera off.
+
+Fix (2026-11-09): RUNTIME_PATCHES 'muxer time limit' (0x7E7A7C50) uses the
+SD value, 2 hours. Larger values are untested: the muxer seems to multiply
+by 90 (a 90 kHz clock), and anything over about 6.6 hours would overflow
+32 bits. Mark One also stops and restarts the recording itself at 3.5 GB of
+video or 100 minutes, whichever comes first, through the normal stop, and
+logs the size and bitrate. Still to test: a session past the first
+restart and past 30 minutes.
+
+Peeks for a stuck camera (uncached): SEQ at 0xA02B1FF4 (18 = stuck),
+MOV_REC state {function, number} at 0xA05B5C7C (0x7e7bc330/6 = waiting in
+user_stop), muxer stopped flag 0xA072FE10, the parameter block at
+0xA072FBC0 (0x44 bytes), and the trace ring at 0xA0784E4C (u16 oldest, u16
+next, then 64 entries of {u8 category, 3 pad, u32 value} at 0xA0784E54).
+After unplugging and replugging USB they all read 0, so the stuck state
+wasn't captured.
+
+The camera won't record without a card (tested 2026-11-09). With none, it
+lists one storage ID, 0x00010000 (PTP "no media"), and GetStorageInfo on
+it answers 0x2008. Mark One checks for this before setting up and asks
+for a card.
 
 ### Frame source candidates
 
@@ -1153,6 +1199,13 @@ stays here for reference, untested.
    (Olympus's firmware license forbids modifying it), whether review
    accepts installing modified camera firmware, screenshots, a build
    upload and the review video.
+5. Before launch: check the battery level. It still read 100% after about
+   45 minutes of recording. Mark One reads PTP property 0x5001 every 30 s,
+   but which values the camera actually reports is unknown; it may only
+   step like its own battery icon (100/66/33, say). Ask the camera with
+   GetDevicePropDesc (0x1014) for 0x5001's range or list of values, and
+   compare readings with the icon on the camera's screen during a long
+   session. If it's coarse, show bars instead of a percentage.
 
 ## App Store (prep, 2026-11-09)
 
