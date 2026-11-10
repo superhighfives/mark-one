@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
 import olyfw  # noqa: E402
 
 BASE = 0x7E421020          # runtime address of main block byte 0
-WEBCAM_REVISION = 1        # the webcam patches' revision; see the marker at 0x7eab0414
+WEBCAM_REVISION = 2        # the webcam patches' revision; see the marker at 0x7eab0414
 STOCK_SHA256 = 'cb158dbdd8092856e8060354b008369f7d33dff32a1204e966ef0d5bce85e535'
 MAIN_SHA256 = '4edb88f3b552ef2fb9066ce7d1ca8bf5b44494f4c21865ac02dcac39e833fcf9'
 
@@ -136,6 +136,50 @@ PATCHES = {
         # registers modes 0 and 5's update commands
         (0x7F0D4BCA, 'cded4ef014df0004', 'dc36b89dffcbcbcb'),
         (0x7EAB0400, stock(17, '1be35d96dbc30e5f0071bf172e0a98d7c65044271db260d8f5352865567385e6'), 'ddb7966200f014dd9d4562002008df0004'),
+        # Webcam-mode movies that don't touch the card (asm/nocard.s): no card
+        # needed, no empty movie file, and no time limit, only while the
+        # connection type is 7. The stubs go over the console-only `sdk api`
+        # EV_* dump; each hook is a jump to its stub, padded with nops.
+        (0x7EAAF760,
+         stock(780, '3ecfe38ecadb3c5fb429d2bcc7c7f04c4a92419d7321603a3965750efb1cceff'),
+         '00000000dd36c1d0ff0004fca5140d5f60a507c911fccde2ff0e00f81420f814'
+         '24f81428dc3ecad0ffcf80fca6140d5f60aa07ce80c907dc7bd2d0ffdddac8d0'
+         'ffb010dc6fd2d0ffcf80fca6140d5f60aa07ce80c908fccc00dd6d00fc81d4fc'
+         '7260dca384cfffcf80fca6140d5f60aa07ce80c90800dc580cd1ffdd740cd1ff'
+         'e010dc4c0cd1ffcf80fca6140d5f60aa07ce80c91c00fc81d8525b60fc8160f7'
+         'aa7eddd76acfff000000dc0779cfffdd317acffff020dcfb78cfffcf80fca614'
+         '0d5f60aa07ce80c932f8240c71f86504a501c9068100f104f86506a501c909fc'
+         'a560f7aa7ee4fc8160f7aa7edd8d6acfff000000dc2d79cfffddf97dcffff01c'
+         'dc2179cfffcf80fca6140d5f60aa07ce80c919f8240cfca460f7aa7e61dd5c6a'
+         'cfff000000dc1779cfffdd877fcfffa010dc0b79cfffcf80fca6140d5f60aa07'
+         'ce80c91ef8240cf821080060f82114800260dd276acfff00008002dc8e78cfff'
+         'dd697ecffff020dc8278cfffcf80fca6140d5f60aa07ce80c933fccc18f9aa7e'
+         'f81018fccc00002140f81010f81014fcdcccf9aa7efcdddc525b608508706150'
+         '5129ffc9fa00dc7c80cfffdde0c8cfff0004dc7080cfff000000000000000000'
+         '9cf9aa7e50313031303030314d4f560000000000000000000000000000006100'
+         '0000000000000000000000000000214000002140000000000000000000000000'
+         '0000000000000000000000000000000000000000000000000000000064000100'
+         '2020202000000000000000000000000000000000000000000000000000000000'
+         '000000003130304f4c594d502020200000006400000060001c1e020000000000'
+         '0000000000000000042b0000433a5c4443494d5c3130304f4c594d505c503130'
+         '31303030312e4d4f56000000cf80fca6140d5f60aa07ce80c907dce3c9d0ffdd'
+         '320bd1ff300cdcd7c9d0ffcf80fca6140d5f60aa07ce80c907dcbdc9d0ffddb5'
+         '0bd1ff0004dcb1c9d0ffcf80fca6140d5f60aa07ce80c90800dcbe05d1ffddc0'
+         '77cfffc00cdcb205d1ffdd8702fdffc008cf80fca6140d5f60aa07ce80c908fc'
+         'cc00f00000dc851e0c000000'),
+        (0x7E7BC1BD, 'cdddf60004', 'dca7352f00'),  # S1: aud_wait limits
+        (0x7E7BCA0D, 'cd69f6b010', 'dc7c2d2f00'),  # S2: TIME_LIMIT check
+        (0x7E7A7C5F, 'fc81d4fc7260', 'dc497b3000cb'),  # S3: muxer maximum time
+        (0x7E7C0429, 'cd2600e010', 'dc9ef32e00'),  # S4: MOV_FILE write
+        (0x7E7A710C, 'cd3401f020', 'dcdb863000'),  # S5: QT_FILE open
+        (0x7E7A717C, 'cdd604f01c', 'dc9f863000'),  # S6: QT_FILE seek
+        (0x7E7A7197, 'cd7a06a010', 'dcce863000'),  # S7: QT_FILE position
+        (0x7E7A7144, 'cde505f020', 'dc52873000'),  # S8: QT_FILE read
+        (0x7E7A797D, 'cd6e480004', 'dc4f7f3000'),  # S9: IMDF 50 (file number)
+        (0x7E7BC3D8, 'cd5941300c', 'dc14362f00'),  # S10: record_end
+        (0x7E7BC3D1, 'cd02420004', 'dc3a362f00'),  # S11: record cancel
+        (0x7E7BFFF0, 'dd0e72feffc00c', 'dc3afa2e00cbcb'),  # S12: QT_FILE remove
+        (0x7EB718E3, 'ddeee3f0ffc008', 'dc67e1f3ffcbcb'),  # S13: movie start media check
         # "MARK" and the firmware revision (a little-endian u32), which Mark
         # One reads to tell whether the camera needs an update. Bump it with
         # every change to these patches.
