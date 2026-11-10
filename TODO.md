@@ -15,10 +15,13 @@ Mark One.
     the 2-hour limit)
   - whether the card's free space shrinks
   - what the "Slow pass" log says about the video pauses
-- [ ] **Video pauses.** A couple of times a minute the video stops for
-  0.2-1.4 s, then the missed frames arrive at once: the camera keeps
-  encoding while Mark One isn't reading. Fix the cause the long session
-  points to.
+- [ ] **Video pauses.** Down from 15-25 a minute to about 4 with the wrap
+  fix, but Mark One still loses track about 3 times a minute and about 8
+  frames a minute fail to decode. See "Video pauses" in `NOTES.md` for
+  what's known and what was tried.
+- [ ] **Hard freeze at 21.6 minutes** (2026-11-09, revision 2, card in):
+  the camera froze mid-stream and needed a battery pull. A 26-minute run
+  afterwards didn't freeze. Watch for it in long sessions.
 
 ## Before launch
 

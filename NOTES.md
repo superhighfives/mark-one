@@ -1222,6 +1222,34 @@ reproduce the shipped edits exactly.
 After a USB install the camera goes back to the picture it showed, still
 running the old firmware from RAM, until it's switched off and on.
 
+## Video pauses (in progress, 2026-11-09)
+
+Mark One's stream pauses for 0.2-1.4 s, then the frames arrive at once:
+the camera keeps encoding while Mark One can't find the next frame. The
+logs ("No video from the camera", "Slow pass", "Lost track",
+"frames failed to decode") show it's the frame finding in
+`Streamer.swift`, not USB: during a pause the polls are fast and empty.
+
+- Fixed: the last frame before the encoder wraps to the start of the
+  ring (every 1-2 s) is followed by older data with no delimiter, so Mark
+  One waited half a second for the recorder's table. It now ends that
+  frame by comparing with a shadow copy of the ring (`wrapLength`). That
+  took a 22-minute session from 15-25 pauses a minute to about 4, but
+  about a third of those guesses are off (frames that fail to decode,
+  about 8 a minute).
+- Each picture is one slice (AUD, SPS at keyframes, PPS, SEI, slice);
+  P-frames run 50-80 KB, keyframes about 170 KB. The bytes after a slice
+  hold no start codes, so slice parsing can't find the end.
+- Still open: "Lost track" (no frame for a second, then resync at a
+  keyframe), about 3 a minute in a 26-minute session: 60 after a frame
+  whose end came from the recorder's table, 28 after a wrap frame. Many
+  of the wrap cases find the same bytes where the next frame should be
+  (58ce330c0136c541...), and some wrap frames are logged well away from
+  the end of the ring, which doesn't fit how they're found yet.
+- Tried and reverted: always checking the start of the ring for the next
+  frame (not only within 1 MB of the end). It matched stale frames and
+  lost track every few seconds.
+
 ## Where it stands
 
 Mark One works end to end over USB: firmware setup from the card, updates
