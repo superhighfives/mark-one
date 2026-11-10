@@ -35,6 +35,7 @@ struct MarkOneApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         Task { @MainActor in
+            DockIcon.start()
             Preferences.shared.start(Pipeline.shared)
             ExtensionInstaller.shared.activate()
             Pipeline.shared.run()
@@ -47,5 +48,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             sender.reply(toApplicationShouldTerminate: true)
         }
         return .terminateLater
+    }
+}
+
+/// Shows Mark One in the Dock and the app switcher while one of its windows
+/// is open (setup, firmware, settings), so it isn't lost behind other apps.
+/// Otherwise it lives only in the menu bar.
+@MainActor
+enum DockIcon {
+    static func start() {
+        for name in [NSWindow.didBecomeKeyNotification, NSWindow.willCloseNotification] {
+            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { _ in
+                // A closing window is still visible now; look once it's gone.
+                DispatchQueue.main.async { MainActor.assumeIsolated { update() } }
+            }
+        }
+    }
+
+    private static func update() {
+        let open = NSApp.windows.contains { $0.isVisible && $0.styleMask.contains(.titled) && !($0 is NSPanel) }
+        let policy: NSApplication.ActivationPolicy = open ? .regular : .accessory
+        guard NSApp.activationPolicy() != policy else { return }
+        NSApp.setActivationPolicy(policy)
+        if open { NSApp.activate(ignoringOtherApps: true) }
     }
 }

@@ -233,10 +233,13 @@ struct WelcomeView: View {
                             .fixedSize(horizontal: false, vertical: true)
                         HStack {
                             Button("Set Up Camera…") { openWindow.firmware() }
+                                .fixedSize()
                             Link("Read the steps", destination: URL(string: "https://superhighfives.com/mark-one/help")!)
+                                .fixedSize()
                         }
                         .font(.callout)
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
                 Card(padding: 14) {
                     VStack(alignment: .leading, spacing: 6) {
@@ -246,8 +249,10 @@ struct WelcomeView: View {
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
             }
+            .fixedSize(horizontal: false, vertical: true)
             Label("Changing firmware always carries some risk. Use a full battery and don’t switch the camera off while it updates. You can go back to Olympus’s firmware the same way.",
                   systemImage: "exclamationmark.triangle.fill")
                 .font(.callout)
