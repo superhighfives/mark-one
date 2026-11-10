@@ -20,7 +20,7 @@ final class Pipeline: ObservableObject {
     @Published private(set) var framesPerSecond = 0.0
 
     /// Why Mark One is waiting, when it's something the user can fix.
-    enum Problem { case cameraOff, wrongFirmware, connectedForPhotos }
+    enum Problem { case cameraOff, wrongFirmware, connectedForPhotos, noCard }
     @Published private(set) var problem: Problem?
 
     /// Whether the camera's buttons are locked while Mark One uses it.
@@ -284,6 +284,17 @@ final class Pipeline: ObservableObject {
                         Thread.sleep(forTimeInterval: 0.5)
                     }
                     throw CameraError.disconnected
+                }
+                // The camera only records with a card in, though Mark One
+                // never writes to it. Wait for one.
+                if try !Firmware.hasCard(camera) {
+                    report("There's no card in the camera. It needs one to record, though Mark One doesn't save anything to it.", .waiting)
+                    note(.noCard)
+                    while try !Firmware.hasCard(camera) {
+                        if !camera.connected || stopRequested.value { throw CameraError.disconnected }
+                        Thread.sleep(forTimeInterval: 1)
+                    }
+                    note(nil)
                 }
                 report("Setting up the camera…")
                 // Open the camera extension first: setting up locks the

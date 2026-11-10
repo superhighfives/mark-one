@@ -271,6 +271,15 @@ enum Firmware {
         return Int(level)
     }
 
+    /// Whether the camera has a card in. Without one it lists a single
+    /// storage ID whose low half is 0, PTP's "no media".
+    static func hasCard(_ camera: Camera) throws -> Bool {
+        let data = try camera.send(0x1004, [], name: "the storage list").1
+        guard data.count >= 4 else { return false }
+        let count = Int(data.le(UInt32.self, at: 0))
+        return (0..<count).contains { 4 + 4 * $0 + 4 <= data.count && data.le(UInt32.self, at: 4 + 4 * $0) & 0xFFFF != 0 }
+    }
+
     static func isRecording(_ camera: Camera) throws -> Bool {
         try camera.run(read32, 0, 0, sequence).0 == 0x10
     }

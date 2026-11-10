@@ -12,7 +12,7 @@ struct MenuView: View {
     private static let width: CGFloat = 320
     private static let padding: CGFloat = 14
 
-    private enum Mode { case install, waiting, photos, off, firmware, connected }
+    private enum Mode { case install, waiting, photos, off, noCard, firmware, connected }
 
     private var mode: Mode {
         if !installer.installed && (installer.needsApproval || installer.failed) { return .install }
@@ -24,6 +24,7 @@ struct MenuView: View {
             case .wrongFirmware: return .firmware
             case .cameraOff: return .off
             case .connectedForPhotos: return .photos
+            case .noCard: return .noCard
             case nil: return .waiting
             }
         }
@@ -35,6 +36,7 @@ struct MenuView: View {
         case .waiting: "No camera yet"
         case .photos: "Connected for photos"
         case .off: "Camera off"
+        case .noCard: "No card"
         case .firmware: "Needs firmware"
         case .connected: pipeline.state == .streaming ? "Live" : "Ready"
         }
@@ -48,6 +50,7 @@ struct MenuView: View {
             case .waiting: waiting
             case .photos: photos
             case .off: off
+            case .noCard: noCard
             case .firmware: firmware
             case .connected: connected
             }
@@ -149,6 +152,15 @@ struct MenuView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        }
+    }
+
+    private var noCard: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Put a card in the camera").font(.title3.weight(.semibold))
+            Text("The camera only records with a memory card in. Mark One doesn't save anything to it.")
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
