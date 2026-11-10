@@ -226,40 +226,25 @@ struct WelcomeView: View {
     private var firmware: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Put the Mark One firmware on the camera").font(.title.weight(.bold))
-            Text("Out of the box, the E-M5 (Mark I) only sends files over USB. Mark One needs its firmware 2.3 with a few changes that let it send video. Mark One builds that firmware from Olympus’s and puts it on your SD card. Switching the camera off undoes everything else Mark One does.")
+            Text("Mark One needs Olympus’s firmware 2.3 with a few changes that let the camera send video. It builds the firmware for you.")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            VStack(alignment: .leading, spacing: 10) {
-                Card(padding: 14) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("With an SD card").fontWeight(.semibold)
-                        Text("Copy the file to the card, then hold OK while switching the camera on. About 10 minutes.")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        HStack {
-                            Button("Set Up Camera…") { openWindow.firmware() }
-                                .primary(!installed)
-                                .fixedSize()
-                            Link("Read the steps", destination: URL(string: "https://superhighfives.com/mark-one/help")!)
-                                .fixedSize()
-                        }
+            Card(padding: 14) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Install it once from an SD card").fontWeight(.semibold)
+                    Text("About 10 minutes. Later updates install over USB.")
                         .font(.callout)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                Label {
-                    Text("\(Text("Updates over USB.").fontWeight(.semibold).foregroundStyle(.primary)) Once the camera has Mark One’s firmware, later versions install straight from Mark One, with no card.")
                         .foregroundStyle(.secondary)
-                } icon: {
-                    Image(systemName: "arrow.down.circle").imageScale(.large).foregroundStyle(.secondary).frame(width: 18)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button("Set Up Camera…") { openWindow.firmware() }
+                        .primary(!installed)
+                        .fixedSize()
+                        .font(.callout)
                 }
-                .font(.callout)
-                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Divider()
             Label {
-                Text("Changing firmware always carries some risk. Use a full battery and don’t switch the camera off while it updates. You can go back to Olympus’s firmware the same way.")
+                Text("Use a full battery, and don’t switch the camera off while it updates. You can go back to Olympus’s firmware the same way.")
             } icon: {
                 Image(systemName: "exclamationmark.triangle.fill").frame(width: 18)
             }
