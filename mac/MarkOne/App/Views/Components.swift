@@ -106,15 +106,20 @@ struct CameraSketch: View {
                 if !faded { context.fill(shape, with: .color(Color(white: 0.78))) }
                 context.stroke(shape, with: ink, lineWidth: 1.2)
             }
-            let lens = Path(ellipseIn: CGRect(x: 42, y: 30, width: 36, height: 36))
-            let glass = Path(ellipseIn: CGRect(x: 48, y: 36, width: 24, height: 24))
+            // The lens is a little taller than the body, so it covers the
+            // body's top and bottom edges.
+            let lens = Path(ellipseIn: CGRect(x: 35, y: 23, width: 50, height: 50))
+            let glass = Path(ellipseIn: CGRect(x: 43, y: 31, width: 34, height: 34))
             if faded {
+                var erase = context
+                erase.blendMode = .clear
+                erase.fill(lens, with: ink)
                 context.stroke(lens, with: ink, style: line)
                 context.stroke(glass, with: ink, lineWidth: 1.2)
             } else {
                 context.fill(lens, with: .color(Color(white: 0.11)))
                 context.fill(glass, with: .color(Color(red: 0.17, green: 0.21, blue: 0.31)))
-                context.fill(Path(ellipseIn: CGRect(x: 53, y: 41, width: 6, height: 6)), with: .color(Color(red: 0.62, green: 0.70, blue: 0.85).opacity(0.8)))
+                context.fill(Path(ellipseIn: CGRect(x: 50, y: 38, width: 8, height: 8)), with: .color(Color(red: 0.62, green: 0.70, blue: 0.85).opacity(0.8)))
             }
             let lamp = CGRect(x: 96.5, y: 29.5, width: 5, height: 5)
             if lit {

@@ -142,10 +142,16 @@ struct WelcomeView: View {
                 .disabled(step == .welcome)
             Spacer()
             Button(nextTitle) { step == .done ? done() : move(1) }
-                .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.defaultAction)
+                .primary(step != .firmware || installed)
         }
         .controlSize(.large)
+    }
+
+    /// Whether the camera reports Mark One's firmware. Until it does, the
+    /// firmware step's main action is Set Up Camera, not It's Installed.
+    private var installed: Bool {
+        if case .markOne = pipeline.firmware { return true }
+        return false
     }
 
     private var nextTitle: String {
@@ -223,7 +229,7 @@ struct WelcomeView: View {
             Text("Out of the box, the E-M5 (Mark I) only sends files over USB. Mark One needs its firmware 2.3 with a few changes that let it send video. Mark One builds that firmware from Olympus’s and puts it on your SD card. Switching the camera off undoes everything else Mark One does.")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 10) {
                 Card(padding: 14) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("With an SD card").fontWeight(.semibold)
@@ -233,28 +239,30 @@ struct WelcomeView: View {
                             .fixedSize(horizontal: false, vertical: true)
                         HStack {
                             Button("Set Up Camera…") { openWindow.firmware() }
+                                .primary(!installed)
                                 .fixedSize()
                             Link("Read the steps", destination: URL(string: "https://superhighfives.com/mark-one/help")!)
                                 .fixedSize()
                         }
                         .font(.callout)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                Card(padding: 14) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Updates over USB").fontWeight(.semibold)
-                        Text("Once the camera has Mark One’s firmware, later versions install straight from Mark One, with no card.")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                Label {
+                    Text("\(Text("Updates over USB.").fontWeight(.semibold).foregroundStyle(.primary)) Once the camera has Mark One’s firmware, later versions install straight from Mark One, with no card.")
+                        .foregroundStyle(.secondary)
+                } icon: {
+                    Image(systemName: "arrow.down.circle").imageScale(.large).foregroundStyle(.secondary).frame(width: 18)
                 }
+                .font(.callout)
+                .fixedSize(horizontal: false, vertical: true)
             }
-            .fixedSize(horizontal: false, vertical: true)
-            Label("Changing firmware always carries some risk. Use a full battery and don’t switch the camera off while it updates. You can go back to Olympus’s firmware the same way.",
-                  systemImage: "exclamationmark.triangle.fill")
+            Divider()
+            Label {
+                Text("Changing firmware always carries some risk. Use a full battery and don’t switch the camera off while it updates. You can go back to Olympus’s firmware the same way.")
+            } icon: {
+                Image(systemName: "exclamationmark.triangle.fill").frame(width: 18)
+            }
                 .font(.callout)
                 .symbolRenderingMode(.multicolor)
                 .fixedSize(horizontal: false, vertical: true)
@@ -322,6 +330,17 @@ struct WelcomeView: View {
                         .padding(.leading, 20)
                 }
             }
+        }
+    }
+}
+
+private extension View {
+    /// The blue default button when `on`, a plain one otherwise.
+    @ViewBuilder func primary(_ on: Bool) -> some View {
+        if on {
+            buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+        } else {
+            buttonStyle(.bordered)
         }
     }
 }
