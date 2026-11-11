@@ -1225,7 +1225,56 @@ the last: rebuilding the previous revision with the old build.py should
 reproduce the shipped edits exactly.
 
 After a USB install the camera goes back to the picture it showed, still
-running the old firmware from RAM, until it's switched off and on.
+running the old firmware from RAM, until it's switched off and on. Mark
+One now restarts it instead (see "Restarting after a USB install").
+
+## Restarting after a USB install (2026-11-10)
+
+What a stock install does at the end (found by a research pass over the
+code): the firmup task's USB branch (`[firmup]TYPE_FIRMUP_USBUP`,
+0x7e624260) writes flash, logs `SUCCESS_REBOOT` or `ERROR_REBOOT`, draws
+OK or NG, then calls fn_7e9df2e9 ("Owariyade"), which busy-waits for the
+power switch to change, then powers off through the PMU (fn_7e454a2b)
+and spins. Despite the log text, nothing restarts. The camera drops off
+USB within a second of UpdateInitiate (0x9123), so Mark One can't send
+anything after the install.
+
+The watchdog does restart it. Boot turns it on (0x7e46789b: 0x6041e72c =
+1, period 10 s) and a task feeds it every 3 s. The firmware forces a
+restart itself when its second CPU doesn't answer at boot (0x7e5e53e6):
+`0x7e4431bf(1)` masks interrupts, `0x40064e17(1)` sets a 1 s period, then
+it spins. The console's `wdt rbt2` command does the same with the 10 s
+period: calling its handler (0x7e467916, a0 = argv with argv[2] = the
+firmware's "rbt2" string at 0x7e4c5939) over USB froze the camera for a
+few seconds, then it came back at the USB prompt with RAM reloaded
+(Mark One's hooks gone).
+
+`asm/restart.s` is the boot-time sequence. Before 0x9123, Mark One
+(`Firmware.armRestart`) checks the watchdog is on and that fn_7e9df2e9
+holds the stock bytes, then writes the stub over it through the
+uncached mirror. fn_7e9df2e9 hasn't run since the CPU last reset, and
+only the end of an install calls it (0x7e753168
+"api_firmup_Firmup_Client_END", 0x7e9df18d, 0x7e9df2e1). Tested: a USB
+install of revision 3 showed OK, and about a second later the camera
+restarted by itself into revision 3, with fn_7e9df2e9 stock again. The
+flag at 0x6051204c turns nonzero once flash is written, but USB is gone by
+then.
+
+Settings: the camera saves settings only when it's switched off. USB
+Mode set to Auto, then a watchdog restart, came back as Webcam; set to
+Webcam, then switched off and on, it stayed Webcam. So a restart drops
+settings changed since the last power-off.
+
+## USB Mode Webcam (2026-11-10)
+
+Setting 0x76 (USB Mode) to 7 makes the camera connect as Webcam without
+asking. Mark One sets it while "Connect as a webcam without asking" is on
+(the default), and sets Auto (0xff) when it's off. Stock firmware maps
+setting values it doesn't know to Storage (0x7edd54f6: 0xff Auto, 4 and
+5 MTP, 3 and 2 their own types, everything else Storage), so a camera
+restored to Olympus's firmware with USB Mode still Webcam connects as a
+drive. Before restoring, Mark One sets Auto and has the camera switched
+off and on, so it's saved, then carries on.
 
 ## Video pauses (in progress, 2026-11-09)
 

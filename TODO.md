@@ -22,34 +22,36 @@ Mark One.
 
 - [ ] **Extension updates.** Replacing the camera extension can leave no
   camera until the Mac restarts (see "Camera extension updates" in
-  `NOTES.md`). The extension now has its own build number in
-  `project.yml` (4), changed only when the extension changes; build 3
-  hit the race, build 4 didn't. Still to do: if the Mark One device
-  doesn't appear after an update, say a restart is needed, and retry
-  opening the camera's input instead of waiting for the camera to be
-  reconnected (seen once right after an update).
-- [ ] **Battery steps.** Mark One shows full, low or empty and logs each
-  new reading ("Camera battery reads"). A full discharge (2026-11-10)
-  read 100, then 50 once the camera's icon flashes empty, then 5 nine
-  seconds before the camera switched itself off. Check that Mark One's
-  full, low and empty match those readings.
+  `NOTES.md`). The extension has its own build number in `project.yml`
+  (4), changed only when the extension changes. After installing, Mark
+  One checks that the Mark One camera appears within 10 s and otherwise
+  asks for a restart, and it retries opening the camera's input every
+  2 s instead of waiting for the camera to be reconnected. Not yet seen
+  working: the restart message only shows when the race happens.
+- [x] **Battery steps.** A full discharge (2026-11-10) read 100, 50 once
+  the camera's icon flashes empty, then 5 nine seconds before it switched
+  itself off: Full, Low and Empty. USB installs now wait for Full.
 
 ### Webcam firmware
 
 Revision 2 records in webcam mode with no card, creates no movie file and
 lifts the time limits (see "Recording without a card" in `NOTES.md`).
 
-- [ ] **Restart after a USB install.** The camera goes back to its old
-  picture, still running the old firmware, until it's switched off and
-  on. Find the firmware's restart routine and have Mark One call it when
-  the install finishes, then say "it'll restart, then choose Webcam".
-- [ ] **Long session with no card.** Stream for more than 30 minutes
-  with no card, and past Mark One's first scheduled restart.
-- [ ] **Drop the runtime patches on revision 2.** Mark One still applies
-  'card writes', 'time limit' and 'muxer time limit' each session; on
-  revision 2 they're redundant.
-- [ ] **Remove the empty movie files** that earlier sessions left on
-  cards (96 on the test card), or tell users they can delete them.
+- [x] **Restart after a USB install** (2026-11-10): the camera restarts
+  itself after OK (see "Restarting after a USB install" in `NOTES.md`).
+  Tested with a script; still to try from Mark One's Reinstall.
+- [x] **Connect as a webcam without asking** (2026-11-10): USB Mode
+  Webcam, on by default, in setup and Settings. Docs: to import photos
+  over USB, set Custom Menu > USB Mode back to Auto, or turn it off.
+- [x] **Long session with no card** (2026-11-10): 71 minutes, past two
+  scheduled restarts.
+- [ ] **Long session with a card in**, now that Mark One skips the
+  runtime patches on revision 2 and later ('card writes', 'time limit',
+  'muxer time limit'; revision 2's hooks do the same). Run past 30
+  minutes and check the card gets no new files and keeps its free space.
+- [x] **Empty movie files** from earlier sessions: only on the test card
+  (only pre-release firmware made them), so delete them there; Mark One
+  doesn't.
 
 ### Direct distribution
 
