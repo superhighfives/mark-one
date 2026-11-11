@@ -26,6 +26,8 @@ final class CameraSink {
     private var waiting: CVPixelBuffer?
     /// Frames dropped because two arrived while the queue was full.
     private(set) var dropped = 0
+    /// Frames can come from the pipeline and from a `Freeze` at once.
+    private let lock = NSLock()
 
     /// Opens the sink, waiting up to five seconds for the extension's device.
     init() throws {
@@ -84,7 +86,8 @@ final class CameraSink {
     /// Queues one frame, or holds it back until the extension has taken the
     /// last one. Only the newest frame is held back.
     func send(_ buffer: CVPixelBuffer) {
-        flush()
+        lock.lock(); defer { lock.unlock() }
+        sendWaiting()
         if waiting == nil, enqueue(buffer) { return }
         if waiting != nil { dropped += 1 }
         waiting = buffer
@@ -92,6 +95,11 @@ final class CameraSink {
 
     /// Sends the frame held back, if the extension has room for it. Call often.
     func flush() {
+        lock.lock(); defer { lock.unlock() }
+        sendWaiting()
+    }
+
+    private func sendWaiting() {
         if let frame = waiting, enqueue(frame) { waiting = nil }
     }
 

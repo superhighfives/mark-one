@@ -544,6 +544,8 @@ final class Pipeline: ObservableObject {
     /// 27 minutes) and well before its 2-hour limit.
     static let restartBytes = 3_758_096_384   // 3.5 GB
     static let restartTime: TimeInterval = 100 * 60
+    /// The longest the last picture is held while a recording restarts.
+    static let restartFreeze: TimeInterval = 30
 
     /// Records and streams until nothing has wanted video for `grace`.
     private nonisolated func stream(_ camera: Camera, to sink: CameraSink, frameList: Bool, applied: inout Applied) throws {
@@ -553,9 +555,15 @@ final class Pipeline: ObservableObject {
         var shown = 0
         var last: CVPixelBuffer?
         var decoded = false
+        var freeze: Freeze?
         let focus = applied.focus
         decoder.onFrame = { [weak self] buffer in
             if let self, self.clearBusyOnFrame.value { self.setBusy(nil) }
+            if let restart = freeze {
+                restart.stop()
+                log.notice("Video back \(Date().timeIntervalSince(restart.started), format: .fixed(precision: 2), privacy: .public) s after restarting the recording")
+                freeze = nil
+            }
             focus.measure(buffer)
             sink.send(buffer)
             Preview.shared.show(buffer)
@@ -571,12 +579,20 @@ final class Pipeline: ObservableObject {
         var recordedBytes = 0
         var client: pid_t?
         let capture = UserDefaults.standard.bool(forKey: "SaveCapture") ? Capture() : nil
+        // Seconds between restarts, for testing them: defaults write
+        // com.superhighfives.markone RestartAfter 60
+        let restartForTesting = UserDefaults.standard.double(forKey: "RestartAfter")
+        // Whether to skip the 3.5 GB restart, to test if the camera really
+        // hangs at 4 GB: defaults write com.superhighfives.markone NoSizeRestart -bool true
+        let noSizeRestart = UserDefaults.standard.bool(forKey: "NoSizeRestart")
+        var loggedGB = 0
         report("Starting to record…", .streaming)
         setBusy("Starting the camera…")
         try Firmware.setScreen(camera, true)
         try Firmware.setRecording(camera, true)
         var recordingSince = Date()
         defer {
+            freeze?.stop()
             setBusy(nil)
             showClient(nil)
             if camera.connected {
@@ -616,13 +632,24 @@ final class Pipeline: ObservableObject {
             // with Mark One's patch, and perhaps 4 GB) hangs the camera's
             // recorder until it's switched off. Stop and start well before.
             let recordedFor = Date().timeIntervalSince(recordingSince)
-            if recordedBytes >= Pipeline.restartBytes || recordedFor >= Pipeline.restartTime {
+            if noSizeRestart, recordedBytes / 1_073_741_824 > loggedGB {
+                loggedGB = recordedBytes / 1_073_741_824
+                log.notice("Recorded \(loggedGB, privacy: .public) GB in \(recordedFor / 60, format: .fixed(precision: 1), privacy: .public) minutes without restarting")
+            }
+            if (!noSizeRestart && recordedBytes >= Pipeline.restartBytes) || recordedFor >= Pipeline.restartTime
+                || (restartForTesting > 0 && recordedFor >= restartForTesting) {
                 let rate = Double(recordedBytes) * 8 / recordedFor / 1_000_000
                 log.notice("Restarting the recording after \(recordedFor / 60, format: .fixed(precision: 1), privacy: .public) minutes and \(Double(recordedBytes) / 1_073_741_824, format: .fixed(precision: 2), privacy: .public) GB (\(rate, format: .fixed(precision: 1), privacy: .public) Mbps).")
+                // The camera takes about 5 s to start recording again,
+                // longer than the extension fills in with the last picture.
+                // Its gray placeholder after that ends recordings in apps
+                // such as QuickTime.
+                if let last { freeze = Freeze(last, to: sink, for: Pipeline.restartFreeze) }
                 try Firmware.setRecording(camera, false)
                 try Firmware.setRecording(camera, true)
                 recordingSince = Date()
                 recordedBytes = 0
+                loggedGB = 0
             }
             // If video stops for anything else, such as the REC button,
             // start recording again.
@@ -633,7 +660,7 @@ final class Pipeline: ObservableObject {
                     log.notice("The camera stopped recording after \(minutes, format: .fixed(precision: 2), privacy: .public) minutes. Starting again.")
                     try Firmware.setRecording(camera, true)
                     recordingSince = Date()
-                    recordedBytes = 0
+                    recordedBytes = 0; loggedGB = 0
                 }
             }
             let checkedAt = Date()
@@ -810,5 +837,32 @@ private extension Pipeline.Problem {
         case FirmwareError.unexpected: self = .wrongFirmware
         default: return nil
         }
+    }
+}
+
+/// Sends one picture to the camera extension 30 times a second on its own
+/// thread, until stopped or for at most `limit` seconds, so apps see a
+/// frozen picture while the pipeline is busy restarting the camera.
+private final class Freeze {
+    private let queue = DispatchQueue(label: "com.superhighfives.markone.freeze")
+    private let timer: DispatchSourceTimer
+    let started = Date()
+
+    init(_ picture: CVPixelBuffer, to sink: CameraSink, for limit: TimeInterval) {
+        let until = Date().addingTimeInterval(limit)
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+        timer.schedule(deadline: .now(), repeating: 1.0 / 30)
+        timer.setEventHandler {
+            guard Date() < until else { return timer.cancel() }
+            sink.send(picture)
+        }
+        timer.resume()
+        self.timer = timer
+    }
+
+    /// Stops sending. No picture goes out after this returns.
+    func stop() {
+        timer.cancel()
+        queue.sync {}
     }
 }
