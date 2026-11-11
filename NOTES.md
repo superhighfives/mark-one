@@ -1343,6 +1343,27 @@ Test: `vt.swift` (scratchpad, not kept), feeding each frame as AVCC
 with a 4-byte length, hardware required
 (`kVTVideoDecoderSpecification_RequireHardwareAcceleratedVideoDecoder`).
 
+Mark One uses it on revision 3 (`HardwareDecoder.swift`, 2026-11-10):
+it hands over to libavcodec if the Mac has no H.264 hardware decoder or
+after 5 failures (about 2 s of frozen picture, tested by adding 0xff
+after every frame). Same capture: 585 pictures identical to libavcodec's.
+Streaming to QuickTime, Mark One went from 37-41% of a core to about
+12%; what's left is mostly reading frames over USB. Finding start
+codes with a byte loop in Swift was most of the cost in the Debug build;
+`memmem` fixed it.
+
+Stutter with the panel open: QuickTime's recording repeated 2-5
+pictures a second while Mark One's panel was open, though Mark One's
+preview was smooth and Mark One handed every frame over on time
+(pauses under 55 ms). QuickTime's log ("getting frames too slowly")
+showed about 10 frames a second arriving 70 ms after the one before,
+only while the panel was open; the extension repeats the last frame
+after 66 ms without one. The preview was showing the same pixel buffer
+that went to the extension. Giving the preview its own copy fixed it:
+6 frames late in the next recording, none over 36 ms. Mark One also
+holds back a frame that arrives while the extension's one-frame queue
+is full, instead of dropping it, and logs any frames it does drop.
+
 ## Where it stands
 
 Mark One works end to end over USB: firmware setup from the card, updates

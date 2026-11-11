@@ -111,13 +111,10 @@ lifts the time limits (see "Recording without a card" in `NOTES.md`).
   only near the 2-hour cap. Values above about 6.6 hours would likely
   overflow the muxer's 90 kHz clock. Also check whether the card's free
   space shrinks in a long session.
-- [ ] **Apple's video decoder.** Works on revision 3's exact frames:
-  hardware decoding of every frame, identical pictures, 0.74 ms a frame
-  against libavcodec's 4.5 ms (see "Apple's decoder on exact frames" in
-  `NOTES.md`). Mark One uses 29-41% of a core while streaming, mostly
-  libavcodec (see "CPU use" in `NOTES.md`). Decode with VideoToolbox on
-  revision 3, adding each new PPS to the format description, and keep
-  libavcodec for older revisions and as a fallback.
+- [x] **Apple's video decoder.** Mark One decodes with VideoToolbox on
+  revision 3 and libavcodec otherwise, or when the hardware fails:
+  about 12% of a core while streaming, down from 37-41% (see "Apple's
+  decoder on exact frames" in `NOTES.md`).
 - [ ] **HDMI live view (optional).** The `hdmi-liveview` patch is built
   but has never been tried on a camera. It would help anyone using a
   capture card.
