@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>SUFeedURL</key>
-	<string>https://superhighfives.com/releases/mark-one/feed</string>
+	<string>$(MARK_ONE_FEED_URL)</string>
 	<key>SUPublicEDKey</key>
 	<string>bQPW92QW90/RZvadGqL2WXD2mhyVV7cu1hzQety2Uqc=</string>
 </dict>

@@ -56,7 +56,8 @@ step "Archiving"
 xcodegen generate --quiet
 xcodebuild -project MarkOne.xcodeproj -scheme MarkOne -configuration Release \
 	-derivedDataPath build -archivePath "$OUT/MarkOne.xcarchive" \
-	-allowProvisioningUpdates archive -quiet
+	-allowProvisioningUpdates archive -quiet \
+	MARK_ONE_FEED_URL=https://superhighfives.com/releases/mark-one/feed
 
 step "Exporting with Developer ID"
 cat >"$OUT/ExportOptions.plist" <<EOF

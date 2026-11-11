@@ -1,5 +1,6 @@
-// Updates through Sparkle, from the feed in Info.plist (SUFeedURL). Updates
-// are signed with Mark One's own EdDSA key; its public half is SUPublicEDKey
+// Updates through Sparkle, from the feed in Info.plist (SUFeedURL). Only
+// release builds have a feed (scripts/release.sh sets it); builds from
+// source don't update. Updates are signed with Mark One's own EdDSA key; its public half is SUPublicEDKey
 // and the private half is in the release Mac's keychain, under the account
 // "mark-one" (see scripts/release.sh).
 
@@ -9,6 +10,9 @@ import Sparkle
 @MainActor
 final class Updater: NSObject, ObservableObject {
     static let shared = Updater()
+
+    /// Whether this build gets updates: release builds only.
+    static let enabled = !((Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String) ?? "").isEmpty
 
     /// False while a check is already running.
     @Published private(set) var canCheck = false
@@ -27,6 +31,7 @@ final class Updater: NSObject, ObservableObject {
 
     /// Starts the daily checks. Call once at launch.
     func start() {
+        guard Updater.enabled else { return }
         controller.startUpdater()
         controller.updater.publisher(for: \.canCheckForUpdates)
             .receive(on: DispatchQueue.main)

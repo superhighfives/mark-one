@@ -4,22 +4,30 @@ Turns an original Olympus OM-D E-M5 (Mark I, 2012) into a Mac webcam over a sing
 
 ## Where it stands
 
-Mark One works end to end, with nothing to click. It sits in the menu bar and can open at login. Plug in the camera with its USB Mode set to MTP, switch it on, and open a video app. Mark One:
+Mark One works end to end, with nothing to click. It sits in the menu bar and can open at login. Plug in the camera, switch it on, choose Webcam on its screen, and open a video app. Mark One:
 
 1. connects through ImageCaptureCore, which shares the camera with macOS's camera service
-2. switches the camera to live view with USB connected, so movies don't write to the card and have no time limit (that last part is still untested)
+2. switches the camera to live view with USB connected; with Mark One's firmware, movies need no card, never write to one and have no time limit
 3. presses the camera's REC button for you when an app starts using the Mark One camera
-4. follows the camera's 1080p, 30 frames per second H.264 movie stream straight out of its memory
-5. decodes it with libavcodec
+4. copies each frame of the camera's 1080p, 30 frames per second H.264 movie stream straight out of its memory, using a list of finished frames the firmware keeps
+5. decodes it with Apple's hardware decoder (libavcodec on older firmware revisions, or if that fails)
 6. publishes it as the "Mark One" camera through a Core Media IO camera extension, for FaceTime, Zoom, OBS, QuickTime and so on
 
 Recording stops 5 seconds after the last app stops using the camera, and when you quit Mark One. Mark One notices when the camera is switched back on or plugged in again and sets it up again. The camera's power switch turns it off as usual, and Mark One says so. Video reaches the Mac about 200 ms after it happens.
 
-All of this rests on one firmware change, `usb-tools`, which adds USB commands that read and write camera memory and run code. Everything else Mark One does lives in the camera's memory only, and switching the camera off undoes it. Flashing modified firmware can brick a camera, so read the risks in `NOTES.md` first.
+All of this rests on Mark One's firmware: `usb-tools`, which adds USB commands that read and write camera memory and run code, and `webcam`, which adds the Webcam connection, card-free recording and the frame list. Mark One installs it for you: it downloads Olympus's firmware 2.3, patches it on your Mac, and writes it to the card for the first install, then updates it over USB. Flashing modified firmware can brick a camera, so read the risks in `NOTES.md` first.
 
 ## What's left
 
 `TODO.md` lists everything left before launch, fast follows and longer-term ideas.
+
+## Build it yourself
+
+A signed, notarized build that keeps itself up to date is at [superhighfives.com/mark-one](https://superhighfives.com/mark-one), or you can build it yourself from the source here.
+
+You need a Mac with Xcode and [XcodeGen](https://github.com/yonaskolb/XcodeGen), and an Apple developer team that can sign a camera extension, which uses the System Extension capability. A paid Apple Developer Program membership has it. Then follow the steps under "Mark One" below. Builds from source don't check for updates: to update, pull and build again. Only `scripts/release.sh` sets the update feed, and it uses Mark One's own signing keys.
+
+Mark One downloads Olympus's firmware from Olympus's own update server and patches it on your Mac, so nothing from Olympus is in this repo or in the app.
 
 ## Mark One
 

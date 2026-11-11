@@ -35,6 +35,9 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         # Sparkle's feed and public key, merged with the generated keys below
         INFOPLIST_FILE: App/Info.plist
+        # Sparkle's feed. Empty, so builds from source don't update
+        # themselves into the release build; scripts/release.sh sets it.
+        MARK_ONE_FEED_URL: ""
         INFOPLIST_KEY_CFBundleDisplayName: Mark One
         INFOPLIST_KEY_LSUIElement: YES
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.video
