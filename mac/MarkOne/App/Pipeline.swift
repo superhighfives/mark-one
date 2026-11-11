@@ -484,7 +484,9 @@ final class Pipeline: ObservableObject {
 
     /// Records and streams until nothing has wanted video for `grace`.
     private nonisolated func stream(_ camera: Camera, to sink: CameraSink, frameList: Bool, applied: inout Applied) throws {
-        let decoder = FrameDecoder()
+        // Apple's hardware decoder needs revision 3's exact frames.
+        let decoder: VideoDecoder = (frameList ? HardwareDecoder() : nil) ?? FrameDecoder()
+        log.notice("Decoding with \(decoder is HardwareDecoder ? "Apple's hardware decoder" : "libavcodec", privacy: .public)")
         var shown = 0
         var last: CVPixelBuffer?
         var decoded = false
@@ -501,7 +503,7 @@ final class Pipeline: ObservableObject {
         let streamer = Streamer(camera: camera, frameList: frameList)
         streamer.onLostTrack = { log.notice("\($0, privacy: .public)") }
         var since = Date(), lastUsed = Date(), lastChecked = Date()
-        var received = 0, failuresBefore = 0
+        var received = 0, failuresBefore = 0, droppedBefore = sink.dropped
         var lastReceived = Date(), lastRecordingCheck = Date()
         var recordedBytes = 0
         var client: pid_t?
@@ -522,6 +524,7 @@ final class Pipeline: ObservableObject {
         while !stopRequested.value {
             if installImage.value != nil { throw PipelineInterrupt.install }
             let started = Date()
+            sink.flush()
             let frames = try streamer.poll()
             let polled = Date()
             received += frames.count
@@ -600,6 +603,10 @@ final class Pipeline: ObservableObject {
                 if decoder.failures > failuresBefore {
                     log.notice("\(decoder.failures - failuresBefore, privacy: .public) frames failed to decode")
                 }
+                if sink.dropped > droppedBefore {
+                    log.notice("\(sink.dropped - droppedBefore, privacy: .public) frames dropped on the way to the camera extension")
+                }
+                droppedBefore = sink.dropped
                 Task { @MainActor in
                     self.framesPerSecond = rate
                     self.status = live ? "Streaming (\(detail))." : "Waiting for video from the camera."

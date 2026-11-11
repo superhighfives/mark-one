@@ -11,6 +11,8 @@ final class Preview: @unchecked Sendable {
 
     private let lock = NSLock()
     private var layers: [ObjectIdentifier: AVSampleBufferDisplayLayer] = [:]
+    private var pool: CVPixelBufferPool?
+    private var poolSize = (0, 0)
 
     /// Whether a preview is on screen.
     var visible: Bool { lock.withLock { !layers.isEmpty } }
@@ -27,7 +29,7 @@ final class Preview: @unchecked Sendable {
     /// Shows one decoded frame in every visible preview.
     func show(_ buffer: CVPixelBuffer) {
         let targets = lock.withLock { Array(layers.values) }
-        guard !targets.isEmpty else { return }
+        guard !targets.isEmpty, let buffer = copy(buffer) else { return }
         var format: CMFormatDescription?
         CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil, imageBuffer: buffer, formatDescriptionOut: &format)
         var timing = CMSampleTimingInfo(duration: .invalid, presentationTimeStamp: .zero, decodeTimeStamp: .invalid)
@@ -48,6 +50,54 @@ final class Preview: @unchecked Sendable {
                 layer.enqueue(sample)
             }
         }
+    }
+}
+
+extension Preview {
+    /// A copy of a frame for the preview. Showing the same pixel buffer
+    /// that goes to the camera extension made apps' video stutter while
+    /// the panel was open (about 10 frames a second reached QuickTime
+    /// 70 ms late), though Mark One sent every frame on time. A copy is
+    /// about 3 MB a frame, and only while the preview is on screen.
+    private func copy(_ source: CVPixelBuffer) -> CVPixelBuffer? {
+        let width = CVPixelBufferGetWidth(source), height = CVPixelBufferGetHeight(source)
+        if pool == nil || poolSize != (width, height) {
+            let attributes: [CFString: Any] = [
+                kCVPixelBufferPixelFormatTypeKey: CVPixelBufferGetPixelFormatType(source),
+                kCVPixelBufferWidthKey: width,
+                kCVPixelBufferHeightKey: height,
+                kCVPixelBufferIOSurfacePropertiesKey: [:] as CFDictionary,
+            ]
+            pool = nil
+            CVPixelBufferPoolCreate(nil, nil, attributes as CFDictionary, &pool)
+            poolSize = (width, height)
+        }
+        var copy: CVPixelBuffer?
+        guard let pool, CVPixelBufferPoolCreatePixelBuffer(nil, pool, &copy) == kCVReturnSuccess, let copy else {
+            return nil
+        }
+        CVPixelBufferLockBaseAddress(source, .readOnly)
+        CVPixelBufferLockBaseAddress(copy, [])
+        defer {
+            CVPixelBufferUnlockBaseAddress(copy, [])
+            CVPixelBufferUnlockBaseAddress(source, .readOnly)
+        }
+        for plane in 0..<CVPixelBufferGetPlaneCount(source) {
+            guard let from = CVPixelBufferGetBaseAddressOfPlane(source, plane),
+                  let to = CVPixelBufferGetBaseAddressOfPlane(copy, plane) else { return nil }
+            let fromStride = CVPixelBufferGetBytesPerRowOfPlane(source, plane)
+            let toStride = CVPixelBufferGetBytesPerRowOfPlane(copy, plane)
+            let rows = CVPixelBufferGetHeightOfPlane(source, plane)
+            if fromStride == toStride {
+                to.copyMemory(from: from, byteCount: fromStride * rows)
+            } else {
+                for row in 0..<rows {
+                    (to + row * toStride).copyMemory(from: from + row * fromStride, byteCount: min(fromStride, toStride))
+                }
+            }
+        }
+        CVBufferPropagateAttachments(source, copy)
+        return copy
     }
 }
 

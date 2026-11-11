@@ -19,6 +19,13 @@ final class CameraSink {
     private let device: CMIODeviceID
     private let stream: CMIOStreamID
     private let queue: CMSimpleQueue
+    /// A frame that arrived while the queue was full, sent as soon as the
+    /// extension takes the one before. The extension asks about 26 ms after
+    /// each frame, so frames that arrive together go out evenly spaced
+    /// instead of all but the first being dropped.
+    private var waiting: CVPixelBuffer?
+    /// Frames dropped because two arrived while the queue was full.
+    private(set) var dropped = 0
 
     /// Opens the sink, waiting up to five seconds for the extension's device.
     init() throws {
@@ -71,9 +78,22 @@ final class CameraSink {
             .first { string(of: $0, kCMIODevicePropertyDeviceUID) == deviceUID }
     }
 
-    /// Queues one frame, dropping it if the extension hasn't taken the last one.
+    /// Queues one frame, or holds it back until the extension has taken the
+    /// last one. Only the newest frame is held back.
     func send(_ buffer: CVPixelBuffer) {
-        guard CMSimpleQueueGetCount(queue) < CMSimpleQueueGetCapacity(queue) else { return }
+        flush()
+        if waiting == nil, enqueue(buffer) { return }
+        if waiting != nil { dropped += 1 }
+        waiting = buffer
+    }
+
+    /// Sends the frame held back, if the extension has room for it. Call often.
+    func flush() {
+        if let frame = waiting, enqueue(frame) { waiting = nil }
+    }
+
+    private func enqueue(_ buffer: CVPixelBuffer) -> Bool {
+        guard CMSimpleQueueGetCount(queue) < CMSimpleQueueGetCapacity(queue) else { return false }
         var format: CMFormatDescription?
         CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil, imageBuffer: buffer, formatDescriptionOut: &format)
         var timing = CMSampleTimingInfo(duration: CMTime(value: 1, timescale: 30),
@@ -83,8 +103,9 @@ final class CameraSink {
         guard let format,
               CMSampleBufferCreateReadyWithImageBuffer(allocator: nil, imageBuffer: buffer, formatDescription: format,
                                                        sampleTiming: &timing, sampleBufferOut: &sample) == noErr,
-              let sample else { return }
+              let sample else { return true }
         CMSimpleQueueEnqueue(queue, element: Unmanaged.passRetained(sample).toOpaque())
+        return true
     }
 
     private static func address(_ selector: Int) -> CMIOObjectPropertyAddress {

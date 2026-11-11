@@ -1,8 +1,8 @@
 // Decodes the camera's H.264 frames with libavcodec.
 //
-// VideoToolbox's software decoder rejects about 1% of this camera's frames
-// (and its hardware decoder all of them; see NOTES.md), while libavcodec
-// decodes every one. Each frame comes out as soon as it goes in: the
+// Used for firmware before revision 3, whose frames Mark One can't cut
+// exactly enough for Apple's decoder (see HardwareDecoder.swift), and when
+// the hardware decoder fails. Each frame comes out as soon as it goes in: the
 // stream has no reordering, and low-delay mode stops libavcodec from
 // holding frames back. Output is full-range NV12 in IOSurface-backed
 // pixel buffers, the camera extension's format.
@@ -11,7 +11,17 @@ import Accelerate
 import CoreVideo
 import Foundation
 
-final class FrameDecoder {
+/// Turns the camera's H.264 frames into NV12 pixel buffers.
+protocol VideoDecoder: AnyObject {
+    /// Frames that failed to decode so far.
+    var failures: Int { get }
+    /// Called with each decoded picture, before `decode` returns.
+    var onFrame: ((CVPixelBuffer) -> Void)? { get set }
+    /// Decodes one frame: Annex B NAL units, starting with an access unit delimiter.
+    func decode(_ data: Data)
+}
+
+final class FrameDecoder: VideoDecoder {
     private let context: UnsafeMutablePointer<AVCodecContext>
     private let packet: UnsafeMutablePointer<AVPacket>
     private let frame: UnsafeMutablePointer<AVFrame>
