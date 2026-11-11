@@ -73,6 +73,9 @@ final class CameraSink {
         return pid
     }
 
+    /// Whether the Mark One camera exists, meaning its extension is running.
+    static var available: Bool { installedDevice() != nil }
+
     private static func installedDevice() -> CMIODeviceID? {
         objectIDs(of: CMIOObjectID(kCMIOObjectSystemObject), kCMIOHardwarePropertyDevices)
             .first { string(of: $0, kCMIODevicePropertyDeviceUID) == deviceUID }
@@ -139,8 +142,8 @@ enum SinkError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .notInstalled: "The Mark One camera isn't installed yet. Click Install camera."
-        case .cantOpen: "Couldn't open the Mark One camera's input."
+        case .notInstalled: "Waiting for the Mark One camera to start…"
+        case .cantOpen: "Waiting for the Mark One camera's input to open…"
         }
     }
 }

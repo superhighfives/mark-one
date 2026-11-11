@@ -45,10 +45,18 @@ private struct GeneralSettings: View {
                 }
                 Toggle("Mirror the preview", isOn: $preferences.mirrorPreview)
             }
-            Section {
-                Toggle(isOn: $updater.checksAutomatically) {
-                    Text("Check for updates automatically")
-                    Text("Once a day, and never during a call.")
+            Section("Camera") {
+                Toggle(isOn: $pipeline.connectAsWebcam) {
+                    Text("Connect as a webcam without asking")
+                    Text("Sets the camera's USB Mode to Webcam. Off puts it back to Auto, so the camera asks how to connect.")
+                }
+            }
+            if Updater.enabled {
+                Section {
+                    Toggle(isOn: $updater.checksAutomatically) {
+                        Text("Check for updates automatically")
+                        Text("Once a day, and never during a call.")
+                    }
                 }
             }
             Section {
@@ -79,6 +87,7 @@ private struct CameraSettings: View {
                 LabeledContent("Firmware") {
                     HStack {
                         Text(pipeline.firmware?.label ?? "Not connected")
+                            .fixedSize()
                         Button(pipeline.firmware?.updateAvailable == true ? "Update…" : "Manage…") {
                             openWindow.firmware()
                         }
@@ -154,8 +163,10 @@ private struct AboutSettings: View {
                 Text("Mark One").font(.title2.weight(.bold))
                 Text(version).font(.callout).foregroundStyle(.secondary)
             }
-            Button("Check for Updates…") { updater.check() }
-                .disabled(!updater.canCheck)
+            if Updater.enabled {
+                Button("Check for Updates…") { updater.check() }
+                    .disabled(!updater.canCheck)
+            }
             Form {
                 Section("Acknowledgements") {
                     LabeledContent {
@@ -166,7 +177,7 @@ private struct AboutSettings: View {
                         }
                     } label: {
                         Text("FFmpeg 9.0.2 (libavcodec, libavutil)")
-                        Text("Decodes the camera’s video. LGPL 2.1, built from the unmodified source and shipped as separate libraries.")
+                        Text("Decodes the camera’s video on older Mark One firmware, and if Apple’s decoder can’t. LGPL 2.1, built from the unmodified source and shipped as separate libraries.")
                     }
                 }
             }

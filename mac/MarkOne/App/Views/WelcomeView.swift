@@ -208,7 +208,7 @@ struct WelcomeView: View {
                             .foregroundStyle(.red)
                         Text(installer.status).fixedSize(horizontal: false, vertical: true)
                         Spacer()
-                        Button("Try Again") { installer.activate() }
+                        Button(installer.needsRestart ? "Check Again" : "Try Again") { installer.activate() }
                     } else {
                         ProgressView().controlSize(.small)
                         VStack(alignment: .leading) {
@@ -257,7 +257,7 @@ struct WelcomeView: View {
     private var connect: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Connect the camera").font(.title.weight(.bold))
-            Text("Plug the camera in, switch it on and choose **Webcam** on its screen.")
+            Text("Plug the camera in and switch it on. If it asks how to connect, choose **Webcam**.")
                 .foregroundStyle(.secondary)
             Card(padding: 14) {
                 HStack(spacing: 14) {
@@ -290,6 +290,13 @@ struct WelcomeView: View {
                         ProgressView().controlSize(.small)
                     }
                 }
+            }
+            Toggle(isOn: $pipeline.connectAsWebcam) {
+                Text("Connect as a webcam without asking")
+                Text("Sets the camera's USB Mode to Webcam. To import photos over USB, set it back to Auto in the camera's Custom Menu, or turn this off.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Text("The E-M5 (Mark I) runs on its battery, even over USB. For long calls, a dummy battery with a power adapter keeps it going.")
                 .font(.callout)

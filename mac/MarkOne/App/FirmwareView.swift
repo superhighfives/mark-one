@@ -88,24 +88,45 @@ struct FirmwareView: View {
         VStack(alignment: .leading, spacing: 14) {
             let current = revision ?? 0
             let bundled = FirmwareImage.bundledRevision
-            Label(current >= bundled ? "Mark One's firmware, up to date (revision \(current))"
-                                     : "Mark One's firmware, revision \(current). Revision \(bundled) is ready.",
-                  systemImage: current >= bundled ? "checkmark.circle.fill" : "arrow.down.circle.fill")
-                .foregroundStyle(current >= bundled ? .green : .accentColor)
-                .fixedSize(horizontal: false, vertical: true)
-            choice(current < bundled ? "Update" : "Reinstall",
-                   current < bundled ? "Install revision \(bundled) over USB."
-                                     : "Install the same firmware again over USB, if something seems wrong.") {
-                begin(.update)
+            Card(padding: 14) {
+                HStack(spacing: 12) {
+                    Image(systemName: current >= bundled ? "checkmark.circle.fill" : "arrow.down.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(current >= bundled ? .green : .accentColor)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Mark One's firmware, revision \(current)").fontWeight(.semibold)
+                        Text(current >= bundled ? "Up to date." : "Revision \(bundled) is ready to install over USB.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if current < bundled {
+                        Button("Update…") { begin(.update) }
+                            .buttonStyle(.borderedProminent)
+                    }
+                }
             }
-            choice("Restore Olympus's firmware",
-                   "Put Olympus's own firmware 2.3 back over USB. Mark One stops working with the camera until you set it up again.") {
-                begin(.restore)
-            }
-            choice("Prepare for OM Workspace",
-                   "Make the camera report firmware 1.0 until it's switched off, so Olympus's OM Workspace offers to install 2.3. Changes nothing permanent.") {
-                pipeline.reportOlderVersion()
-                step = .omWorkspace
+            Card(padding: 0) {
+                VStack(spacing: 0) {
+                    if current >= bundled {
+                        choice("Reinstall", "Install revision \(current) again, if something seems wrong.", "Reinstall…") {
+                            begin(.update)
+                        }
+                        Divider().padding(.leading, 14)
+                    }
+                    choice("Restore Olympus's firmware",
+                           "Put firmware 2.3 back. You can set the camera up for Mark One again later.",
+                           "Restore…") {
+                        begin(.restore)
+                    }
+                    Divider().padding(.leading, 14)
+                    choice("Prepare for OM Workspace",
+                           "Report firmware 1.0 until the camera is switched off, so OM Workspace offers 2.3.",
+                           "Prepare…") {
+                        pipeline.reportOlderVersion()
+                        step = .omWorkspace
+                    }
+                }
             }
             HStack {
                 Spacer()
@@ -114,15 +135,17 @@ struct FirmwareView: View {
         }
     }
 
-    private func choice(_ title: String, _ detail: String, _ action: @escaping () -> Void) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+    private func choice(_ title: String, _ detail: String, _ button: String,
+                        _ action: @escaping () -> Void) -> some View {
+        HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.headline)
+                Text(title).fontWeight(.semibold)
                 Text(detail).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
-            Spacer()
-            Button(title, action: action).labelsHidden()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Button(action: action) { Text(button).frame(minWidth: 80) }
         }
+        .padding(14)
     }
 
     private var omWorkspace: some View {
@@ -195,14 +218,28 @@ struct FirmwareView: View {
                 }
                 .padding(4)
             }
+            if lowBattery {
+                Label("The camera's battery is low. Charge it before installing.", systemImage: "battery.25percent")
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             HStack {
                 Button("Cancel") { step = .start }.keyboardShortcut(.cancelAction)
                 Spacer()
                 Button(action == .setUp ? "Continue" : action == .restore ? "Restore" : "Install") { prepare() }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(!understood)
+                    .disabled(!understood || lowBattery)
             }
         }
+    }
+
+    /// Whether a USB install should wait for a charge. The camera reports
+    /// 100 when full, then 50 once its own battery icon flashes empty.
+    /// Setting up from the card happens with the camera unplugged, so Mark
+    /// One can't check it then.
+    private var lowBattery: Bool {
+        guard action != .setUp, let level = pipeline.battery else { return false }
+        return CameraBattery(level: level) != .full
     }
 
     private var preparing: some View {
@@ -322,6 +359,8 @@ struct FirmwareView: View {
                         .foregroundStyle(.green)
                     Text(action == .restore
                          ? "To use the camera with Mark One again, choose Set Up Camera."
+                         : pipeline.connectAsWebcam
+                         ? "Pick “Mark One” as the camera in any video app."
                          : "Choose Webcam on the camera when you connect it, then pick “Mark One” as the camera in any video app.")
                         .fixedSize(horizontal: false, vertical: true)
                     HStack {
@@ -329,13 +368,30 @@ struct FirmwareView: View {
                         Button("Done") { pipeline.install = nil; step = .start; closeWindow() }
                             .keyboardShortcut(.defaultAction)
                     }
+                } else if install.phase == .switchOffFirst {
+                    Text("Mark One set the camera's USB Mode back to Auto, which Olympus's firmware needs. The camera saves it when it's switched off.")
+                        .fixedSize(horizontal: false, vertical: true)
+                    numbered(1, "Switch the camera off and on.")
+                    numbered(2, "Choose Webcam on its screen. The restore carries on by itself.")
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("Waiting for the camera.").foregroundStyle(.secondary)
+                    }
                 } else if install.phase == .installing {
                     Text("The camera has the firmware and is installing it.")
                     CameraUpdateScreen().frame(maxWidth: .infinity)
                     numbered(1, "Wait while the camera's screen shows this. If Mark One was using the camera, the screen flickers between this and the last picture. Don't switch the camera off or unplug it.")
-                    numbered(2, "When the screen shows OK, or goes back to the picture it showed before, the install is done. The camera keeps running the old firmware until it restarts, so switch it off and on.")
-                    numbered(3, action == .restore ? "Connect the camera to your Mac again."
-                                                   : "Connect the camera to your Mac again and choose Webcam on its screen.")
+                    if install.restarts {
+                        numbered(2, "When the screen shows OK, the camera restarts by itself, with the new firmware. It takes about a minute and a half.")
+                        numbered(3, action == .restore ? "It asks how to connect again, as it did before Mark One."
+                                 : pipeline.connectAsWebcam ? "Mark One connects to it again. There's nothing to do."
+                                 : "Choose Webcam on its screen when it asks.")
+                    } else {
+                        numbered(2, "When the screen shows OK, or goes back to the picture it showed before, the install is done. The camera keeps running the old firmware until it restarts, so switch it off and on.")
+                        numbered(3, action == .restore ? "Connect the camera to your Mac again."
+                                 : pipeline.connectAsWebcam ? "Connect the camera to your Mac again."
+                                 : "Connect the camera to your Mac again and choose Webcam on its screen.")
+                    }
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
                         Text("Mark One carries on when it sees the camera.").foregroundStyle(.secondary)

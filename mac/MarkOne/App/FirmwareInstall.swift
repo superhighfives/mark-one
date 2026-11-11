@@ -71,8 +71,11 @@ enum FirmwareInstall {
     /// camera to install it. The camera checks the file before it changes
     /// anything; once it starts installing, it must not lose power.
     /// `progress` gets a description and 0 to 1.
+    /// Returns whether the camera restarts by itself once it's done (see
+    /// `Firmware.armRestart`); otherwise it waits to be switched off and on.
+    @discardableResult
     static func overUSB(_ camera: Camera, _ image: FirmwareImage,
-                        progress: (String, Double) -> Void) throws {
+                        progress: (String, Double) -> Void) throws -> Bool {
         let firm = image.data
         let mode = try camera.send(0x911C, [], name: "the update check").0
         guard mode.first == 1 else { throw InstallError.notReady }
@@ -108,7 +111,9 @@ enum FirmwareInstall {
             progress("The camera is checking the firmware…", 0.2 + 0.3 * min(1, elapsed / 30))
             Thread.sleep(forTimeInterval: 1)
         }
+        let restarts = (try? Firmware.armRestart(camera)) ?? false
         try camera.send(0x9123, [], name: "the update")
+        return restarts
     }
 
     /// Removable volumes that look like a camera's SD card: a FAT or exFAT

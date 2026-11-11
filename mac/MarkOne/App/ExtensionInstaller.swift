@@ -2,7 +2,10 @@
 // allow once in System Settings.
 
 import AppKit
+import os
 import SystemExtensions
+
+private let log = Logger(subsystem: "com.superhighfives.markone", category: "extension")
 
 /// Installs and removes the camera extension embedded in the app.
 @MainActor
@@ -15,14 +18,19 @@ final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionReq
     @Published var needsApproval = false
     /// Whether installing failed, so the user needs to try again.
     @Published var failed = false
+    /// Whether macOS installed the extension but didn't start it, which
+    /// only a restart fixes. Also sets `failed`.
+    @Published var needsRestart = false
 
     private let identifier = "com.superhighfives.markone.camera"
     private var removing = false
+    private var check: Task<Void, Never>?
 
     func activate() {
         status = "Installing the camera…"
         removing = false
         failed = false
+        needsRestart = false
         let request = OSSystemExtensionRequest.activationRequest(forExtensionWithIdentifier: identifier, queue: .main)
         request.delegate = self
         OSSystemExtensionManager.shared.submitRequest(request)
@@ -62,6 +70,7 @@ final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionReq
                 status = removing ? "Removed." : "Installed."
                 installed = !removing
                 needsApproval = false
+                if !removing { confirmCamera() }
             }
         }
     }
@@ -73,6 +82,7 @@ final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionReq
                 status = "Installed."
                 installed = true
                 needsApproval = false
+                confirmCamera()
                 return
             }
             status = "Failed: \(error.localizedDescription)"
@@ -82,6 +92,26 @@ final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionReq
 }
 
 extension ExtensionInstaller {
+    /// Checks that the Mark One camera shows up. After an update, macOS can
+    /// switch to the new extension without starting it, and then there's no
+    /// camera until the Mac restarts (see "Camera extension updates" in
+    /// NOTES.md).
+    private func confirmCamera() {
+        check?.cancel()
+        check = Task { @MainActor in
+            for _ in 0..<20 {
+                if CameraSink.available { return }
+                try? await Task.sleep(for: .milliseconds(500))
+                if Task.isCancelled { return }
+            }
+            log.notice("The Mark One camera didn't appear after installing; asking for a restart")
+            installed = false
+            failed = true
+            needsRestart = true
+            status = "macOS installed the Mark One camera but didn’t start it. Restart your Mac to finish, then open Mark One."
+        }
+    }
+
     /// Opens the pane in System Settings where camera extensions are allowed.
     static func openSystemSettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension") {

@@ -35,9 +35,12 @@ enum Firmware {
 
     /// Puts the camera in shooting mode with USB connected, with movies that
     /// don't write the card and have no time limit. See shoot() in ptp.py.
-    static func prepare(_ camera: Camera) throws {
+    /// `cardless`: revision 2 or later of Mark One's firmware, whose own
+    /// hooks (asm/nocard.s) already keep movies off the card and lift the
+    /// time limits, so `patches` aren't needed.
+    static func prepare(_ camera: Camera, cardless: Bool) throws {
         try camera.poke(read32, helpers)
-        for patch in patches {
+        for patch in patches where !cardless {
             let patched = Data(hex: patch.patched)
             let current = try camera.peek(patch.address, patch.stock.count)
             if patch.stock.matches(current) {
@@ -127,6 +130,12 @@ enum Firmware {
     static let lockedKeys: [UInt32] = [48, 49, 52, 53, 56, 57, 60, 61, 64, 65, 68, 69, 72, 73, 76, 77,
                                        80, 81, 84, 85, 88, 89, 92, 93, 96, 97, 100, 101, 120, 121, 127, 128]
 
+    /// The camera's USB Mode (Custom menu): Auto asks on every connection,
+    /// Webcam (only with Mark One's firmware) connects as a webcam without
+    /// asking. Olympus's firmware treats unknown values as Storage.
+    static let usbMode = UInt32(0x76)
+    static let usbAuto = UInt32(0xFF)
+    static let usbWebcam = UInt32(7)
     static let whiteBalance = UInt32(0x0B)             // see Pipeline.WhiteBalance
     static let pictureMode = UInt32(0xAC)              // see Pipeline.PictureMode
     static let facePriority = UInt32(0x172)            // 0 off, 1 faces, 2-4 faces and eyes
@@ -145,6 +154,32 @@ enum Firmware {
 
     /// Remembered on the Mac until they're back on the camera.
     static let pendingKey = "CameraSettingsToRestore"
+
+    /// After an install the camera shows OK, then waits for the power switch
+    /// (fn_7e9df2e9, which only the end of an install calls), still running
+    /// the old firmware. asm/restart.s replaces it, in memory, with the
+    /// firmware's own forced restart (interrupts masked, watchdog at 1 s),
+    /// so the camera restarts into the new firmware by itself. It has to be
+    /// in place before the install starts: the camera drops off USB at once.
+    /// Writes nothing to flash. Returns false, changing nothing, if the
+    /// watchdog is off or the code isn't what's expected.
+    static func armRestart(_ camera: Camera) throws -> Bool {
+        try camera.poke(read32, helpers)
+        guard try camera.run(read32, 0, 0, watchdogOn).0 & 0xFF == 1 else { return false }
+        // Pokes are even, so this starts a byte early and ends a byte late.
+        let current = try camera.peek(installEnd, installEndStock.count)
+        let armed = current.prefix(1) + restartCode + current.suffix(1)
+        if current == armed { return true }
+        guard installEndStock.matches(current) else { return false }
+        try camera.poke(installEnd, armed)
+        return try camera.peek(installEnd, armed.count) == armed
+    }
+
+    static let installEnd = UInt32(0x7E9D_F2E8)
+    static let installEndStock = StockCode(count: 22, sha256: "42c37a464f66a2f846c03623afc2bfe136d50f72891ff8552ce8a6fb5d4433b6")
+    static let restartCode = Data(hex: "8001ddd43ea6ff00008001dd235b68c10000ca00")
+    /// 1 once the camera has started its watchdog, at boot.
+    static let watchdogOn = UInt32(0x6041_E72C)
 
     static func readSetting(_ camera: Camera, _ setting: UInt32) throws -> UInt32 {
         let settings = try camera.run(read32, 0, 0, settingsObject).0

@@ -12,10 +12,11 @@ struct MenuView: View {
     private static let width: CGFloat = 320
     private static let padding: CGFloat = 14
 
-    private enum Mode { case install, waiting, photos, off, noCard, firmware, connected }
+    private enum Mode { case install, updating, waiting, photos, off, noCard, firmware, connected }
 
     private var mode: Mode {
         if !installer.installed && (installer.needsApproval || installer.failed) { return .install }
+        if pipeline.updating { return .updating }
         switch pipeline.state {
         case .ready, .streaming: return .connected
         case .waiting:
@@ -32,7 +33,8 @@ struct MenuView: View {
 
     private var headline: String {
         switch mode {
-        case .install: "Needs your OK"
+        case .install: installer.needsRestart ? "Needs a restart" : "Needs your OK"
+        case .updating: "Updating the camera"
         case .waiting: "No camera yet"
         case .photos: "Connected for photos"
         case .off: "Camera off"
@@ -47,6 +49,7 @@ struct MenuView: View {
             header
             switch mode {
             case .install: install
+            case .updating: updating
             case .waiting: waiting
             case .photos: photos
             case .off: off
@@ -86,7 +89,7 @@ struct MenuView: View {
 
     private var install: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(installer.failed ? "The camera didn’t install" : "Allow the Mark One camera")
+            Text(installer.needsRestart ? "Restart to finish" : installer.failed ? "The camera didn’t install" : "Allow the Mark One camera")
                 .font(.title3.weight(.semibold))
             Text(installer.failed
                  ? installer.status
@@ -94,7 +97,7 @@ struct MenuView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if installer.failed {
-                Button("Try Again") { installer.activate() }
+                Button(installer.needsRestart ? "Check Again" : "Try Again") { installer.activate() }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                     .frame(maxWidth: .infinity)
@@ -117,7 +120,7 @@ struct MenuView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     StepRow(number: 1, text: "Plug it into this Mac with a USB cable.")
                     StepRow(number: 2, text: "Switch the camera on.")
-                    StepRow(number: 3, text: "Choose **Webcam** on its screen.")
+                    StepRow(number: 3, text: "If it asks how to connect, choose **Webcam**.")
                 }
             }
             HStack(spacing: 8) {
@@ -169,6 +172,20 @@ struct MenuView: View {
                     .controlSize(.large)
                     .frame(maxWidth: .infinity)
             }
+        }
+    }
+
+    private var updating: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Updating the camera").font(.title3.weight(.semibold))
+            Text(pipeline.install?.phase == .switchOffFirst
+                 ? "Switch the camera off and on to carry on."
+                 : "Leave the camera alone, and don't unplug it, until it's done. Mark One carries on by itself.")
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("Show Progress") { openWindow.firmware() }
+                .controlSize(.large)
+                .frame(maxWidth: .infinity)
         }
     }
 
@@ -253,7 +270,7 @@ struct MenuView: View {
     // MARK: Footer
 
     private var footer: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 10) {
             Divider().padding(.horizontal, -Self.padding)
             HStack {
                 Button("Settings…") {
@@ -264,6 +281,8 @@ struct MenuView: View {
                 Spacer()
                 Button("Quit Mark One") { NSApp.terminate(nil) }
                     .keyboardShortcut("q")
+                    .disabled(pipeline.updating)
+                    .help(pipeline.updating ? "Mark One is updating the camera." : "")
             }
             .buttonStyle(.borderless)
             .foregroundStyle(.primary)

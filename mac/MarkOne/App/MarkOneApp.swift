@@ -45,6 +45,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if MainActor.assumeIsolated({ Pipeline.shared.updating }) {
+            let alert = NSAlert()
+            alert.messageText = "Mark One is updating the camera"
+            alert.informativeText = "Quitting now can interrupt the update. Wait until the camera is done, then quit."
+            alert.addButton(withTitle: "Keep Updating")
+            alert.addButton(withTitle: "Quit Anyway")
+            NSApp.activate(ignoringOtherApps: true)
+            if alert.runModal() == .alertFirstButtonReturn { return .terminateCancel }
+        }
         Pipeline.shared.stop {
             sender.reply(toApplicationShouldTerminate: true)
         }

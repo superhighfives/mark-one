@@ -316,7 +316,7 @@ struct CameraUpdateScreen: View {
             }
         }
         .padding(.vertical, 18)
-        .frame(width: 200)
+        .frame(maxWidth: .infinity)
         .background(.black, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .environment(\.colorScheme, .dark)
     }

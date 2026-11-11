@@ -32,6 +32,16 @@ final class Pipeline: ObservableObject {
     }
     private let lockWanted = Flag()
 
+    /// Whether the camera connects as a webcam without asking: Mark One sets
+    /// its USB Mode to Webcam, or back to Auto when this is off.
+    @Published var connectAsWebcam = UserDefaults.standard.object(forKey: "ConnectAsWebcam") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(connectAsWebcam, forKey: "ConnectAsWebcam")
+            webcamWanted.value = connectAsWebcam
+        }
+    }
+    private let webcamWanted = Flag()
+
     /// Exposure compensation in thirds of a stop, -9 to 9.
     @Published var brightness = UserDefaults.standard.integer(forKey: "Brightness") {
         didSet {
@@ -143,15 +153,26 @@ final class Pipeline: ObservableObject {
         /// What the camera should report once the install is done.
         var expected: CameraFirmware?
         var phase = Phase.sending
+        /// Whether the camera restarts by itself once it has installed.
+        var restarts = false
 
         enum Phase: Equatable {
             case sending
             /// The camera has the firmware and is installing it by itself.
             case installing
+            /// Before restoring, the camera has to be switched off and on so
+            /// it saves USB Mode Auto.
+            case switchOffFirst
         }
     }
     /// A USB firmware install, while one runs and after it ends.
     @Published var install: InstallProgress?
+
+    /// Whether a USB install is under way, so quitting should wait.
+    var updating: Bool {
+        guard let install else { return false }
+        return !install.finished && install.error == nil
+    }
     private let installImage = Locked<FirmwareImage?>(nil)
 
     /// Installs Mark One's firmware over USB. The camera has to have Mark
@@ -219,6 +240,7 @@ final class Pipeline: ObservableObject {
     func run() {
         guard thread == nil else { return }
         lockWanted.value = lockControls
+        webcamWanted.value = connectAsWebcam
         brightnessWanted.value = brightness
         continuousWanted.value = continuousFocus
         graceWanted.value = grace.rawValue
@@ -244,6 +266,25 @@ final class Pipeline: ObservableObject {
             self.status = text
             if let state { self.state = state }
             if state != .streaming { self.framesPerSecond = 0 }
+        }
+    }
+
+    /// Opens the camera extension's input, trying again every 2 seconds
+    /// while the camera stays connected. Right after the extension is
+    /// installed, updated or allowed, it may not be running yet.
+    private nonisolated func openSink(_ camera: Camera) throws -> CameraSink {
+        var reported = false
+        while true {
+            do {
+                return try CameraSink()
+            } catch {
+                if !reported { report(error.localizedDescription, .waiting) }
+                reported = true
+            }
+            for _ in 0..<4 {
+                if !camera.connected || stopRequested.value { throw CameraError.disconnected }
+                Thread.sleep(forTimeInterval: 0.5)
+            }
         }
     }
 
@@ -308,8 +349,8 @@ final class Pipeline: ObservableObject {
                 // Open the camera extension first: setting up locks the
                 // camera's buttons and dial, and nothing unlocks them if
                 // the extension turns out to be missing.
-                let sink = try CameraSink()
-                try Firmware.prepare(camera)
+                let sink = try openSink(camera)
+                try Firmware.prepare(camera, cardless: cardless)
                 Thread.sleep(forTimeInterval: 1)
                 let saved = try Firmware.applyPresets(camera)
                 defer { if camera.connected { try? Firmware.releasePresets(camera, saved) } }
@@ -351,10 +392,22 @@ final class Pipeline: ObservableObject {
     /// restarts by itself, so the session ends here either way.
     private nonisolated func installIfRequested(_ camera: Camera) throws {
         guard let image = installImage.value else { return }
+        // Olympus's firmware reads the Webcam USB Mode as Storage. The camera
+        // only saves settings when it's switched off, and the install ends
+        // without that, so set Auto and have it switched off first. The
+        // install carries on when it's back.
+        if image.revision == 0, try Firmware.readSetting(camera, Firmware.usbMode) == Firmware.usbWebcam {
+            try Firmware.writeSetting(camera, Firmware.usbMode, Firmware.usbAuto)
+            installProgress(InstallProgress(text: "", fraction: 0, phase: .switchOffFirst))
+            report("Switch the camera off and on to carry on.", .waiting)
+            while camera.connected && !stopRequested.value { Thread.sleep(forTimeInterval: 0.5) }
+            throw CameraError.disconnected
+        }
         installImage.value = nil
         report("Installing Mark One's firmware…", .waiting)
+        let restarts: Bool
         do {
-            try FirmwareInstall.overUSB(camera, image) { text, fraction in
+            restarts = try FirmwareInstall.overUSB(camera, image) { text, fraction in
                 installProgress(InstallProgress(text: text, fraction: fraction))
             }
         } catch {
@@ -363,7 +416,8 @@ final class Pipeline: ObservableObject {
             throw error
         }
         let expected: CameraFirmware = image.revision == 0 ? .stock : .markOne(image.revision)
-        installProgress(InstallProgress(text: "The camera is installing.", fraction: 0.5, expected: expected, phase: .installing))
+        installProgress(InstallProgress(text: "The camera is installing.", fraction: 0.5, expected: expected, phase: .installing,
+                                        restarts: restarts))
         // The camera drops off USB while it installs and comes back as
         // itself once it's done.
         while camera.connected && !stopRequested.value { Thread.sleep(forTimeInterval: 0.5) }
@@ -378,6 +432,7 @@ final class Pipeline: ObservableObject {
         var whiteBalance: UInt32?
         var pictureMode: UInt32?
         var face: Bool?
+        var usbMode: UInt32?
         var batteryChecked = Date.distantPast
         let focus = FocusWatch()
     }
@@ -415,6 +470,14 @@ final class Pipeline: ObservableObject {
         if applied.brightness != brightness {
             try Firmware.setBrightness(camera, brightness)
             applied.brightness = brightness
+        }
+        // Not while a restore waits for Auto to be saved (installIfRequested).
+        let usbMode = webcamWanted.value ? Firmware.usbWebcam : Firmware.usbAuto
+        if applied.usbMode != usbMode, installImage.value?.revision != 0 {
+            if try Firmware.readSetting(camera, Firmware.usbMode) != usbMode {
+                try Firmware.writeSetting(camera, Firmware.usbMode, usbMode)
+            }
+            applied.usbMode = usbMode
         }
         let whiteBalance = whiteBalanceWanted.value, pictureMode = pictureModeWanted.value, face = faceWanted.value
         if applied.whiteBalance != whiteBalance {
