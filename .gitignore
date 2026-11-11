@@ -30,3 +30,6 @@ mac/MarkOne/Vendor/
 
 # USB recordings; they contain firmware.
 captures/
+
+# Wrangler (Cloudflare) local cache.
+.wrangler/
