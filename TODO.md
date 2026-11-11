@@ -45,10 +45,26 @@ lifts the time limits (see "Recording without a card" in `NOTES.md`).
   over USB, set Custom Menu > USB Mode back to Auto, or turn it off.
 - [x] **Long session with no card** (2026-11-10): 71 minutes, past two
   scheduled restarts.
-- [ ] **Long session with a card in**, now that Mark One skips the
-  runtime patches on revision 2 and later ('card writes', 'time limit',
-  'muxer time limit'; revision 2's hooks do the same). Run past 30
-  minutes and check the card gets no new files and keeps its free space.
+- [ ] **Long session with a card in, past 4 GB with no restart.** Mark
+  One skips the runtime patches on revision 2 and later ('card writes',
+  'time limit', 'muxer time limit'; revision 2's hooks do the same).
+  The first try (2026-11-10) ended at the 3.5 GB restart: the camera
+  takes about 5 s to record again, the extension's gray placeholder
+  replaced the last picture after 3 s, and QuickTime stopped recording
+  at the switch. Fixed in a9b0a2f (Mark One holds the last picture).
+  Now test whether the restart is needed at all:
+  - The installed build has `NoSizeRestart` on (`defaults write
+    com.superhighfives.markone NoSizeRestart -bool true`). Reopen
+    QuickTime first.
+  - Record about 35 minutes. Mark One logs "Recorded N GB in M minutes
+    without restarting" each GB.
+  - If video keeps going past 4 GB: remove the 3.5 GB restart, leaving
+    the 100-minute one.
+  - If it freezes for good: don't switch the camera off yet; read the
+    stuck-camera peeks in `NOTES.md` ("Peeks for a stuck camera"), then
+    power cycle.
+  - Either way: the card gets no new files and keeps its free space.
+    Then `defaults delete com.superhighfives.markone NoSizeRestart`.
 - [x] **Empty movie files** from earlier sessions: only on the test card
   (only pre-release firmware made them), so delete them there; Mark One
   doesn't.
@@ -106,11 +122,12 @@ lifts the time limits (see "Recording without a card" in `NOTES.md`).
 - [ ] **Power.** The E-M5 doesn't run from USB power. Try the dummy
   battery and power adapter (on order) for long calls.
 - [ ] **Shorter, rarer restarts.** Mark One's scheduled restart at 3.5 GB
-  (about every 31-33 minutes at 15-16 Mbps) freezes the picture for
-  about 4.9 s, almost all of it waiting for the camera to report it's
+  (about every 28-33 minutes at 15-18 Mbps) freezes the picture for
+  about 5 s, almost all of it waiting for the camera to report it's
   recording again (see "Exact frame boundaries" in `NOTES.md`). Find
-  out why that check takes nearly 5 s. If 4 GB isn't a limit, restart
-  only near the 2-hour cap. Values above about 6.6 hours would likely
+  out why that check takes nearly 5 s. If 4 GB isn't a limit (being
+  tested, see "Long session with a card in"), restart only near the
+  2-hour cap. Values above about 6.6 hours would likely
   overflow the muxer's 90 kHz clock. Also check whether the card's free
   space shrinks in a long session.
 - [x] **Apple's video decoder.** Mark One decodes with VideoToolbox on
