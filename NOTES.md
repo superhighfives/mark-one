@@ -1521,3 +1521,22 @@ still apply.
   Mark One ships only its own edits and downloads the firmware from
   Olympus, but review may still object. Outside the App Store (Developer
   ID and notarization) neither applies.
+
+## FaceTime (2026-11-12, macOS 27)
+
+FaceTime listed Mark One and ticked it, but kept showing the Mac's own
+camera, with Automatic Camera Selection on or off. Photo Booth showed
+Mark One fine. FaceTime hands capture to its video service,
+`avconferenced`, and that logged `VCVideoCaptureServer
+setCameraPerClientRequest: ignoring because captureDevice is nil` each
+time FaceTime picked Mark One: it couldn't find the device.
+
+`avconferenced` had been running since Nov 8, and the camera extension
+was replaced three times after that (versions 1 to 4, the last on Nov
+10). Restarting it (`killall avconferenced`, which launchd restarts,
+and which drops any call in progress) fixed it at once: it logged
+`Camera is set to 5B2F6E1C-…, deviceType=AVCaptureDeviceTypeExternal`
+and FaceTime showed the E-M5. So the service keeps a stale device list
+across extension replacements; apps that build their own list, like
+Photo Booth, aren't affected. A restart of the Mac also clears it.
+
