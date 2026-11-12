@@ -7,7 +7,8 @@
     "window": {
       "app": "Mark One",
       "panel": true
-    }
+    },
+    "live": true
   },
   {
     "id": "02-call",
@@ -16,7 +17,8 @@
     "capture": "FaceTime's camera preview or a call window with Mark One picked as the camera.",
     "window": {
       "app": "FaceTime"
-    }
+    },
+    "live": true
   },
   {
     "id": "03-controls",
@@ -26,7 +28,8 @@
     "window": {
       "app": "Mark One",
       "panel": true
-    }
+    },
+    "live": true
   },
   {
     "id": "04-setup",

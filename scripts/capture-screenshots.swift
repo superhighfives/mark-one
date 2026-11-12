@@ -1,15 +1,17 @@
 // Captures the website's screenshots: for each shot in screenshots/shots.json
-// it says what to set up, counts down, then grabs that shot's window (found
-// by app and title, no clicking) into screenshots/raw/<id>.png, without its
-// shadow. Then run scripts/frame-screenshots.swift to frame them.
+// it says what to set up, waits for Return, then grabs that shot's window
+// (found by app and title, no clicking) into screenshots/raw/<id>.png,
+// without its shadow. Shots of the live camera picture ("live" in the list)
+// count down first, so you can open the panel and get ready. Then run
+// scripts/frame-screenshots.swift to frame them.
 //
 //   swift scripts/capture-screenshots.swift              every shot
 //   swift scripts/capture-screenshots.swift 01-panel     only these shots
 //   swift scripts/capture-screenshots.swift --delay 10   a longer countdown
 //
-// Run it from any folder. From a terminal it waits for Return before each
-// countdown; otherwise it only counts down. The terminal needs Screen
-// Recording permission (System Settings > Privacy & Security).
+// Run it from any folder. Without a terminal it doesn't wait for Return.
+// The terminal app needs Screen Recording permission (System Settings >
+// Privacy & Security).
 
 import AppKit
 
@@ -24,6 +26,7 @@ struct Shot: Decodable {
     let caption: String
     let capture: String
     let window: Target
+    let live: Bool?
 }
 
 let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
@@ -44,6 +47,16 @@ guard unknown.isEmpty else {
 }
 let interactive = isatty(STDIN_FILENO) == 1
 
+guard CGPreflightScreenCaptureAccess() else {
+    CGRequestScreenCaptureAccess()
+    print("""
+        This terminal can't capture other apps' windows. Turn it on in System
+        Settings > Privacy & Security > Screen & System Audio Recording, then
+        quit and reopen the terminal.
+        """)
+    exit(1)
+}
+
 func play(_ sound: String) {
     let task = Process()
     task.executableURL = URL(fileURLWithPath: "/usr/bin/afplay")
@@ -54,9 +67,13 @@ func play(_ sound: String) {
 /// The window to capture: a menu bar panel is the app's biggest window above
 /// the normal level (its menu bar icon is a small one); otherwise the app's
 /// frontmost normal window, with the given title if there is one.
-func findWindow(_ target: Target) -> CGWindowID? {
+func windows(of app: String) -> [[String: Any]] {
     let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
-    let windows = list.filter { ($0[kCGWindowOwnerName as String] as? String) == target.app }
+    return list.filter { ($0[kCGWindowOwnerName as String] as? String) == app }
+}
+
+func findWindow(_ target: Target) -> CGWindowID? {
+    let windows = windows(of: target.app)
     func area(_ window: [String: Any]) -> CGFloat {
         guard let bounds = window[kCGWindowBounds as String] as? [String: CGFloat] else { return 0 }
         return (bounds["Width"] ?? 0) * (bounds["Height"] ?? 0)
@@ -80,19 +97,30 @@ var missed: [String] = []
 for shot in shots where only.isEmpty || only.contains(shot.id) {
     print("\n\(shot.id): \(shot.caption)")
     print("  Set up: \(shot.capture)")
+    let live = shot.live == true
     if interactive {
-        print("  Press Return to start the countdown, or type s and Return to skip.", terminator: " ")
+        print("  Press Return to \(live ? "start the countdown" : "capture"), or type s and Return to skip.", terminator: " ")
         if readLine()?.lowercased() == "s" { continue }
     }
-    for second in stride(from: delay, through: 1, by: -1) {
-        print("  \(second)…")
-        play("Tink")
-        sleep(1)
+    if live {
+        for second in stride(from: delay, through: 1, by: -1) {
+            print("  \(second)…")
+            play("Tink")
+            sleep(1)
+        }
     }
     guard let id = findWindow(shot.window) else {
         let name = shot.window.title.map { "\"\($0)\" in \(shot.window.app)" }
             ?? (shot.window.panel == true ? "\(shot.window.app)'s menu bar panel" : "a \(shot.window.app) window")
         print("  Couldn't find \(name) on screen. Skipped.")
+        let seen = windows(of: shot.window.app).map { window -> String in
+            let title = (window[kCGWindowName as String] as? String).map { "\"\($0)\"" } ?? "untitled"
+            let bounds = window[kCGWindowBounds as String] as? [String: CGFloat] ?? [:]
+            return "\(title) \(Int(bounds["Width"] ?? 0))x\(Int(bounds["Height"] ?? 0)), level \(window[kCGWindowLayer as String] as? Int ?? 0)"
+        }
+        print(seen.isEmpty
+            ? "  \(shot.window.app) has no windows on screen."
+            : "  \(shot.window.app)'s windows on screen: \(seen.joined(separator: "; "))")
         missed.append(shot.id)
         continue
     }
