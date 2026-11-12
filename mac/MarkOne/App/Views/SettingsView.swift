@@ -163,9 +163,13 @@ private struct AboutSettings: View {
                 Text("Mark One").font(.title2.weight(.bold))
                 Text(version).font(.callout).foregroundStyle(.secondary)
             }
-            if Updater.enabled {
-                Button("Check for Updates…") { updater.check() }
-                    .disabled(!updater.canCheck)
+            HStack(spacing: 12) {
+                if Updater.enabled {
+                    Button("Check for Updates…") { updater.check() }
+                        .disabled(!updater.canCheck)
+                }
+                // Mark One is free; this is the tip jar.
+                Link("Support My Work…", destination: URL(string: "https://github.com/sponsors/superhighfives")!)
             }
             Form {
                 Section("Acknowledgements") {

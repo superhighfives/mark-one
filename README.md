@@ -23,7 +23,7 @@ All of this rests on Mark One's firmware: `usb-tools`, which adds USB commands t
 
 ## Build it yourself
 
-A signed, notarized build that keeps itself up to date is at [superhighfives.com/mark-one](https://superhighfives.com/mark-one), or you can build it yourself from the source here.
+Mark One is free. A signed, notarized build that keeps itself up to date is at [superhighfives.com/mark-one](https://superhighfives.com/mark-one), or you can build it yourself from the source here. If it's useful to you, you can [support my work](https://github.com/sponsors/superhighfives).
 
 You need a Mac with Xcode and [XcodeGen](https://github.com/yonaskolb/XcodeGen), and an Apple developer team that can sign a camera extension, which uses the System Extension capability. A paid Apple Developer Program membership has it. Then follow the steps under "Mark One" below. Builds from source don't check for updates: to update, pull and build again. Only `scripts/release.sh` sets the update feed, and it uses Mark One's own signing keys.
 
