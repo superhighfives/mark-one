@@ -134,27 +134,125 @@ struct CameraSketch: View {
     }
 }
 
+/// A control with its label in a fixed-width column, so the controls in a
+/// stack of rows line up and fill the rest of the width.
+struct ControlRow<Control: View>: View {
+    let title: String
+    @ViewBuilder let control: Control
+
+    init(_ title: String, @ViewBuilder control: () -> Control) {
+        self.title = title
+        self.control = control()
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text(title)
+                .frame(width: 92, alignment: .leading)
+                .accessibilityHidden(true)
+            control.frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+/// A pop-up menu that fills its width. SwiftUI's menu pickers keep their own.
+struct PopUp<Value: Hashable>: NSViewRepresentable {
+    @Binding var selection: Value
+    let options: [Value]
+    let label: (Value) -> String
+
+    func makeNSView(context: Context) -> NSPopUpButton {
+        let button = NSPopUpButton(frame: .zero, pullsDown: false)
+        button.target = context.coordinator
+        button.action = #selector(Coordinator.picked(_:))
+        button.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        button.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return button
+    }
+
+    func updateNSView(_ button: NSPopUpButton, context: Context) {
+        context.coordinator.parent = self
+        let titles = options.map(label)
+        if button.itemTitles != titles {
+            button.removeAllItems()
+            button.addItems(withTitles: titles)
+        }
+        if let index = options.firstIndex(of: selection) { button.selectItem(at: index) }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    final class Coordinator: NSObject {
+        var parent: PopUp
+        init(_ parent: PopUp) { self.parent = parent }
+        @objc func picked(_ sender: NSPopUpButton) {
+            parent.selection = parent.options[sender.indexOfSelectedItem]
+        }
+    }
+}
+
+/// A segmented control whose segments share its full width.
+struct Segments<Value: Hashable>: NSViewRepresentable {
+    @Binding var selection: Value
+    let options: [Value]
+    let label: (Value) -> String
+
+    func makeNSView(context: Context) -> NSSegmentedControl {
+        let control = NSSegmentedControl(labels: options.map(label), trackingMode: .selectOne,
+                                         target: context.coordinator, action: #selector(Coordinator.picked(_:)))
+        control.segmentDistribution = .fillEqually
+        control.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        control.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return control
+    }
+
+    func updateNSView(_ control: NSSegmentedControl, context: Context) {
+        context.coordinator.parent = self
+        if let index = options.firstIndex(of: selection) { control.selectedSegment = index }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    final class Coordinator: NSObject {
+        var parent: Segments
+        init(_ parent: Segments) { self.parent = parent }
+        @objc func picked(_ sender: NSSegmentedControl) {
+            parent.selection = parent.options[sender.selectedSegment]
+        }
+    }
+}
+
 /// Brightness, in thirds of a stop of exposure compensation.
 struct BrightnessControl: View {
     @ObservedObject var pipeline: Pipeline
     var showsLabel = true
 
     var body: some View {
-        LabeledContent {
-            HStack {
-                Slider(value: Binding(get: { Double(pipeline.brightness) },
-                                      set: { pipeline.brightness = Int($0.rounded()) }),
-                       in: -9...9, step: 1)
-                    .labelsHidden()
-                Text(label)
-                    .font(.callout.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .frame(width: 52, alignment: .trailing)
+        if showsLabel {
+            LabeledContent {
+                slider
+            } label: {
+                Text("Brightness")
             }
-        } label: {
-            Text("Brightness")
+            .accessibilityValue(label)
+        } else {
+            slider
+                .accessibilityLabel("Brightness")
+                .accessibilityValue(label)
         }
-        .accessibilityValue(label)
+    }
+
+    private var slider: some View {
+        HStack {
+            Slider(value: Binding(get: { Double(pipeline.brightness) },
+                                  set: { pipeline.brightness = Int($0.rounded()) }),
+                   in: -9...9, step: 1)
+                .labelsHidden()
+            Text(label)
+                .font(.callout.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .frame(width: 52, alignment: .trailing)
+        }
     }
 
     private var label: String {

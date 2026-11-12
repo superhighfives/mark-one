@@ -249,21 +249,36 @@ struct MenuView: View {
                 .font(.callout)
             }
             Card {
-                VStack(alignment: .leading, spacing: 12) {
-                    BrightnessControl(pipeline: pipeline)
-                    Picker("White balance", selection: $pipeline.whiteBalance) {
-                        ForEach(Pipeline.WhiteBalance.allCases) { Text($0.label).tag($0) }
+                VStack(alignment: .leading, spacing: 10) {
+                    ControlRow("Brightness") {
+                        BrightnessControl(pipeline: pipeline, showsLabel: false)
                     }
-                    Picker("Picture mode", selection: $pipeline.pictureMode) {
-                        ForEach(Pipeline.PictureMode.allCases) { Text($0.label).tag($0) }
+                    ControlRow("White balance") {
+                        PopUp(selection: $pipeline.whiteBalance, options: Pipeline.WhiteBalance.allCases) { $0.label }
+                            .accessibilityLabel("White balance")
                     }
-                    HStack {
-                        Button(pipeline.focusing ? "Focusing…" : "Focus") { pipeline.focus() }
+                    ControlRow("Picture mode") {
+                        PopUp(selection: $pipeline.pictureMode, options: Pipeline.PictureMode.allCases) { $0.label }
+                            .accessibilityLabel("Picture mode")
+                    }
+                    ControlRow("Focus") {
+                        HStack(spacing: 6) {
+                            Segments(selection: $pipeline.continuousFocus, options: [true, false]) { $0 ? "Always" : "Once" }
+                                .accessibilityLabel("Autofocus")
+                            // Focuses once, when focus is set to Once.
+                            Button {
+                                pipeline.focus()
+                            } label: {
+                                // Both stay in place, so the button keeps its size.
+                                ZStack {
+                                    Image(systemName: "scope").opacity(pipeline.focusing ? 0 : 1)
+                                    ProgressView().controlSize(.mini).opacity(pipeline.focusing ? 1 : 0)
+                                }
+                            }
                             .disabled(!live || pipeline.focusing || pipeline.continuousFocus)
-                        Spacer()
-                        Toggle("Continuous autofocus", isOn: $pipeline.continuousFocus)
-                            .toggleStyle(.switch)
-                            .controlSize(.small)
+                            .help("Focus now")
+                            .accessibilityLabel(pipeline.focusing ? "Focusing" : "Focus now")
+                        }
                     }
                 }
             }

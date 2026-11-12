@@ -258,6 +258,12 @@ final class Pipeline: ObservableObject {
         guard thread != nil else { return done() }
         onStopped.append(done)
         stopRequested.value = true
+        // Stopping the recording and handing the controls back takes a
+        // moment, with the preview frozen; say so instead of looking stuck.
+        if state == .streaming || state == .ready {
+            clearBusyOnFrame.value = false
+            busy = "Stopping the camera…"
+        }
     }
 
     private nonisolated func report(_ text: String, _ state: State? = nil) {
@@ -588,7 +594,8 @@ final class Pipeline: ObservableObject {
         var recordingSince = Date()
         defer {
             freeze?.stop()
-            setBusy(nil)
+            // Quitting keeps "Stopping the camera…" up until Mark One is gone.
+            if !stopRequested.value { setBusy(nil) }
             showClient(nil)
             if camera.connected {
                 report("Stopping the recording…")
