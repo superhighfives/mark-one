@@ -132,6 +132,11 @@ Next.js on Cloudflare Workers through OpenNext), next to Pika.
 - [x] **Coming soon** (2026-11-11): `available` in `src/data/markone.ts`
   is off, so the page shows "Coming soon" with no download or source
   link, and `/mark-one/download` returns 404.
+- [x] **Deploy** (2026-11-12): PR #29 merged and live, showing "Coming
+  soon". `/mark-one/download` returns 404 until launch.
+- [ ] **Launch:** publish the first release, make the repo public, and
+  set `available` to true in `src/data/markone.ts` (a constant, not an
+  environment variable, like the rest of the site's settings).
 - [ ] **Test end to end:** download from the page, then publish an
   update and watch Sparkle install it. Check that downloads report their
   size, so browsers show progress.
