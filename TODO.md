@@ -87,10 +87,9 @@ Next.js on Cloudflare Workers through OpenNext), next to Pika.
   mid-call. `SUFeedURL` and `SUPublicEDKey` are in `App/Info.plist`. The
   key is Mark One's own, in the login keychain under the account
   `mark-one`.
-- [ ] **Back up the Sparkle key**: `generate_keys --account mark-one -x
-  <file>` (in `build/SourcePackages/artifacts/sparkle/Sparkle/bin`), and
-  keep the file in a password manager. Losing it means no more updates
-  for existing copies.
+- [x] **Sparkle key backed up** (2026-11-12). To restore it on another
+  Mac: `generate_keys --account mark-one -f <file>` (in
+  `build/SourcePackages/artifacts/sparkle/Sparkle/bin`).
 - [ ] **Updates and the camera extension.** Sparkle only replaces the
   app. The extension changes only when Mark One asks the system to
   activate it, so updates that keep the extension's build number are
