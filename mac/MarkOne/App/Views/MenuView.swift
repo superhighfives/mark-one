@@ -31,7 +31,8 @@ struct MenuView: View {
         }
     }
 
-    private var headline: String {
+    /// Under the name. Nothing while connected: the preview shows it.
+    private var headline: String? {
         switch mode {
         case .install: installer.needsRestart ? "Needs a restart" : "Needs your OK"
         case .updating: "Updating the camera"
@@ -40,7 +41,7 @@ struct MenuView: View {
         case .off: "Camera off"
         case .noCard: "No card"
         case .firmware: "Needs firmware"
-        case .connected: pipeline.state == .streaming ? "Live" : "Ready"
+        case .connected: nil
         }
     }
 
@@ -71,7 +72,9 @@ struct MenuView: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 0) {
                 Text("Mark One").font(.headline)
-                Text(headline).font(.caption).foregroundStyle(.secondary)
+                if let headline {
+                    Text(headline).font(.caption).foregroundStyle(.secondary)
+                }
             }
             Spacer()
             if pipeline.framesPerSecond > 0 {
