@@ -152,6 +152,9 @@ struct ControlRow<Control: View>: View {
                 .accessibilityHidden(true)
             control.frame(maxWidth: .infinity, alignment: .leading)
         }
+        // The same height for every row, so a slider's row isn't shorter
+        // than a menu's and the labels sit evenly apart.
+        .frame(minHeight: 26)
     }
 }
 
