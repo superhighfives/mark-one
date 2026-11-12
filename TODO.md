@@ -107,6 +107,7 @@ Next.js on Cloudflare Workers through OpenNext), next to Pika.
   changelog entry. First full run (2026-11-12, 1.0 build 2, not
   uploaded): app and DMG notarized and stapled, Gatekeeper accepts both,
   and the Sparkle signature checks out against the app's public key.
+  Installed from the DMG, it streams live at 30 fps.
 - [x] **Builds from source** (2026-11-11): the README's "Build it
   yourself". Those builds have no update feed.
 
