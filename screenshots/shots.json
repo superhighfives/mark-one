@@ -3,30 +3,49 @@
     "id": "01-panel",
     "caption": "Your E-M5 (Mark I) is a webcam now.",
     "detail": "One USB cable. Mark One starts recording when an app uses the camera.",
-    "capture": "The menu bar panel, streaming, with a good-looking preview."
+    "capture": "The menu bar panel, streaming, with a good-looking preview.",
+    "window": {
+      "app": "Mark One",
+      "panel": true
+    }
   },
   {
     "id": "02-call",
     "caption": "Works in every video app.",
     "detail": "FaceTime, Zoom, Google Meet, Microsoft Teams, OBS and more.",
-    "capture": "FaceTime's camera preview or a call window with Mark One picked as the camera."
+    "capture": "FaceTime's camera preview or a call window with Mark One picked as the camera.",
+    "window": {
+      "app": "FaceTime"
+    }
   },
   {
     "id": "03-controls",
     "caption": "Focus and picture, from the menu bar.",
     "detail": "Focus, continuous autofocus, exposure, white balance and picture mode.",
-    "capture": "The panel with its picture controls open."
+    "capture": "The panel with its picture controls open.",
+    "window": {
+      "app": "Mark One",
+      "panel": true
+    }
   },
   {
     "id": "04-setup",
     "caption": "Set up in a few minutes.",
     "detail": "Mark One prepares the camera's firmware and walks you through installing it.",
-    "capture": "The first-run window on its firmware step."
+    "capture": "The first-run window on its firmware step.",
+    "window": {
+      "app": "Mark One",
+      "title": "Welcome to Mark One"
+    }
   },
   {
     "id": "05-settings",
     "caption": "Updates over USB, and a way back.",
     "detail": "Install updates over USB, or put Olympus's own firmware back at any time.",
-    "capture": "The Camera Firmware window with Update, Restore and Prepare for OM Workspace."
+    "capture": "The Camera Firmware window with Update, Restore and Prepare for OM Workspace.",
+    "window": {
+      "app": "Mark One",
+      "title": "Camera Firmware"
+    }
   }
 ]

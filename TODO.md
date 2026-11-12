@@ -131,8 +131,10 @@ Next.js on Cloudflare Workers through OpenNext), next to Pika.
 
 ### Release
 
-- [ ] Screenshots for the website (`screenshots/shots.json` lists
-  them, and `scripts/frame-screenshots.swift` frames them).
+- [ ] Screenshots for the website: `swift
+  scripts/capture-screenshots.swift` walks through the shots in
+  `screenshots/shots.json` with a countdown and grabs each window, then
+  `scripts/frame-screenshots.swift` frames them.
 - [ ] A support page, or point support at the repo's issues.
 - [ ] A Release build.
 

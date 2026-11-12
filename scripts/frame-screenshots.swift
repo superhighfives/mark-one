@@ -5,8 +5,8 @@
 //
 //   swift scripts/frame-screenshots.swift
 //
-// Capture a window with its shadow, on a Retina display:
-//   screencapture -w -o screenshots/raw/01-panel.png   (no shadow: -o)
+// Capture the windows first, on a Retina display:
+//   swift scripts/capture-screenshots.swift
 
 import AppKit
 
