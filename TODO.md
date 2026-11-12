@@ -1,5 +1,8 @@
 # To do
 
+Everything left to do for Mark One, in one place. `NOTES.md` has the
+research behind each item.
+
 The goal is software that feels like magic: plug in the camera, open a
 video call, and it works, with nothing to press on the camera or in
 Mark One.
@@ -58,7 +61,10 @@ lifts the time limits (see "Recording without a card" in `NOTES.md`).
 
 ### Decide
 
-- [ ] **A license** for the repo before it goes public.
+- [x] **License** (2026-11-12): MIT, in `LICENSE`, with the README
+  listing what's under other terms (FFmpeg's LGPL, Sparkle, om-emu's
+  `olyfw.py`, which is downloaded rather than copied because it has no
+  license).
 
 ### Direct distribution
 
@@ -118,7 +124,9 @@ Next.js on Cloudflare Workers through OpenNext), next to Pika.
 
 ### Release
 
-- [ ] Pages for the support, marketing and privacy URLs.
+- [ ] Screenshots for the website (`screenshots/shots.json` lists
+  them, and `scripts/frame-screenshots.swift` frames them).
+- [ ] A support page, or point support at the repo's issues.
 - [ ] A Release build.
 
 ### Website
@@ -159,4 +167,6 @@ Next.js on Cloudflare Workers through OpenNext), next to Pika.
 - Unplugging mid-call leaves the camera usable, and plugging back in
   works (2026-11-09).
 - USB firmware installs work on a camera Mark One has set up
+  (2026-11-09).
+- FFmpeg credit and license in the app, no Downloads entitlement
   (2026-11-09).

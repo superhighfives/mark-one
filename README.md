@@ -132,3 +132,14 @@ Other projects that made this possible:
 - [cmdada/em10-fw](https://github.com/cmdada/em10-fw), a firmware map, emulator and plugin loader for the E-M10 Mark I, the E-M5's closest sibling.
 - [fishcu/oly_fw_analysis](https://github.com/fishcu/oly_fw_analysis), shared research across Olympus bodies, including a USB live view patch for the OM-3.
 - [xulfr/om-emu](https://github.com/xulfr/om-emu), an emulator and notes on the firmware container.
+
+## License
+
+Mark One's code, patches and notes are under the [MIT license](LICENSE). Some pieces it uses have their own:
+
+- FFmpeg's libavcodec and libavutil, which `scripts/build-libavcodec.sh` builds and the app ships as separate libraries, are under the LGPL 2.1 (`mac/MarkOne/Vendor/ffmpeg/COPYING.LGPLv2.1`).
+- [Sparkle](https://github.com/sparkle-project/Sparkle), for updates, is under the MIT license.
+- `olyfw.py` comes from [xulfr/om-emu](https://github.com/xulfr/om-emu), which has no license, so it isn't copied here: `scripts/setup.sh` downloads it.
+- Olympus's firmware isn't part of this repo or the app, and stays under OM Digital Solutions' own license.
+
+Olympus and OM-D are trademarks of OM Digital Solutions. Mark One isn't affiliated with or endorsed by them.

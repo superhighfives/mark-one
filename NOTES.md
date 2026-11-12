@@ -400,7 +400,7 @@ markone-feed schemes; set DEVELOPMENT_TEAM in `Local.xcconfig`):
 - `markone-feed` finds the device by its fixed UID, opens the sink with
   CMIOStreamCopyBufferQueue and enqueues each NV12 frame from stdin:
   `uv run scripts/stream.py --raw | markone-feed`. Works in QuickTime.
-- In-app pipeline (works; no Python, as the App Store needs): Mark
+- In-app pipeline (works, with no Python): Mark
   One.app, a menu bar app, finds the camera with ImageCaptureCore (sandbox-friendly,
   shares the camera with ptpcamerad instead of claiming the interface),
   sends the usb-tools commands with requestSendPTPCommand (`Camera.swift`),
@@ -438,8 +438,8 @@ with only the H.264 decoder (LGPL 2.1, no GPL parts) as universal
 dynamic libraries in `mac/MarkOne/Vendor/ffmpeg`, which the app embeds.
 With low-delay mode and one thread, every frame of the one-minute capture
 comes out as soon as it goes in, in 4.5 ms including the NV12 copy, and
-matches PyAV's output exactly. Before App Store release: credit FFmpeg
-and link to the source in the app, and include the LGPL text.
+matches PyAV's output exactly. The app credits FFmpeg, links to the
+source and includes the LGPL text (see "FFmpeg and entitlements" below).
 
 The stream follower used to search past the first access unit delimiter
 after a frame for one whose header followed. When a large frame left the
@@ -1494,7 +1494,11 @@ the same version. To keep users clear of it otherwise (in `TODO.md`):
   also recovers with deactivate, wait, activate, which costs the user
   a second approval.
 
-## App Store (prep, 2026-11-09)
+## FFmpeg and entitlements (2026-11-09)
+
+Written while preparing for the App Store. Mark One is free and ships
+directly instead (2026-11-11), but the FFmpeg and entitlement details
+still apply.
 
 - FFmpeg: Settings > About credits FFmpeg 9.0.2 (libavcodec, libavutil),
   links the exact source release, and shows the LGPL 2.1 text from the
@@ -1505,7 +1509,7 @@ the same version. To keep users clear of it otherwise (in `TODO.md`):
 - Entitlements are camera, USB and the system extension install, with
   the hardened runtime for notarization. Mark One dropped the sandbox
   (and with it the network client and user-selected files entitlements)
-  when it moved to direct sales (2026-11-09). Debug captures
+  when it moved to direct distribution (2026-11-09). Debug captures
   (`SaveCapture`) go to ~/Library/Caches.
 - Camera extensions are an App Store delivery method (WWDC 2022 session
   10022). `com.apple.developer.system-extension.install` needs a

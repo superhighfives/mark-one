@@ -1,12 +1,12 @@
-// Frames raw window captures into App Store screenshots: each capture from
-// appstore/screenshots/raw/<id>.png goes on a 2880x1800 background, with its
-// caption and detail from appstore/screenshots/shots.json, and is written to
-// appstore/screenshots/framed/<id>.png. Shots without a capture yet are skipped.
+// Frames raw window captures into screenshots for the website: each capture
+// from screenshots/raw/<id>.png goes on a 2880x1800 background, with its
+// caption and detail from screenshots/shots.json, and is written to
+// screenshots/framed/<id>.png. Shots without a capture yet are skipped.
 //
 //   swift scripts/frame-screenshots.swift
 //
 // Capture a window with its shadow, on a Retina display:
-//   screencapture -w -o appstore/screenshots/raw/01-panel.png   (no shadow: -o)
+//   screencapture -w -o screenshots/raw/01-panel.png   (no shadow: -o)
 
 import AppKit
 
@@ -17,7 +17,7 @@ struct Shot: Decodable {
 }
 
 let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-let folder = root.appendingPathComponent("appstore/screenshots")
+let folder = root.appendingPathComponent("screenshots")
 let shots = try JSONDecoder().decode([Shot].self, from: Data(contentsOf: folder.appendingPathComponent("shots.json")))
 let output = folder.appendingPathComponent("framed")
 try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
