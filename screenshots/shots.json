@@ -15,9 +15,9 @@
     "id": "02-call",
     "caption": "Works in every video app.",
     "detail": "FaceTime, Zoom, Google Meet, Microsoft Teams, OBS and more.",
-    "capture": "Photo Booth with Mark One picked under its Camera menu.",
+    "capture": "FaceTime's camera preview with Mark One picked under its Video menu.",
     "window": {
-      "app": "Photo Booth"
+      "app": "FaceTime"
     },
     "live": true
   },
