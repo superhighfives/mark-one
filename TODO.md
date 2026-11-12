@@ -56,9 +56,20 @@ lifts the time limits (see "Recording without a card" in `NOTES.md`).
   (only pre-release firmware made them), so delete them there; Mark One
   doesn't.
 
+### Decide
+
+- [ ] **A license** for the repo before it goes public.
+
 ### Direct distribution
 
+Downloads live on superhighfives.com (`~/Development/superhighfives.com`,
+Next.js on Cloudflare Workers through OpenNext), next to Pika.
+
 ```
+/mark-one                       product page, Download (or Coming soon)
+/mark-one/download              streams the latest DMG from R2
+/releases/mark-one/feed         Sparkle appcast
+/releases/mark-one/<v>.dmg      update files
 ```
 
 **In the app**
@@ -84,12 +95,26 @@ lifts the time limits (see "Recording without a card" in `NOTES.md`).
   signs the DMG, notarizes and staples that, signs it for Sparkle,
   uploads it to R2 with `--upload`, and prints the front matter for the
   changelog entry. Tested up to notarization.
+- [x] **Builds from source** (2026-11-11): the README's "Build it
+  yourself". Those builds have no update feed.
 
 **On superhighfives.com**
 
+- [x] **Release files:** the private R2 bucket `mark-one-releases`
+  exists (empty). `/releases/mark-one/Mark-One-<v>.dmg` serves the files
+  publicly for Sparkle, and `/mark-one/download` serves the latest.
 - [x] **Appcast:** `changelog/mark-one/<version>.md`, in the same format
   as Pika's, and `/releases/mark-one/feed`. `generateAppcast.ts` now
   takes settings per app, and Pika's feeds are unchanged.
+- [x] **Privacy page** covers Cloudflare, GitHub Sponsors, update checks
+  and the Olympus firmware download. No live page loads an analytics
+  script.
+- [x] **Coming soon** (2026-11-11): `available` in `src/data/markone.ts`
+  is off, so the page shows "Coming soon" with no download or source
+  link, and `/mark-one/download` returns 404.
+- [ ] **Test end to end:** download from the page, then publish an
+  update and watch Sparkle install it. Check that downloads report their
+  size, so browsers show progress.
 
 ### Release
 
