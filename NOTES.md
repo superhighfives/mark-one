@@ -762,8 +762,9 @@ context is 0x60010e44 (vtable 0x7ef013f4, beside the event table at
   unplug mid-call leaves the camera recording, with the buttons locked and
   the mode dial forced to movie: the stuck camera.
 
-Fix (`asm/unplug.s`, loaded by Mark One's `prepare` and by
-`scripts/unplug.py --fix`): the callback's first two instructions become a
+Fix (`asm/unplug.s`, built into revision 4 of the firmware; before
+that, loaded by Mark One's `prepare` and by `scripts/unplug.py --fix`):
+the callback's first two instructions become a
 jump to a stub at 0x7eaaf600. For event 9 it clears the dial state in the
 override, calls resetKeyEvent and, if a movie is recording, presses and
 releases REC through the key stub; then it runs the replaced instructions
@@ -771,6 +772,20 @@ and carries on at 0x7edd9111. Posted mid-recording with the fix, the
 camera stopped recording, dropped off USB and came back with its buttons
 and dial working. Checked with a real unplug mid-call (2026-11-09): the
 camera recovers, and plugged back in it connects and streams normally.
+
+Revision 4 (2026-11-11) builds the stub and the callback jump into the
+firmware, so Mark One writes no code into the camera's memory on revision
+4: `prepare` checks the jump is there and sends the "start camera
+control" notification, and nothing else. The helpers, key and button
+stubs and the power switch entry were already built in from revision 1,
+and the 0x6005 event list write isn't needed for the Webcam connection.
+The hook is now there from boot in every mode, not only after a Mark One
+session. The stub only acts on event 9, and outside a session its work
+should change nothing (no keys are cancelled and no movie records over
+USB; it clears the dial override's state half, as releasePresets does).
+To check: plug in as Storage and MTP, unplug, and the dial and buttons
+still work. Still loaded at run time: the
+install restart (`asm/restart.s`), which only the install over USB uses.
 
 ### Before the fix (2026-11-08)
 
@@ -997,10 +1012,11 @@ confirmed on the camera):
 Fix (2026-11-09): RUNTIME_PATCHES 'muxer time limit' (0x7E7A7C50) uses the
 SD value, 2 hours. Larger values are untested: the muxer seems to multiply
 by 90 (a 90 kHz clock), and anything over about 6.6 hours would overflow
-32 bits. Mark One also stops and restarts the recording itself at 3.5 GB of
-video or 100 minutes, whichever comes first, through the normal stop, and
-logs the size and bitrate. Still to test: a session past the first
-restart and past 30 minutes.
+32 bits. Mark One also stops and restarts the recording itself after 100
+minutes, through the normal stop, and logs the size and bitrate. It used
+to restart at 3.5 GB too, in case of a 4 GB file limit, but there isn't
+one: on revision 4 with a card in, a recording ran past 4.6 GB and 37
+minutes, until the battery ran out (2026-11-11).
 
 Peeks for a stuck camera (uncached): SEQ at 0xA02B1FF4 (18 = stuck),
 MOV_REC state {function, number} at 0xA05B5C7C (0x7e7bc330/6 = waiting in

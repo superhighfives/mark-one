@@ -539,13 +539,12 @@ final class Pipeline: ObservableObject {
         }
     }
 
-    /// When to restart a recording: before the movie writer's 4 GB file
-    /// limit (if it enforces one; at about 21 Mbps it would be reached in
-    /// 27 minutes) and well before its 2-hour limit.
-    static let restartBytes = 3_758_096_384   // 3.5 GB
-    static let restartTime: TimeInterval = 100 * 60
+    /// When to restart a recording: well before the movie writer's 2-hour
+    /// limit. There's no 4 GB limit: with a card in, a recording ran
+    /// past 4.5 GB and 37 minutes without a restart (2026-11-11).
+    nonisolated static let restartTime: TimeInterval = 100 * 60
     /// The longest the last picture is held while a recording restarts.
-    static let restartFreeze: TimeInterval = 30
+    nonisolated static let restartFreeze: TimeInterval = 30
 
     /// Records and streams until nothing has wanted video for `grace`.
     private nonisolated func stream(_ camera: Camera, to sink: CameraSink, frameList: Bool, applied: inout Applied) throws {
@@ -582,10 +581,6 @@ final class Pipeline: ObservableObject {
         // Seconds between restarts, for testing them: defaults write
         // com.superhighfives.markone RestartAfter 60
         let restartForTesting = UserDefaults.standard.double(forKey: "RestartAfter")
-        // Whether to skip the 3.5 GB restart, to test if the camera really
-        // hangs at 4 GB: defaults write com.superhighfives.markone NoSizeRestart -bool true
-        let noSizeRestart = UserDefaults.standard.bool(forKey: "NoSizeRestart")
-        var loggedGB = 0
         report("Starting to record…", .streaming)
         setBusy("Starting the camera…")
         try Firmware.setScreen(camera, true)
@@ -628,15 +623,11 @@ final class Pipeline: ObservableObject {
             }
             let decodedAt = Date()
             if frames.isEmpty { Thread.sleep(forTimeInterval: 0.003) }
-            // A recording that reaches the movie writer's limits (2 hours
-            // with Mark One's patch, and perhaps 4 GB) hangs the camera's
-            // recorder until it's switched off. Stop and start well before.
+            // A recording that reaches the movie writer's 2-hour limit
+            // hangs the camera's recorder until it's switched off. Stop and
+            // start well before.
             let recordedFor = Date().timeIntervalSince(recordingSince)
-            if noSizeRestart, recordedBytes / 1_073_741_824 > loggedGB {
-                loggedGB = recordedBytes / 1_073_741_824
-                log.notice("Recorded \(loggedGB, privacy: .public) GB in \(recordedFor / 60, format: .fixed(precision: 1), privacy: .public) minutes without restarting")
-            }
-            if (!noSizeRestart && recordedBytes >= Pipeline.restartBytes) || recordedFor >= Pipeline.restartTime
+            if recordedFor >= Pipeline.restartTime
                 || (restartForTesting > 0 && recordedFor >= restartForTesting) {
                 let rate = Double(recordedBytes) * 8 / recordedFor / 1_000_000
                 log.notice("Restarting the recording after \(recordedFor / 60, format: .fixed(precision: 1), privacy: .public) minutes and \(Double(recordedBytes) / 1_073_741_824, format: .fixed(precision: 2), privacy: .public) GB (\(rate, format: .fixed(precision: 1), privacy: .public) Mbps).")
@@ -649,7 +640,6 @@ final class Pipeline: ObservableObject {
                 try Firmware.setRecording(camera, true)
                 recordingSince = Date()
                 recordedBytes = 0
-                loggedGB = 0
             }
             // If video stops for anything else, such as the REC button,
             // start recording again.
@@ -660,7 +650,7 @@ final class Pipeline: ObservableObject {
                     log.notice("The camera stopped recording after \(minutes, format: .fixed(precision: 2), privacy: .public) minutes. Starting again.")
                     try Firmware.setRecording(camera, true)
                     recordingSince = Date()
-                    recordedBytes = 0; loggedGB = 0
+                    recordedBytes = 0
                 }
             }
             let checkedAt = Date()
