@@ -308,7 +308,7 @@ struct WelcomeView: View {
     private var finished: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("You’re all set").font(.largeTitle.weight(.bold))
-            Text("Open FaceTime, Zoom or any video app and choose **Mark One** as the camera. Mark One starts the camera when a call starts and stops it when the call ends. It lives in the menu bar.")
+            Text("Open FaceTime, Zoom or any video app and choose **Mark One** as the camera, and your Mac’s microphone or a headset for sound. Mark One starts the camera when a call starts and stops it when the call ends. It lives in the menu bar.")
                 .font(.title3)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
