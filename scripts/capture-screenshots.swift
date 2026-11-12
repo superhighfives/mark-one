@@ -6,7 +6,7 @@
 // Then run scripts/frame-screenshots.swift to frame them.
 //
 // Mark One needs to be running, with the camera connected for the live
-// shots. For the FaceTime shot, pick Mark One under FaceTime's Video menu
+// shots. For the call shot, pick Mark One under Photo Booth's Camera menu
 // once beforehand.
 //
 //   swift scripts/capture-screenshots.swift              every shot
