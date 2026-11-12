@@ -80,6 +80,11 @@ Next.js on Cloudflare Workers through OpenNext), next to Pika.
 
 **In the app**
 
+- [ ] **Developer ID build** with the system extension entitlement,
+  notarized. The archive and export work (2026-11-10): every nested
+  binary is signed with Developer ID, the hardened runtime and a
+  timestamp. The notarytool profile `mark-one` is saved
+  (hi@superhighfives.com, 2026-11-12).
 - [x] **Sparkle** 2.10 through Swift Package Manager (2026-11-10).
   `App/Updater.swift`, with "Check for Updates…" under Settings > About
   and the automatic check under Settings > General. Scheduled checks
