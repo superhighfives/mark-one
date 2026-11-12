@@ -80,7 +80,7 @@ Next.js on Cloudflare Workers through OpenNext), next to Pika.
 
 **In the app**
 
-- [ ] **Developer ID build** with the system extension entitlement,
+- [x] **Developer ID build** with the system extension entitlement,
   notarized. The archive and export work (2026-11-10): every nested
   binary is signed with Developer ID, the hardened runtime and a
   timestamp. The notarytool profile `mark-one` is saved
@@ -104,7 +104,9 @@ Next.js on Cloudflare Workers through OpenNext), next to Pika.
   exports with Developer ID, notarizes and staples the app, makes and
   signs the DMG, notarizes and staples that, signs it for Sparkle,
   uploads it to R2 with `--upload`, and prints the front matter for the
-  changelog entry. Tested up to notarization.
+  changelog entry. First full run (2026-11-12, 1.0 build 2, not
+  uploaded): app and DMG notarized and stapled, Gatekeeper accepts both,
+  and the Sparkle signature checks out against the app's public key.
 - [x] **Builds from source** (2026-11-11): the README's "Build it
   yourself". Those builds have no update feed.
 
