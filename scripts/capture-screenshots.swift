@@ -3,7 +3,7 @@
 // its own when asked; other apps are just opened), then grabs it into
 // screenshots/raw/<id>.png without its shadow. Shots of the live camera
 // picture ("live" in the list) count down first, so you can get ready.
-// Then run scripts/frame-screenshots.swift to frame them.
+// The website lays them out, with its own captions.
 //
 // Mark One needs to be running, with the camera connected for the live
 // shots. For the call shot, pick Mark One under FaceTime's Video menu
@@ -29,7 +29,6 @@ struct Target: Decodable {
 
 struct Shot: Decodable {
     let id: String
-    let caption: String
     let capture: String
     let window: Target
     let live: Bool?
@@ -116,8 +115,7 @@ try FileManager.default.createDirectory(at: raw, withIntermediateDirectories: tr
 var missed: [String] = []
 
 for shot in shots where only.isEmpty || only.contains(shot.id) {
-    print("\n\(shot.id): \(shot.caption)")
-    print("  Set up: \(shot.capture)")
+    print("\n\(shot.id): \(shot.capture)")
     let live = shot.live == true
     if interactive {
         print("  Press Return to \(live ? "start the countdown" : "capture"), or type s and Return to skip.", terminator: " ")
@@ -173,5 +171,5 @@ for shot in shots where only.isEmpty || only.contains(shot.id) {
 open(Target(app: "Mark One", title: nil, panel: nil, open: "none"))
 
 print(missed.isEmpty
-    ? "\nDone. Frame them with: swift scripts/frame-screenshots.swift"
+    ? "\nDone. They're in screenshots/raw."
     : "\nMissed: \(missed.joined(separator: " ")). Try again with: swift scripts/capture-screenshots.swift \(missed.joined(separator: " "))")
