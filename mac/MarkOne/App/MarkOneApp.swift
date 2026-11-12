@@ -13,7 +13,7 @@ struct MarkOneApp: App {
         MenuBarExtra {
             MenuView(installer: installer, pipeline: pipeline)
         } label: {
-            Image(nsImage: MenuBarIcon.image(recording: pipeline.state == .streaming))
+            MenuBarLabel(recording: pipeline.state == .streaming)
         }
         .menuBarExtraStyle(.window)
 

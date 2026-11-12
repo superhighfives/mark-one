@@ -6,7 +6,8 @@
     "capture": "The menu bar panel, streaming, with a good-looking preview.",
     "window": {
       "app": "Mark One",
-      "panel": true
+      "panel": true,
+      "open": "panel"
     },
     "live": true
   },
@@ -27,7 +28,8 @@
     "capture": "The panel with its picture controls open.",
     "window": {
       "app": "Mark One",
-      "panel": true
+      "panel": true,
+      "open": "panel"
     },
     "live": true
   },
@@ -38,7 +40,8 @@
     "capture": "The first-run window on its firmware step.",
     "window": {
       "app": "Mark One",
-      "title": "Welcome to Mark One"
+      "title": "Welcome to Mark One",
+      "open": "welcome"
     }
   },
   {
@@ -48,7 +51,8 @@
     "capture": "The Camera Firmware window with Update, Restore and Prepare for OM Workspace.",
     "window": {
       "app": "Mark One",
-      "title": "Camera Firmware"
+      "title": "Camera Firmware",
+      "open": "firmware"
     }
   }
 ]

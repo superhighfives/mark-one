@@ -1,9 +1,13 @@
 // Captures the website's screenshots: for each shot in screenshots/shots.json
-// it says what to set up, waits for Return, then grabs that shot's window
-// (found by app and title, no clicking) into screenshots/raw/<id>.png,
-// without its shadow. Shots of the live camera picture ("live" in the list)
-// count down first, so you can open the panel and get ready. Then run
-// scripts/frame-screenshots.swift to frame them.
+// it says what to set up, waits for Return, opens the window (Mark One opens
+// its own when asked; other apps are just opened), then grabs it into
+// screenshots/raw/<id>.png without its shadow. Shots of the live camera
+// picture ("live" in the list) count down first, so you can get ready.
+// Then run scripts/frame-screenshots.swift to frame them.
+//
+// Mark One needs to be running, with the camera connected for the live
+// shots. For the FaceTime shot, pick Mark One under FaceTime's Video menu
+// once beforehand.
 //
 //   swift scripts/capture-screenshots.swift              every shot
 //   swift scripts/capture-screenshots.swift 01-panel     only these shots
@@ -19,6 +23,8 @@ struct Target: Decodable {
     let app: String
     let title: String?
     let panel: Bool?
+    /// The window Mark One opens for this shot (see ScreenshotRequests.swift).
+    let open: String?
 }
 
 struct Shot: Decodable {
@@ -55,6 +61,21 @@ guard CGPreflightScreenCaptureAccess() else {
         quit and reopen the terminal.
         """)
     exit(1)
+}
+
+/// Asks Mark One to open one of its windows, or another app to come forward.
+func open(_ target: Target) {
+    if target.app == "Mark One" {
+        DistributedNotificationCenter.default().postNotificationName(
+            Notification.Name("com.superhighfives.markone.show"), object: target.open ?? "none",
+            userInfo: nil, deliverImmediately: true)
+    } else {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        task.arguments = ["-a", target.app]
+        try? task.run()
+        task.waitUntilExit()
+    }
 }
 
 func play(_ sound: String) {
@@ -102,12 +123,22 @@ for shot in shots where only.isEmpty || only.contains(shot.id) {
         print("  Press Return to \(live ? "start the countdown" : "capture"), or type s and Return to skip.", terminator: " ")
         if readLine()?.lowercased() == "s" { continue }
     }
+    open(shot.window)
+    if shot.window.panel == true {
+        sleep(1)
+        if findWindow(shot.window) == nil {
+            print("  The panel didn't open (its icon may be hidden in a full menu bar). Click the Mark One icon now.")
+        }
+    }
     if live {
         for second in stride(from: delay, through: 1, by: -1) {
             print("  \(second)…")
             play("Tink")
             sleep(1)
         }
+    } else {
+        // Time for the window to open and draw.
+        sleep(1)
     }
     guard let id = findWindow(shot.window) else {
         let name = shot.window.title.map { "\"\($0)\" in \(shot.window.app)" }
@@ -138,6 +169,8 @@ for shot in shots where only.isEmpty || only.contains(shot.id) {
         missed.append(shot.id)
     }
 }
+
+open(Target(app: "Mark One", title: nil, panel: nil, open: "none"))
 
 print(missed.isEmpty
     ? "\nDone. Frame them with: swift scripts/frame-screenshots.swift"
