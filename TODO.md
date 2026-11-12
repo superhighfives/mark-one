@@ -19,6 +19,11 @@ Mark One.
   afterwards didn't freeze, nor did a 71-minute run on revision 3
   (2026-11-10). Watch for it in long sessions.
 
+- [ ] **FaceTime ignores the Mark One camera** (2026-11-12, macOS 27):
+  with Mark One picked and Automatic Camera Selection off, FaceTime
+  still shows the Mac's own camera. Photo Booth shows Mark One fine.
+  The README and website list FaceTime, so fix it or drop it from both.
+
 ## Before launch
 
 ### Mark One
