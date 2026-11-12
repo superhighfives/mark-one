@@ -142,7 +142,6 @@ Next.js on Cloudflare Workers through OpenNext), next to Pika.
   walks through the shots in `screenshots/shots.json`, opens each
   window and grabs it into `screenshots/raw/`. The website lays them out
   in HTML with its own captions.
-- [ ] Put the screenshots on the website.
 - [ ] A support page, or point support at the repo's issues.
 - [ ] A Release build.
 
