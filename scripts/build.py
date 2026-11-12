@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
 import olyfw  # noqa: E402
 
 BASE = 0x7E421020          # runtime address of main block byte 0
-WEBCAM_REVISION = 3        # the webcam patches' revision; see the marker at 0x7eab0414
+WEBCAM_REVISION = 4        # the webcam patches' revision; see the marker at 0x7eab0414
 STOCK_SHA256 = 'cb158dbdd8092856e8060354b008369f7d33dff32a1204e966ef0d5bce85e535'
 MAIN_SHA256 = '4edb88f3b552ef2fb9066ce7d1ca8bf5b44494f4c21865ac02dcac39e833fcf9'
 
@@ -225,6 +225,16 @@ PATCHES = {
          '0000000000000000000000000000000000000000000000000000000000000000'
          '0000'),
         (0x7E5307B9, 'dd3170ffff0000', 'dcd5a35700cbcb'),  # jmp frames; nop; nop
+        # Unplugging mid-call leaves the camera usable (asm/unplug.s): the
+        # stub, over console usage code after the button stub, and the
+        # system event callback's first two instructions replaced by a jump
+        # to it. Mark One loaded both at run time before revision 4.
+        (0x7EAAF600,
+         stock(94, '9d01ce1c29fdcc4edf28e8ccee3ae9f4e79e0265da8b0bc1c510222108c4bcda'),
+         'a509c952f8fef0430047044208460cfca4bced5a60fce00000fffffc81bced5a60'
+         'fcfff9bb0100fca4f41f2b60a010c91afccc09120002fcff490d0000fccc091201'
+         '02fcff3d0d00005c005d045808590cf8fe10cff0f8fee4dcb89a3200'),
+        (0x7EDD910C, 'cff0f8fee4', 'dcf464cdff'),  # jmp unplug
         # "MARK" and the firmware revision (a little-endian u32), which Mark
         # One reads to tell whether the camera needs an update. Bump it with
         # every change to these patches.

@@ -17,6 +17,8 @@
 # two instructions the jump replaced and carries on in the callback.
 #
 # Placed over console usage code at 0x7eaaf600, clear of what Mark One uses.
+# Built into the firmware from revision 4 (scripts/build.py's `webcam`
+# patches); before that, Mark One loaded it each session.
 #
 # Build:
 #   T=toolchain/install/bin

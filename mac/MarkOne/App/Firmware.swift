@@ -35,12 +35,20 @@ enum Firmware {
 
     /// Puts the camera in shooting mode with USB connected, with movies that
     /// don't write the card and have no time limit. See shoot() in ptp.py.
-    /// `cardless`: revision 2 or later of Mark One's firmware, whose own
-    /// hooks (asm/nocard.s) already keep movies off the card and lift the
-    /// time limits, so `patches` aren't needed.
-    static func prepare(_ camera: Camera, cardless: Bool) throws {
+    /// `revision`: the camera's Mark One firmware. Revision 2 keeps movies
+    /// off the card and lifts the time limits itself (asm/nocard.s), so
+    /// `patches` aren't needed. Revision 4 has all of Mark One's code built
+    /// in, so this only starts camera control and writes no code.
+    static func prepare(_ camera: Camera, revision: Int) throws {
+        if revision >= 4 {
+            guard try camera.peek(callbackHook, callbackJump.count) == callbackJump else {
+                throw FirmwareError.unexpected("system event callback")
+            }
+            try startCameraControl(camera)
+            return
+        }
         try camera.poke(read32, helpers)
-        for patch in patches where !cardless {
+        for patch in patches where revision < 2 {
             let patched = Data(hex: patch.patched)
             let current = try camera.peek(patch.address, patch.stock.count)
             if patch.stock.matches(current) {
@@ -57,8 +65,7 @@ enum Firmware {
         // shooting app, as in normal shooting, instead of the app changer,
         // which drops it in this mode.
         try camera.run(write32, powerSwitchCheck, 0, powerSwitchEntry)
-        let pcMode = try camera.run(read32, 0, 0, 0x605F_0D3C).0
-        try camera.run(0x7EDD_55BA, 2, 50, pcMode, 1)      // notification 50: camera control
+        try startCameraControl(camera)
         try camera.poke(keyStub, keyCode)
         try camera.poke(buttonStub, buttonCode)
         // Unplugging mid-call: unlock the camera and stop recording (asm/unplug.s).
@@ -71,9 +78,17 @@ enum Firmware {
         }
     }
 
+    /// Sends the "start camera control" notification, which switches the
+    /// camera to shooting without dropping USB.
+    private static func startCameraControl(_ camera: Camera) throws {
+        let pcMode = try camera.run(read32, 0, 0, 0x605F_0D3C).0
+        try camera.run(0x7EDD_55BA, 2, 50, pcMode, 1)      // notification 50: camera control
+    }
+
     /// asm/unplug.s: when the USB cable comes out, does what Mark One does
     /// when it lets go (unlock the buttons, free the mode dial, stop
-    /// recording), which nothing else would. Placed over console-only code.
+    /// recording), which nothing else would. Placed over console-only code,
+    /// and built into revision 4 and later.
     static let unplugStub = UInt32(0x7EAA_F600)
     static let unplugCode = Data(hex: "a509c952f8fef0430047044208460cfca4bced5a60fce00000fffffc81bced5a60fcfff9bb0100fca4f41f2b60a010c91afccc09120002fcff490d0000fccc09120102fcff3d0d00005c005d045808590cf8fe10cff0f8fee4dcb89a3200")
     /// The system event callback (0x7edd910c) starts with a jump to the stub

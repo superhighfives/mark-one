@@ -327,14 +327,14 @@ final class Pipeline: ObservableObject {
                     }
                     throw CameraError.disconnected
                 }
+                let revision: Int
+                if case .markOne(let markOne) = firmware { revision = markOne } else { revision = 0 }
                 // Before revision 2 of Mark One's firmware, the camera only
                 // records with a card in, though Mark One never writes to
                 // it. Wait for one.
-                let cardless: Bool
-                if case .markOne(let revision) = firmware, revision >= 2 { cardless = true } else { cardless = false }
+                let cardless = revision >= 2
                 // Revision 3 lists each frame's address and size.
-                let frameList: Bool
-                if case .markOne(let revision) = firmware, revision >= 3 { frameList = true } else { frameList = false }
+                let frameList = revision >= 3
                 if !cardless, try !Firmware.hasCard(camera) {
                     report("There's no card in the camera. It needs one to record, though Mark One doesn't save anything to it. Updating the camera's firmware removes the need for one.", .waiting)
                     note(.noCard)
@@ -350,7 +350,7 @@ final class Pipeline: ObservableObject {
                 // camera's buttons and dial, and nothing unlocks them if
                 // the extension turns out to be missing.
                 let sink = try openSink(camera)
-                try Firmware.prepare(camera, cardless: cardless)
+                try Firmware.prepare(camera, revision: revision)
                 Thread.sleep(forTimeInterval: 1)
                 let saved = try Firmware.applyPresets(camera)
                 defer { if camera.connected { try? Firmware.releasePresets(camera, saved) } }
