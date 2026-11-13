@@ -325,7 +325,7 @@ struct FirmwareView: View {
             VStack(alignment: .leading, spacing: 10) {
                 numbered(1, "Put the card in the camera, unplug the USB cable and switch the camera off. Use a charged battery, not a dummy one.")
                 lightStep(2, "Hold OK and switch the camera on. Let go when the orange light on the front comes on.", .steady)
-                lightStep(3, "Wait about a minute, until the light blinks quickly. Then take the battery out and put it back.", .blinking)
+                lightStep(3, "Wait about a minute, until the light blinks quickly. Then switch the camera off.", .blinking)
                 HStack(alignment: .top, spacing: 12) {
                     numbered(4, "Switch the camera on, connect it to your Mac and choose Webcam on its screen.")
                     CameraUSBMenu(choose: .webcam, width: 120)
