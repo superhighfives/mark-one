@@ -92,7 +92,8 @@ struct MenuView: View {
 
     private var install: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(installer.needsRestart ? "Restart to finish" : installer.failed ? "The camera didn’t install" : "Allow the Mark One camera")
+            Text(installer.notInApplications ? "Move Mark One to Applications"
+                 : installer.needsRestart ? "Restart to finish" : installer.failed ? "The camera didn’t install" : "Allow the Mark One camera")
                 .font(.title3.weight(.semibold))
             Text(installer.failed
                  ? installer.status
@@ -100,7 +101,9 @@ struct MenuView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if installer.failed {
-                Button(installer.needsRestart ? "Check Again" : "Try Again") { installer.activate() }
+                Button(installer.notInApplications ? "Quit Mark One" : installer.needsRestart ? "Check Again" : "Try Again") {
+                    if installer.notInApplications { NSApp.terminate(nil) } else { installer.activate() }
+                }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                     .frame(maxWidth: .infinity)

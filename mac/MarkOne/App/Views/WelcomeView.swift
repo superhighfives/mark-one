@@ -238,7 +238,15 @@ struct WelcomeView: View {
     private var allow: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Allow the Mark One camera").font(.title.weight(.bold))
-            if installer.installed || installer.failed {
+            if !installer.checked {
+                // Until macOS answers, rather than show the steps and then
+                // replace them.
+                VStack(spacing: 10) {
+                    ProgressView().controlSize(.small)
+                    Text("Checking…").foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if installer.installed || installer.failed {
                 Card(padding: 14) {
                     HStack(spacing: 12) {
                         if installer.installed {
@@ -261,7 +269,11 @@ struct WelcomeView: View {
                                 .foregroundStyle(.red)
                             Text(installer.status).fixedSize(horizontal: false, vertical: true)
                             Spacer()
-                            Button(installer.needsRestart ? "Check Again" : "Try Again") { installer.activate() }
+                            if installer.notInApplications {
+                                Button("Quit Mark One") { NSApp.terminate(nil) }
+                            } else {
+                                Button(installer.needsRestart ? "Check Again" : "Try Again") { installer.activate() }
+                            }
                         }
                     }
                 }

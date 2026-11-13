@@ -24,6 +24,12 @@ final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionReq
     /// Whether the extension was switched on after Mark One opened, so Mark
     /// One has to be reopened to use the camera.
     @Published var needsReopen = false
+    /// Whether Mark One is running from somewhere other than Applications,
+    /// where macOS won't install its camera. Also sets `failed`.
+    @Published var notInApplications = false
+    /// Whether Mark One has heard from macOS about the extension yet, so
+    /// setup can show what's true rather than a guess.
+    @Published var checked = false
 
     private let identifier = "com.superhighfives.markone.camera"
     private var removing = false
@@ -36,6 +42,13 @@ final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionReq
 
     func activate() {
         requested = true
+        // macOS only installs a system extension from an app in
+        // /Applications. Say so plainly rather than with its error, and don't
+        // follow an extension installed by another copy.
+        guard Bundle.main.bundleURL.deletingLastPathComponent().path == "/Applications" else {
+            outsideApplications()
+            return
+        }
         watch()
         status = "Installing the camera…"
         removing = false
@@ -79,6 +92,7 @@ final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionReq
         Task { @MainActor in
             status = "Allow it in System Settings › General › Login Items & Extensions: click ⓘ beside Mark One and turn on Media Extension."
             needsApproval = true
+            checked = true
         }
     }
 
@@ -111,8 +125,13 @@ final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionReq
                 confirmCamera()
                 return
             }
+            if (error as? OSSystemExtensionError)?.code == .unsupportedParentBundleLocation {
+                outsideApplications()
+                return
+            }
             status = "Failed: \(error.localizedDescription)"
             failed = true
+            checked = true
         }
     }
 }
@@ -132,7 +151,11 @@ extension ExtensionInstaller {
     /// see the camera appear once it's switched on (see "Processes don't see
     /// the camera come back" in NOTES.md).
     private func refresh() async {
-        guard !removing, !pending, let state = await Self.state() else { return }
+        guard !removing, !pending, !notInApplications else { return }
+        let state = await Self.state()
+        // If macOS couldn't say, setup shows the steps.
+        defer { checked = true }
+        guard let state else { return }
         switch state {
         case .enabled:
             // Already known: only a reopen changes what this process sees.
@@ -182,6 +205,16 @@ extension ExtensionInstaller {
         needsReopen = reopen
         if newly { log.notice("The Mark One camera is on\(reopen ? "; Mark One needs reopening to use it" : "", privacy: .public)") }
         if newly && reopen { VideoServices.restartFaceTimeService() }
+    }
+
+    private func outsideApplications() {
+        log.notice("Mark One isn't in Applications, so it can't install its camera")
+        notInApplications = true
+        failed = true
+        checked = true
+        installed = false
+        needsApproval = false
+        status = "Mark One needs to be in your Applications folder to add its camera. Quit it, drag it to Applications, and open it from there."
     }
 
     /// The extension is installed but switched off in System Settings, so
