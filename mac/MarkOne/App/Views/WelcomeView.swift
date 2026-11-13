@@ -240,10 +240,15 @@ struct WelcomeView: View {
                     allowStep(3) { Text("Turn on Media Extension, then click Done.") }
                 }
                 VStack(alignment: .leading, spacing: 16) {
-                    Card(padding: 8) { ExtensionApprovalSteps() }
-                    Text("On older versions of macOS, it's under Camera Extensions.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
+                    Card(padding: 8) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ExtensionApprovalSteps()
+                            Text("On older versions of macOS, it's under Camera Extensions.")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 4)
+                        }
+                    }
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
                         Text("Waiting for your OK. This moves on by itself.")
