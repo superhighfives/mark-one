@@ -204,55 +204,50 @@ struct WelcomeView: View {
     private var allow: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Allow the Mark One camera").font(.title.weight(.bold))
-            Text("macOS asks before an app adds a camera. It lists Mark One's camera as a Media Extension.")
+            Text("macOS asks before an app adds a camera.")
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            if !installer.installed && !installer.failed {
+            if installer.installed || installer.failed {
+                Card(padding: 14) {
+                    HStack(spacing: 12) {
+                        if installer.installed {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.title2)
+                                .foregroundStyle(.green)
+                            VStack(alignment: .leading) {
+                                Text("Camera allowed").fontWeight(.semibold)
+                                Text("“Mark One” now shows up in video apps.").font(.callout).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                        } else {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.title2)
+                                .foregroundStyle(.red)
+                            Text(installer.status).fixedSize(horizontal: false, vertical: true)
+                            Spacer()
+                            Button(installer.needsRestart ? "Check Again" : "Try Again") { installer.activate() }
+                        }
+                    }
+                }
+            } else {
                 VStack(alignment: .leading, spacing: 12) {
                     allowStep(1) {
                         Button("Open System Settings") { ExtensionInstaller.openSystemSettings() }
                     }
-                    allowStep(2) {
-                        Text("In Login Items & Extensions, find Mark One and click ⓘ beside it.")
-                    }
+                    allowStep(2) { Text("Click ⓘ beside Mark One.") }
                     allowStep(3) {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Turn on Media Extension, then click Done.")
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Turn on Media Extension.")
                             ExtensionApprovalSheet()
                         }
                     }
-                    Text("On older versions of macOS, look under Camera Extensions instead, and turn on Mark One.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
-            }
-            Card(padding: 14) {
-                HStack(spacing: 12) {
-                    if installer.installed {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(.green)
-                        VStack(alignment: .leading) {
-                            Text("Camera allowed").fontWeight(.semibold)
-                            Text("“Mark One” now shows up in video apps.").font(.callout).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                    } else if installer.failed {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(.red)
-                        Text(installer.status).fixedSize(horizontal: false, vertical: true)
-                        Spacer()
-                        Button(installer.needsRestart ? "Check Again" : "Try Again") { installer.activate() }
-                    } else {
-                        ProgressView().controlSize(.small)
-                        VStack(alignment: .leading) {
-                            Text("Waiting for your OK").fontWeight(.semibold)
-                            Text("This moves on by itself once you allow it.").font(.callout).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                    }
+                Text("On older versions of macOS, it's under Camera Extensions.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("Waiting for your OK. This moves on by itself.")
+                        .foregroundStyle(.secondary)
                 }
             }
         }
