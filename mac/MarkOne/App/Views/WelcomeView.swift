@@ -232,6 +232,7 @@ struct WelcomeView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     allowStep(1) {
                         Button("Open System Settings") { ExtensionInstaller.openSystemSettings() }
+                            .primary(true)
                     }
                     allowStep(2) { Text("Scroll down to the extensions, and click ⓘ beside Mark One.") }
                     allowStep(3) {
