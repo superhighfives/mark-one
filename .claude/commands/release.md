@@ -29,7 +29,7 @@ Run `/pre-release` first if it hasn't been run since the last change.
 | Release output | `mac/MarkOne/build/release/VERSION/` (gitignored), then filed in the releases repo |
 | Releases repo | `~/Development/pika-workspace/releases` ([superhighfives/releases](https://github.com/superhighfives/releases)), `Mark One/VERSION/`: DMG, delta, appcast, `VERSION.md` and `MarkOne-VERSION.xcarchive.zip` |
 | Sparkle tools | `mac/MarkOne/build/SourcePackages/artifacts/sparkle/Sparkle/bin` (after a build) |
-| releasecast | `npx releasecast` (0.0.13 or later, for `--account` and `--profile`) |
+| releasecast | `npx releasecast@0.0.13` (needs `--account` and `--profile`; this Mac's npm skips packages less than a day old) |
 | Website | `~/Development/superhighfives.com`, `changelog/mark-one/VERSION.md` |
 | Feed | https://superhighfives.com/releases/mark-one/feed (skips `beta: true`) |
 | GitHub | `superhighfives/mark-one`, tag `VERSION`, assets `Mark-One-VERSION.dmg` and `Mark-OneBUILD-FROM.delta` |
@@ -108,7 +108,7 @@ Report the mode (live or dry run).
    ```sh
    export PATH="$PWD/mac/MarkOne/build/SourcePackages/artifacts/sparkle/Sparkle/bin:$PATH"
    cd mac/MarkOne/build/release/export
-   npx releasecast "Mark One.app" -e hi@superhighfives.com -p mark-one -a mark-one \
+   npx releasecast@0.0.13 "Mark One.app" -e hi@superhighfives.com -p mark-one -a mark-one \
      -t "RELEASE_TITLE" -r ../VERSION/previous -o ../VERSION
    ```
    Drop `-r …` for the first release. Add `-d` in dry run mode.
