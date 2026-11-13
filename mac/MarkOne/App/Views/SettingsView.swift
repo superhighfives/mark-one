@@ -99,14 +99,22 @@ private struct CameraSettings: View {
                 }
             }
             Section("Mac extension") {
-                LabeledContent("Status", value: installer.installed ? "Installed and allowed" : installer.status)
-                HStack {
-                    Spacer()
-                    if installer.needsApproval {
-                        Button("Open System Settings") { ExtensionInstaller.openSystemSettings() }
+                // One button, for the opposite of the status. Installing again
+                // while it's installed does nothing: the installer only
+                // replaces the extension with a different version.
+                LabeledContent("Status") {
+                    HStack {
+                        Text(installer.installed ? "Installed" : installer.needsApproval ? "Needs approval" : installer.status)
+                            .multilineTextAlignment(.trailing)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if installer.installed {
+                            Button("Remove…", role: .destructive) { confirmRemove = true }
+                        } else if installer.needsApproval {
+                            Button("Open System Settings") { ExtensionInstaller.openSystemSettings() }
+                        } else {
+                            Button("Install") { installer.activate() }
+                        }
                     }
-                    Button("Reinstall") { installer.activate() }
-                    Button("Remove…", role: .destructive) { confirmRemove = true }
                 }
             }
             // Brightness, white balance, picture mode and autofocus are in
