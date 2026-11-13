@@ -88,7 +88,13 @@ struct FirmwareView: View {
         case .confirm: confirm
         case .preparing: preparing
         case .card: card
-        case .writing: ProgressView("Writing to the card…")
+        case .writing:
+            VStack(spacing: 12) {
+                ProgressView()
+                Text("Writing to the card…").foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 28)
         case .camera: cameraSteps
         case .usb: usb
         case .omWorkspace: omWorkspace
@@ -199,9 +205,8 @@ struct FirmwareView: View {
         VStack(alignment: .leading, spacing: 12) {
             switch action {
             case .setUp:
-                lead("camera") {
-                    Text("Mark One adds a Webcam choice to your camera. Everything else works just as before.")
-                }
+                Text("Mark One adds a Webcam choice to your camera. Everything else works just as before.")
+                    .fixedSize(horizontal: false, vertical: true)
             case .update:
                 lead("arrow.down.circle") {
                     Text("Mark One sends its firmware to the camera over USB. It takes about two minutes. [How updates work](https://superhighfives.com/mark-one/help#updates)")
@@ -320,22 +325,19 @@ struct FirmwareView: View {
     private var cameraSteps: some View {
         VStack(alignment: .leading, spacing: 12) {
             lead("camera") {
-                Text("The card is ready. Now install from it on the camera.")
+                Text("The card is ready. Now install from it on the camera. [Full steps and troubleshooting](https://superhighfives.com/mark-one/help#installing-it-from-the-card)")
             }
             VStack(alignment: .leading, spacing: 10) {
                 numbered(1, "Put the card in the camera, unplug the USB cable and switch the camera off. Use a charged battery, not a dummy one.")
-                lightStep(2, "Hold OK and switch the camera on. Let go when the orange light on the front comes on.", .steady)
-                lightStep(3, "Wait about a minute, until the light blinks quickly. Then switch the camera off.", .blinking)
-                HStack(alignment: .top, spacing: 12) {
-                    numbered(4, "Switch the camera on, connect it to your Mac and choose Webcam on its screen.")
-                    CameraUSBMenu(choose: .webcam, width: 120)
-                }
+                numbered(2, "Hold OK and switch the camera on. Let go when the orange light on the front comes on.")
+                numbered(3, "Wait about a minute, until the light blinks quickly. Then switch the camera off.")
+                numbered(4, "Switch the camera on, connect it to your Mac and choose Webcam on its screen.")
             }
+            CardInstallSequence()
             Label("While the light is on, don't switch the camera off, open the battery door or take the card out.", systemImage: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
                 .fixedSize(horizontal: false, vertical: true)
-            Link("Full steps and troubleshooting", destination: URL(string: "https://superhighfives.com/mark-one/help#installing-it-from-the-card")!)
-                .font(.callout)
+            Divider().padding(.top, 4)
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
                 Text("Mark One carries on when it sees the camera.").foregroundStyle(.secondary)
@@ -459,7 +461,7 @@ struct FirmwareView: View {
 
     /// A step's main line, with a large symbol beside it.
     private func lead(_ symbol: String, @ViewBuilder _ text: () -> Text) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .center, spacing: 12) {
             Image(systemName: symbol)
                 .font(.system(size: 24))
                 .foregroundStyle(.tint)
@@ -487,18 +489,39 @@ struct FirmwareView: View {
         }
     }
 
-    /// A numbered step with the orange light as it looks then.
-    private func lightStep(_ n: Int, _ text: String, _ light: OrangeLight.State) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("\(n)").font(.headline.monospacedDigit()).frame(width: 16)
-            Text(text).fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 4)
-            OrangeLight(state: light)
-        }
-    }
 
     private func closeWindow() {
         NSApp.keyWindow?.close()
+    }
+}
+
+/// What the camera shows during a card install, in order: the orange light
+/// on while it installs, blinking when it's done, then its USB menu once
+/// it's connected, with Webcam to choose.
+private struct CardInstallSequence: View {
+    var body: some View {
+        HStack(spacing: 6) {
+            stage("Installing") { OrangeLight(state: .steady, size: 18) }
+            arrow
+            stage("Done") { OrangeLight(state: .blinking, size: 18) }
+            arrow
+            CameraUSBMenu(choose: .webcam, width: 112)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var arrow: some View {
+        Image(systemName: "arrow.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+    }
+
+    private func stage(_ caption: String, @ViewBuilder _ light: () -> some View) -> some View {
+        VStack(spacing: 10) {
+            light()
+            Text(caption).font(.caption).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, minHeight: 92)
+        .background(Color(white: 0.043), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(.white.opacity(0.1)))
     }
 }
 
@@ -506,6 +529,7 @@ struct FirmwareView: View {
 private struct OrangeLight: View {
     enum State { case steady, blinking, off }
     let state: State
+    var size: CGFloat = 9
 
     var body: some View {
         if state == .blinking {
@@ -521,8 +545,8 @@ private struct OrangeLight: View {
     private func dot(lit: Bool) -> some View {
         Circle()
             .fill(lit ? Color.orange : Color.secondary.opacity(0.3))
-            .frame(width: 9, height: 9)
-            .shadow(color: lit ? .orange.opacity(0.7) : .clear, radius: 3)
+            .frame(width: size, height: size)
+            .shadow(color: lit ? .orange.opacity(0.7) : .clear, radius: size / 3)
             .accessibilityHidden(true)
     }
 }
