@@ -48,6 +48,8 @@ struct FirmwareView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+        // Steps narrower than the window start at its left edge.
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(24)
         .frame(width: 460)
         .onReceive(tick) { _ in if step == .card { cards = FirmwareInstall.cards() } }
@@ -318,32 +320,22 @@ struct FirmwareView: View {
     private var cameraSteps: some View {
         VStack(alignment: .leading, spacing: 12) {
             lead("camera") {
-                Text("The card is ready and ejected. Now install from it on the camera.")
+                Text("The card is ready. Now install from it on the camera.")
             }
             VStack(alignment: .leading, spacing: 10) {
-                numbered(1, "Put the card in the camera and unplug the USB cable. Use a fully charged battery, not a dummy battery.")
-                numbered(2, "Switch the camera off.")
-                numbered(3, "Press and hold OK, the button in the middle of the arrow pad on the back.")
-                numbered(4, "Keep holding OK, and switch the camera on. The screen stays dark; that's expected.")
-                numbered(5, "When the orange light on the front (the AF-assist light) comes on and stays on, let go of OK.")
-                numbered(6, "Wait about a minute while the light stays on. The camera is installing.")
-                numbered(7, "When the light starts blinking quickly, it's done. Take the battery out, put it back, and switch the camera on as usual.")
-                numbered(8, "Connect the camera to your Mac and choose Webcam on its screen.", choose: .webcam)
+                numbered(1, "Put the card in the camera, unplug the USB cable and switch the camera off. Use a charged battery, not a dummy one.")
+                lightStep(2, "Hold OK and switch the camera on. Let go when the orange light on the front comes on.", .steady)
+                lightStep(3, "Wait about a minute, until the light blinks quickly. Then take the battery out and put it back.", .blinking)
+                HStack(alignment: .top, spacing: 12) {
+                    numbered(4, "Switch the camera on, connect it to your Mac and choose Webcam on its screen.")
+                    CameraUSBMenu(choose: .webcam, width: 120)
+                }
             }
-            Label("While the light is on and not blinking, don't switch the camera off, open the battery door or take the card out. The camera is writing its firmware, and stopping it partway can leave it unable to start.", systemImage: "exclamationmark.triangle.fill")
+            Label("While the light is on, don't switch the camera off, open the battery door or take the card out.", systemImage: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
                 .fixedSize(horizontal: false, vertical: true)
-            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 6) {
-                lightRow(.steady, "On, steady", "Installing. Leave the camera alone until it blinks.")
-                lightRow(.blinking, "Blinking quickly", "Done. Take the battery out and put it back.")
-                lightRow(.off, "Doesn't come on", "The camera didn't start the installer. Switch it off and start again from step 3.")
-                lightRow(.off, "Starts normally", "It missed the card. The firmware is still on it, so try again.")
-            }
-            .font(.callout)
-            Text("Afterwards you can delete the DCOLYMP folder from the card, or leave it: the camera only reads it when you hold OK as you switch it on.")
+            Link("Full steps and troubleshooting", destination: URL(string: "https://superhighfives.com/mark-one/help#installing-it-from-the-card")!)
                 .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
                 Text("Mark One carries on when it sees the camera.").foregroundStyle(.secondary)
@@ -495,14 +487,13 @@ struct FirmwareView: View {
         }
     }
 
-    /// One row of the orange light's meanings during a card install.
-    private func lightRow(_ state: OrangeLight.State, _ light: String, _ meaning: String) -> some View {
-        GridRow {
-            HStack(spacing: 8) {
-                OrangeLight(state: state)
-                Text(light).fontWeight(.medium)
-            }
-            Text(meaning).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+    /// A numbered step with the orange light as it looks then.
+    private func lightStep(_ n: Int, _ text: String, _ light: OrangeLight.State) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("\(n)").font(.headline.monospacedDigit()).frame(width: 16)
+            Text(text).fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 4)
+            OrangeLight(state: light)
         }
     }
 
