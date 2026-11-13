@@ -279,8 +279,8 @@ struct FirmwareView: View {
 
     private var card: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Take the SD card out of your camera and put it in your Mac.")
-            Text("Your photos stay on the card. Mark One adds one file, in a folder named DCOLYMP.")
+            Text("Take the SD card out of your camera and put it in your Mac. Any card the camera already takes photos on works.")
+            Text("Your photos stay on the card. Mark One adds one file, in a folder named DCOLYMP, replacing any older E-M5 firmware there. It reads the file back to check the card, then ejects it.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
             if let volume = cards.first {
@@ -303,16 +303,26 @@ struct FirmwareView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("The card is ready and ejected. Now install from it on the camera.")
             VStack(alignment: .leading, spacing: 10) {
-                numbered(1, "Put the card in the camera and unplug the USB cable. Check that the battery is charged.")
+                numbered(1, "Put the card in the camera and unplug the USB cable. Use a fully charged battery, not a dummy battery.")
                 numbered(2, "Switch the camera off.")
                 numbered(3, "Press and hold OK, the button in the middle of the arrow pad on the back.")
                 numbered(4, "Keep holding OK, and switch the camera on. The screen stays dark; that's expected.")
-                numbered(5, "When the orange light on the front comes on, let go of OK.")
-                numbered(6, "Wait about a minute while the light stays on. The camera is installing, so don't switch it off or open the battery door.")
-                numbered(7, "When the light starts blinking, it's done. Take the battery out, put it back, and switch the camera on as usual.")
+                numbered(5, "When the orange light on the front (the AF-assist light) comes on and stays on, let go of OK.")
+                numbered(6, "Wait about a minute while the light stays on. The camera is installing.")
+                numbered(7, "When the light starts blinking quickly, it's done. Take the battery out, put it back, and switch the camera on as usual.")
                 numbered(8, "Connect the camera to your Mac and choose Webcam on its screen.")
             }
-            Text("If the light doesn't come on, switch the camera off and start again from step 3. If the camera starts normally instead, it missed the card; the firmware is still on it, so just try again.")
+            Label("While the light is on and not blinking, don't switch the camera off, open the battery door or take the card out. The camera is writing its firmware, and stopping it partway can leave it unable to start.", systemImage: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 6) {
+                lightRow(.steady, "On, steady", "Installing. Leave the camera alone until it blinks.")
+                lightRow(.blinking, "Blinking quickly", "Done. Take the battery out and put it back.")
+                lightRow(.off, "Doesn't come on", "The camera didn't start the installer. Switch it off and start again from step 3.")
+                lightRow(.off, "Starts normally", "It missed the card. The firmware is still on it, so try again.")
+            }
+            .font(.callout)
+            Text("Afterwards you can delete the DCOLYMP folder from the card, or leave it: the camera only reads it when you hold OK as you switch it on.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -426,7 +436,43 @@ struct FirmwareView: View {
         }
     }
 
+    /// One row of the orange light's meanings during a card install.
+    private func lightRow(_ state: OrangeLight.State, _ light: String, _ meaning: String) -> some View {
+        GridRow {
+            HStack(spacing: 8) {
+                OrangeLight(state: state)
+                Text(light).fontWeight(.medium)
+            }
+            Text(meaning).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
     private func closeWindow() {
         NSApp.keyWindow?.close()
+    }
+}
+
+/// The camera's orange AF-assist light, as it looks during a card install.
+private struct OrangeLight: View {
+    enum State { case steady, blinking, off }
+    let state: State
+
+    var body: some View {
+        if state == .blinking {
+            TimelineView(.periodic(from: .now, by: 0.2)) { context in
+                let on = Int(context.date.timeIntervalSinceReferenceDate / 0.2) % 2 == 0
+                dot(lit: on)
+            }
+        } else {
+            dot(lit: state == .steady)
+        }
+    }
+
+    private func dot(lit: Bool) -> some View {
+        Circle()
+            .fill(lit ? Color.orange : Color.secondary.opacity(0.3))
+            .frame(width: 9, height: 9)
+            .shadow(color: lit ? .orange.opacity(0.7) : .clear, radius: 3)
+            .accessibilityHidden(true)
     }
 }
