@@ -80,7 +80,7 @@ struct FirmwareImage {
     /// Where the stock download is kept, so it's only fetched once.
     private static var cached: URL {
         let folder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        return folder.appendingPathComponent("OLY_E_097_2300_0000_0000.BIN")
+        return folder.appendingPathComponent("Mark One/OLY_E_097_2300_0000_0000.BIN")
     }
 
     private static func stockFirmware(progress: @escaping @Sendable (Double) -> Void) async throws -> Data {
