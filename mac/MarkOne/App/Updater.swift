@@ -1,8 +1,8 @@
 // Updates through Sparkle, from the feed in Info.plist (SUFeedURL). Only
-// release builds have a feed (scripts/release.sh sets it); builds from
+// release builds have a feed (scripts/build-release.sh sets it); builds from
 // source don't update. Updates are signed with Mark One's own EdDSA key; its public half is SUPublicEDKey
 // and the private half is in the release Mac's keychain, under the account
-// "mark-one" (see scripts/release.sh).
+// "mark-one" (see .claude/commands/release.md).
 
 import AppKit
 import Sparkle

@@ -80,9 +80,9 @@ Next.js on Cloudflare Workers through OpenNext), next to Pika.
 
 ```
 /mark-one                       product page, Download (or Coming soon)
-/mark-one/download              streams the latest DMG from R2
-/releases/mark-one/feed         Sparkle appcast
-/releases/mark-one/<v>.dmg      update files
+/mark-one/download              redirects to the latest DMG on GitHub
+/releases/mark-one/feed         Sparkle appcast, from changelog/mark-one/
+github.com/superhighfives/mark-one/releases   DMGs and deltas
 ```
 
 **In the app**
@@ -107,22 +107,32 @@ Next.js on Cloudflare Workers through OpenNext), next to Pika.
   activate it, so updates that keep the extension's build number are
   safe. Release notes for updates that change the extension should say a
   restart may be needed (see "Extension updates" above).
-- [x] **Release script** (`scripts/release.sh`, 2026-11-10): archives,
-  exports with Developer ID, notarizes and staples the app, makes and
-  signs the DMG, notarizes and staples that, signs it for Sparkle,
-  uploads it to R2 with `--upload`, and prints the front matter for the
-  changelog entry. First full run (2026-11-12, 1.0 build 2, not
-  uploaded): app and DMG notarized and stapled, Gatekeeper accepts both,
-  and the Sparkle signature checks out against the app's public key.
-  Installed from the DMG, it streams live at 30 fps.
+- [x] **Release script** (2026-11-10): first full run 2026-11-12 (1.0
+  build 2, not uploaded): app and DMG notarized and stapled, Gatekeeper
+  accepts both, the Sparkle signature checks out against the app's
+  public key, and installed from the DMG it streams live at 30 fps.
+- [x] **Releases like Pika's** (2026-11-12): `/release` and
+  `/pre-release` (`.claude/commands/`), modelled on Pika's.
+  `scripts/build-release.sh` (was `release.sh`) archives, exports with
+  Developer ID, checks the extension is inside and notarizes the app;
+  releasecast makes the DMG, notarizes it, signs it with Mark One's key
+  and makes a delta from the previous GitHub release. Dry runs of
+  releasecast on Mark One (with a delta) and Pika check out.
+- [ ] **releasecast 0.0.13:** merge
+  [releasecast#4](https://github.com/superhighfives/releasecast/pull/4)
+  (`--account` for Mark One's key, `--profile`, names with spaces) and
+  publish it, so `/release` can use `npx releasecast`. Until then, run
+  it from `~/Development/pika-workspace/releasecast`.
 - [x] **Builds from source** (2026-11-11): the README's "Build it
   yourself". Those builds have no update feed.
 
 **On superhighfives.com**
 
-- [x] **Release files:** the private R2 bucket `mark-one-releases`
-  exists (empty). `/releases/mark-one/Mark-One-<v>.dmg` serves the files
-  publicly for Sparkle, and `/mark-one/download` serves the latest.
+- [x] **Release files on GitHub** (2026-11-12, was R2): the feed points
+  at the DMG and deltas on each GitHub release in
+  `superhighfives/mark-one`, and `/mark-one/download` redirects to the
+  latest DMG. The site's R2 binding is gone; the empty
+  `mark-one-releases` bucket can be deleted.
 - [x] **Appcast:** `changelog/mark-one/<version>.md`, in the same format
   as Pika's, and `/releases/mark-one/feed`. `generateAppcast.ts` now
   takes settings per app, and Pika's feeds are unchanged.
@@ -134,9 +144,10 @@ Next.js on Cloudflare Workers through OpenNext), next to Pika.
   link, and `/mark-one/download` returns 404.
 - [x] **Deploy** (2026-11-12): PR #29 merged and live, showing "Coming
   soon". `/mark-one/download` returns 404 until launch.
-- [ ] **Launch:** publish the first release, make the repo public, and
-  set `available` to true in `src/data/markone.ts` (a constant, not an
-  environment variable, like the rest of the site's settings).
+- [ ] **Launch:** make the repo public (GitHub release downloads need
+  it), then `/release` 1.0. It offers to set `available` to true in
+  `src/data/markone.ts` (a constant, not an environment variable, like
+  the rest of the site's settings).
 - [ ] **Test end to end:** download from the page, then publish an
   update and watch Sparkle install it. Check that downloads report their
   size, so browsers show progress.
