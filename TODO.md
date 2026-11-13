@@ -72,6 +72,16 @@ lifts the time limits (see "Recording without a card" in `NOTES.md`).
   listing what's under other terms (FFmpeg's LGPL, Sparkle, om-emu's
   `olyfw.py`, which is downloaded rather than copied because it has no
   license).
+- [ ] **The user downloads the firmware.** Mark One links to Olympus's
+  download and accepts the file the user drops in, so the user agrees
+  to Olympus's license and changes their own copy. Today Mark One asks
+  the update server itself, presenting as OM Workspace with placeholder
+  device details, and never shows the license.
+- [ ] **No Olympus bytes in the app.** `Firmware.installEndStock` holds
+  22 bytes of Olympus code to check before arming the restart; check a
+  hash instead.
+- [ ] **Before the repo goes public:** review the research notes
+  (`NOTES.md`, `asm/`) for firmware byte sequences and strings.
 
 ### Direct distribution
 
