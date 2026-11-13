@@ -235,13 +235,10 @@ struct WelcomeView: View {
                             .primary(true)
                     }
                     allowStep(2) { Text("Scroll down to the extensions, and click ⓘ beside Mark One.") }
-                    allowStep(3) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Turn on Media Extension, then click Done.")
-                            ExtensionApprovalSheet()
-                        }
-                    }
+                    allowStep(3) { Text("Turn on Media Extension, then click Done.") }
                 }
+                ExtensionApprovalSteps()
+                    .padding(.leading, 26)
                 Text("On older versions of macOS, it's under Camera Extensions.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -254,11 +251,14 @@ struct WelcomeView: View {
         }
     }
 
+    /// One numbered step. Every row is as tall as the button in step 1, so
+    /// the steps are evenly spaced.
     private func allowStep(_ n: Int, @ViewBuilder _ content: () -> some View) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text("\(n)").font(.headline.monospacedDigit()).frame(width: 16)
             content().fixedSize(horizontal: false, vertical: true)
         }
+        .frame(minHeight: 28, alignment: .leading)
     }
 
     private var firmware: some View {

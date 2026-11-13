@@ -525,39 +525,40 @@ struct CameraUSBMenu: View {
     }
 }
 
-/// The sheet System Settings shows for Mark One's extensions (macOS 27,
-/// General › Login Items & Extensions, Mark One's ⓘ), redrawn with the
-/// switch to turn on ringed. macOS calls the camera a Media Extension.
-struct ExtensionApprovalSheet: View {
+/// The two things to click in System Settings to allow the camera (macOS
+/// 27, General › Login Items & Extensions), redrawn side by side with
+/// their step numbers: Mark One's row in the extensions list, with its ⓘ
+/// ringed, then the Media Extension switch in the sheet it opens, on and
+/// ringed. macOS calls the camera a Media Extension.
+struct ExtensionApprovalSteps: View {
     var body: some View {
-        VStack(spacing: 6) {
-            HStack(spacing: 10) {
+        HStack(spacing: 8) {
+            panel(2) {
                 Image(nsImage: NSApp.applicationIconImage)
                     .resizable()
                     .frame(width: 26, height: 26)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Mark One Extensions").font(.system(size: 12, weight: .semibold))
-                    Text("1 extension installed").font(.system(size: 10)).foregroundStyle(.secondary)
+                    Text("Mark One").font(.system(size: 12))
+                    Text("Media Extension").font(.system(size: 10)).foregroundStyle(.secondary)
                 }
-                Spacer()
+                Spacer(minLength: 4)
+                Image(systemName: "info.circle")
+                    .font(.system(size: 15))
+                    .foregroundStyle(.secondary)
+                    .padding(3)
+                    .overlay(Circle().strokeBorder(.orange, lineWidth: 2))
             }
-            .padding(8)
-            .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            HStack(spacing: 10) {
+            Image(systemName: "arrow.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+            panel(3) {
                 Image(systemName: "video.fill")
                     .font(.system(size: 11))
                     .foregroundStyle(.white)
                     .frame(width: 24, height: 24)
                     .background(Color(white: 0.45), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Media Extension").font(.system(size: 12))
-                    Text("Provides additional functionality for media applications")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                Spacer(minLength: 8)
-                // The switch, on, ringed to show which one to turn on.
+                Text("Media Extension").font(.system(size: 12)).fixedSize()
+                Spacer(minLength: 4)
                 Capsule()
                     .fill(Color.accentColor)
                     .frame(width: 30, height: 17)
@@ -567,15 +568,26 @@ struct ExtensionApprovalSheet: View {
                     .padding(3)
                     .overlay(Capsule().strokeBorder(.orange, lineWidth: 2))
             }
-            .padding(8)
-            .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
-        .padding(8)
-        .frame(maxWidth: 380)
-        .background(Color(white: 0.17), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.white.opacity(0.1)))
         .environment(\.colorScheme, .dark)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("System Settings' Mark One Extensions sheet, with Media Extension turned on")
+        .accessibilityLabel("In System Settings, the ⓘ button beside Mark One, then the Media Extension switch, turned on")
+    }
+
+    /// One row as System Settings draws it, tagged with its step.
+    private func panel(_ step: Int, @ViewBuilder _ content: () -> some View) -> some View {
+        HStack(spacing: 8) { content() }
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(Color(white: 0.17), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(.white.opacity(0.1)))
+            .overlay(alignment: .topLeading) {
+                Text("\(step)")
+                    .font(.system(size: 10, weight: .bold).monospacedDigit())
+                    .foregroundStyle(.black)
+                    .frame(width: 16, height: 16)
+                    .background(.white, in: Circle())
+                    .offset(x: -6, y: -6)
+            }
     }
 }
