@@ -98,26 +98,7 @@ private struct CameraSettings: View {
                     LabeledContent("Battery") { BatteryLevel(level: battery) }
                 }
             }
-            Section("Picture") {
-                BrightnessControl(pipeline: pipeline)
-                Picker("White balance", selection: $pipeline.whiteBalance) {
-                    ForEach(Pipeline.WhiteBalance.allCases) { Text($0.label).tag($0) }
-                }
-                Picker("Picture mode", selection: $pipeline.pictureMode) {
-                    ForEach(Pipeline.PictureMode.allCases) { Text($0.label).tag($0) }
-                }
-                Toggle("Continuous autofocus", isOn: $pipeline.continuousFocus)
-                Toggle("Focus on faces", isOn: $pipeline.faceFocus)
-            }
-            Section {
-                Toggle("Lock camera controls", isOn: $pipeline.lockControls)
-            } footer: {
-                Text("While Mark One uses the camera, only its power switch, dials and shutter half press work, so a bump can’t change a setting or take a photo.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Section("Mark One camera") {
+            Section("Mac extension") {
                 LabeledContent("Status", value: installer.installed ? "Installed and allowed" : installer.status)
                 HStack {
                     Spacer()
@@ -127,6 +108,19 @@ private struct CameraSettings: View {
                     Button("Reinstall") { installer.activate() }
                     Button("Remove…", role: .destructive) { confirmRemove = true }
                 }
+            }
+            // Brightness, white balance, picture mode and autofocus are in
+            // the menu bar panel.
+            Section("Picture") {
+                Toggle("Focus on faces", isOn: $pipeline.faceFocus)
+            }
+            Section {
+                Toggle("Lock camera controls", isOn: $pipeline.lockControls)
+            } footer: {
+                Text("While Mark One uses the camera, only its power switch, dials and shutter half press work, so a bump can’t change a setting or take a photo.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Section {
                 Link("Firmware guide and help", destination: URL(string: "https://superhighfives.com/mark-one/help")!)
