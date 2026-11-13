@@ -15,6 +15,9 @@ struct FirmwareView: View {
     @State private var downloaded = 0.0
     @State private var cards: [URL] = []
     @State private var error: String?
+    /// After a restore, whether the camera has had time to install and
+    /// restart, so the window can be closed without waiting for MTP.
+    @State private var restoreSettled = false
 
     enum Step { case start, confirm, preparing, card, writing, camera, ready, usb, omWorkspace }
 
@@ -392,18 +395,31 @@ struct FirmwareView: View {
                     numbered(1, "Wait while the camera's screen shows this. If Mark One was using the camera, the screen flickers between this and the last picture. Don't switch the camera off or unplug it.")
                     if install.restarts {
                         numbered(2, "When the screen shows OK, the camera restarts by itself, with the new firmware. It takes about a minute and a half.")
-                        numbered(3, action == .restore ? "It asks how to connect again, as it did before Mark One."
+                        numbered(3, action == .restore ? "It asks how to connect again, as it did before Mark One. Choose MTP, so Mark One can check the firmware."
                                  : pipeline.connectAsWebcam ? "Mark One connects to it again. There's nothing to do."
                                  : "Choose Webcam on its screen when it asks.")
                     } else {
                         numbered(2, "When the screen shows OK, or goes back to the picture it showed before, the install is done. The camera keeps running the old firmware until it restarts, so switch it off and on.")
-                        numbered(3, action == .restore ? "Connect the camera to your Mac again."
+                        numbered(3, action == .restore ? "Connect the camera to your Mac again and choose MTP on its screen, so Mark One can check the firmware."
                                  : pipeline.connectAsWebcam ? "Connect the camera to your Mac again."
                                  : "Connect the camera to your Mac again and choose Webcam on its screen.")
                     }
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
-                        Text("Mark One carries on when it sees the camera.").foregroundStyle(.secondary)
+                        Text(action == .restore ? "Waiting for the camera to connect as MTP." : "Mark One carries on when it sees the camera.")
+                            .foregroundStyle(.secondary)
+                        // Olympus's firmware asks how to connect, and only MTP
+                        // lets Mark One check it. Once the camera has had time
+                        // to restart, the restore can end without that.
+                        if action == .restore && restoreSettled {
+                            Spacer()
+                            Button("Done") { pipeline.install = nil; step = .start; closeWindow() }
+                        }
+                    }
+                    .task {
+                        restoreSettled = false
+                        guard (try? await Task.sleep(for: .seconds(120))) != nil else { return }
+                        restoreSettled = true
                     }
                 } else {
                     ProgressView(value: install.fraction) { Text(install.text) }
