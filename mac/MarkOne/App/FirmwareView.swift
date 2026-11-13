@@ -74,7 +74,14 @@ struct FirmwareView: View {
         switch step {
         case .start:
             // A Mark One build from before USB updates reinstalls from the card.
-            if overUSB { manage } else { setUpIntro }
+            // Setting up from the card starts at its confirmation.
+            if overUSB {
+                manage
+            } else {
+                confirm.onAppear {
+                    if action != .setUp { action = .setUp; understood = false }
+                }
+            }
         case .ready: ready
         case .confirm: confirm
         case .preparing: preparing
@@ -186,21 +193,12 @@ struct FirmwareView: View {
         step = .confirm
     }
 
-    private var setUpIntro: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Mark One needs its own firmware on your E-M5 (Mark I). It's Olympus's firmware 2.3 with a few changes that let the camera work as a webcam. They only add: photos, movies, menus and settings work as before. Mark One downloads Olympus's firmware, adds its changes, and puts the result on your SD card. You install it from the card once; later updates happen over USB.")
-                .fixedSize(horizontal: false, vertical: true)
-            HStack {
-                Spacer()
-                Button("Continue") { begin(.setUp) }.keyboardShortcut(.defaultAction)
-            }
-        }
-    }
-
     private var confirm: some View {
         VStack(alignment: .leading, spacing: 12) {
             switch action {
-            case .setUp: EmptyView()
+            case .setUp:
+                Text("Mark One adds a Webcam choice to your camera's firmware. Photos, movies and settings work as before. You install it once from an SD card, then updates come over USB. [How it works](https://superhighfives.com/mark-one/help#firmware)")
+                    .fixedSize(horizontal: false, vertical: true)
             case .update:
                 Text("Mark One sends its firmware to the camera over USB. It takes about two minutes. [How updates work](https://superhighfives.com/mark-one/help#updates)")
                     .fixedSize(horizontal: false, vertical: true)
@@ -226,7 +224,11 @@ struct FirmwareView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack {
-                Button("Cancel") { step = .start }.keyboardShortcut(.cancelAction)
+                Button("Cancel") {
+                    // Setting up from the card has no step before this one.
+                    if action == .setUp && !overUSB { closeWindow() } else { step = .start }
+                }
+                .keyboardShortcut(.cancelAction)
                 Spacer()
                 Button(action == .setUp ? "Continue" : action == .restore ? "Restore" : "Install") { prepare() }
                     .keyboardShortcut(.defaultAction)
