@@ -37,10 +37,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task { @MainActor in
             DockIcon.start()
             Preferences.shared.start(Pipeline.shared)
-            ExtensionInstaller.shared.activate()
-            Pipeline.shared.run()
             Updater.shared.start()
-            if WelcomeWindow.needed { WelcomeWindow.show() }
+            // The first time, the welcome window installs the extension and
+            // starts looking for the camera at the steps that explain the
+            // permissions they ask for.
+            if WelcomeWindow.needed {
+                WelcomeWindow.show()
+            } else {
+                WelcomeWindow.start()
+            }
         }
     }
 

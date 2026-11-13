@@ -27,6 +27,7 @@ final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionReq
     private var check: Task<Void, Never>?
 
     func activate() {
+        requested = true
         status = "Installing the camera…"
         removing = false
         failed = false
@@ -34,6 +35,14 @@ final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionReq
         let request = OSSystemExtensionRequest.activationRequest(forExtensionWithIdentifier: identifier, queue: .main)
         request.delegate = self
         OSSystemExtensionManager.shared.submitRequest(request)
+    }
+
+    private var requested = false
+
+    /// Asks for the extension unless that's already been asked this launch.
+    func activateOnce() {
+        guard !requested else { return }
+        activate()
     }
 
     func deactivate() {

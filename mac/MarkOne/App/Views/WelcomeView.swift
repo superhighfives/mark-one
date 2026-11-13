@@ -23,6 +23,10 @@ enum WelcomeWindow {
             window.isReleasedWhenClosed = false
             window.title = "Welcome to Mark One"
             Self.window = window
+            // Closing it early still sets everything up.
+            NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { _ in
+                MainActor.assumeIsolated { start() }
+            }
             return window
         }()
         let host = NSHostingController(rootView: WelcomeView(start: step, done: finish))
@@ -31,6 +35,15 @@ enum WelcomeWindow {
         window.center()
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+    }
+
+    /// Installs the camera extension and starts looking for the camera, if
+    /// they haven't started yet. macOS asks to allow the extension, and to
+    /// let Mark One use removable volumes once it looks for the camera
+    /// (Image Capture lists memory cards as cameras too).
+    static func start() {
+        ExtensionInstaller.shared.activateOnce()
+        Pipeline.shared.run()
     }
 
     private static func finish() {
@@ -129,9 +142,10 @@ struct WelcomeView: View {
     @ViewBuilder private var content: some View {
         switch step {
         case .welcome: welcome
-        case .allow: allow
-        case .firmware: firmware
-        case .connect: connect
+        // Each permission is asked for at the step that explains it.
+        case .allow: allow.task { installer.activateOnce() }
+        case .firmware: firmware.task { WelcomeWindow.start() }
+        case .connect: connect.task { WelcomeWindow.start() }
         case .done: finished
         }
     }
@@ -228,6 +242,10 @@ struct WelcomeView: View {
             Text("Put the Mark One firmware on the camera").font(.title.weight(.bold))
             Text("Mark One needs Olympus’s firmware 2.3 with a few changes that let the camera send video. It builds the firmware for you.")
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Label("macOS asks to let Mark One access removable volumes. Allow it: that's how Mark One finds the camera and your SD card.",
+                  systemImage: "sdcard")
+                .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
             Card(padding: 14) {
                 VStack(alignment: .leading, spacing: 6) {
