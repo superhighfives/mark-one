@@ -72,11 +72,15 @@ lifts the time limits (see "Recording without a card" in `NOTES.md`).
   listing what's under other terms (FFmpeg's LGPL, Sparkle, om-emu's
   `olyfw.py`, which is downloaded rather than copied because it has no
   license).
-- [ ] **The user downloads the firmware.** Mark One links to Olympus's
-  download and accepts the file the user drops in, so the user agrees
-  to Olympus's license and changes their own copy. Today Mark One asks
-  the update server itself, presenting as OM Workspace with placeholder
-  device details, and never shows the license.
+- [x] **The user downloads the firmware** (2026-11-13). Setup links to
+  the unofficial [firmware download page](https://ofu.infinityfreeapp.com/),
+  which gets the file from Olympus's servers, and takes the file the user
+  chooses or drops in, checked by hash. Mark One no longer contacts
+  Olympus's update server or presents as OM Workspace. A copy downloaded
+  before stays in use.
+- [ ] **Website:** the help page and FAQ describe the new firmware step,
+  and the privacy page no longer lists the Olympus firmware download
+  (Mark One makes no request to Olympus now).
 - [x] **No Olympus bytes in the app** (2026-11-13): the app checks
   Olympus's code before patching it by length and SHA-256 (`StockCode` in
   `Firmware.swift`) instead of carrying a copy.
@@ -162,7 +166,6 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
 - [x] **Deploy** (2026-11-12): PR #29 merged and live, showing "Coming
   soon". `/mark-one/download` returns 404 until launch.
 - [ ] **Launch**, in this order:
-  - [ ] The firmware download, under "Decide".
   - [ ] `/pre-release`: read-only hygiene checks (clean tree, leftover
     test code, firmware edits match `scripts/build.py`). `--fix` offers
     the mechanical fixes.
