@@ -157,6 +157,8 @@ struct WelcomeView: View {
             Spacer()
             Button(nextTitle) { step == .done ? done() : move(1) }
                 .primary(step != .firmware || installed)
+                // The rest of setup needs the camera allowed.
+                .disabled(step == .allow && !installer.installed)
         }
         .controlSize(.large)
     }
