@@ -330,28 +330,28 @@ struct WelcomeView: View {
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
             Card(padding: 14) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Install it once from an SD card").fontWeight(.semibold)
-                    Text("About 10 minutes. Later updates install over USB.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Button("Set Up Camera…") { openWindow.firmware() }
-                        .primary(!installed)
-                        .fixedSize()
-                        .font(.callout)
-                        .padding(.top, 6)
+                VStack(alignment: .leading, spacing: 4) {
+                    bullet("Install it once from an SD card, in about 10 minutes.")
+                    bullet("Later updates come over USB.")
+                    bullet("Go back to Olympus’s firmware any time.")
+                    HStack(spacing: 14) {
+                        Button("Set Up Camera…") { openWindow.firmware() }
+                            .primary(!installed)
+                            .fixedSize()
+                        Link("How it works", destination: URL(string: "https://superhighfives.com/mark-one/help#firmware")!)
+                    }
+                    .font(.callout)
+                    .padding(.top, 10)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Label {
-                Text("Use a full battery, and don’t switch the camera off while it updates. You can go back to Olympus’s firmware the same way.")
-            } icon: {
-                Image(systemName: "exclamationmark.triangle.fill").frame(width: 18)
-            }
-                .font(.callout)
-                .symbolRenderingMode(.multicolor)
-                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func bullet(_ text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text("•")
+            Text(text).fixedSize(horizontal: false, vertical: true)
         }
     }
 

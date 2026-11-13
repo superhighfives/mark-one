@@ -199,13 +199,6 @@ struct FirmwareView: View {
             case .setUp:
                 Text("Mark One adds a Webcam choice to your camera. Everything else works just as before.")
                     .fixedSize(horizontal: false, vertical: true)
-                VStack(alignment: .leading, spacing: 4) {
-                    bullet("Install it once from an SD card, in about 10 minutes.")
-                    bullet("Later updates come over USB.")
-                    bullet("Go back to Olympus's firmware any time.")
-                }
-                Link("How it works", destination: URL(string: "https://superhighfives.com/mark-one/help#firmware")!)
-                    .font(.callout)
             case .update:
                 Text("Mark One sends its firmware to the camera over USB. It takes about two minutes. [How updates work](https://superhighfives.com/mark-one/help#updates)")
                     .fixedSize(horizontal: false, vertical: true)
@@ -223,10 +216,10 @@ struct FirmwareView: View {
                     if action != .restore {
                         point("checkmark.shield", "This firmware is unofficial, and not supported by Olympus or OM System.")
                     }
+                    Divider().padding(.vertical, 2)
                     Toggle("I understand, and I accept the risk", isOn: $understood)
-                        .padding(.top, 2)
                 }
-                .padding(4)
+                .padding(8)
             }
             if lowBattery {
                 Label("The camera's battery is low. Charge it before installing.", systemImage: "battery.25percent")
@@ -457,13 +450,6 @@ struct FirmwareView: View {
                 Spacer()
                 Button("Done") { step = .start; closeWindow() }.keyboardShortcut(.defaultAction)
             }
-        }
-    }
-
-    private func bullet(_ text: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text("•")
-            Text(text).fixedSize(horizontal: false, vertical: true)
         }
     }
 
