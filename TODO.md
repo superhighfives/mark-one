@@ -186,16 +186,18 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
   walks through the shots in `screenshots/shots.json`, opens each
   window and grabs it into `screenshots/raw/`. The website lays them out
   in HTML with its own captions.
-- [ ] A support page, or point support at the repo's issues.
+- [x] A support page (2026-11-13): the help page at `/mark-one/help`
+  ends with "Still stuck? Email hi@superhighfives.com".
 - [ ] A Release build.
 
 ### Website
 
-- [ ] Check its claims once the tests pass: no recording time limit, and
-  the card untouched after long sessions.
-- [ ] Update the firmware box: Mark One restores Olympus's firmware over
-  USB ("Going back"), and setup takes a few minutes plus the camera's
-  own install.
+- [x] Check its claims once the tests pass (2026-11-13): "as long as a
+  battery lasts" matches the 37-minute run to an empty battery, and "0
+  files written to the SD card" the same run, which wrote nothing to the
+  card. The 5-second stop and 0.2 s delay match the app and `NOTES.md`.
+- [x] Update the firmware box: "Going back: Olympus's firmware, over
+  USB" and "Setup: about 10 minutes, once" are on the page.
 
 ## After launch
 
