@@ -1549,3 +1549,29 @@ and FaceTime showed the E-M5. So the service keeps a stale device list
 across extension replacements; apps that build their own list, like
 Photo Booth, aren't affected. A restart of the Mac also clears it.
 
+
+## Processes don't see the camera come back (2026-11-13, macOS 27)
+
+A process that's running when the camera extension is switched on in
+System Settings doesn't see the Mark One camera, and keeps not seeing
+it. Tested with three probes while Media Extension was switched off and
+on (scratch code, not kept): one polling CoreMediaIO's device list every
+second, one also listening for changes to that list
+(`CMIOObjectAddPropertyListenerBlock` on `kCMIOHardwarePropertyDevices`),
+and one watching AVFoundation (a `DiscoverySession`, its `devices`, and
+the connected and disconnected notifications). All three saw the camera
+go within a second. None saw it come back, a minute later, while
+sysextd had it `activated_enabled`, the extension was running and a
+fresh process listed it at once. A fourth probe, started while the
+camera was off, didn't see it arrive either.
+
+So, after the extension is switched on (or replaced, as in "FaceTime"
+above):
+
+- Mark One itself can't find its camera, and can't send it frames,
+  until it's reopened. This is the first run for everyone: Mark One
+  opens, then the camera is allowed during setup.
+- Video apps that were open don't list Mark One until they're reopened,
+  and FaceTime until `avconferenced` restarts (it outlives FaceTime).
+- Whether the camera is switched on has to come from sysextd (a
+  properties request), not from the device list.
