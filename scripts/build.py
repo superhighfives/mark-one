@@ -8,7 +8,8 @@ Patches are defined in PATCHES below as (runtime address, expected bytes, new by
 applied to the decoded main block. Addresses below BASE land in the main
 block's 32-byte head, which the camera copies to RAM just before the code.
 Each expected value is checked first, so a patch can't land on the wrong
-build. STRINGS replaces menu strings in every language of the resource
+build. Expected values longer than 8 bytes are given as stock(length,
+sha256), so this file doesn't copy Olympus's code. STRINGS replaces menu strings in every language of the resource
 block (0101).
 """
 import hashlib, struct, sys, os
@@ -31,6 +32,7 @@ def matches(old, got):
     if isinstance(old, tuple):
         return len(got) == old[0] and hashlib.sha256(got).hexdigest() == old[1]
     return got == bytes.fromhex(old)
+
 
 PATCHES = {
     # Shooting mode treats HDMI like analog video: pick it as the display

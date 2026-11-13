@@ -77,11 +77,15 @@ lifts the time limits (see "Recording without a card" in `NOTES.md`).
   to Olympus's license and changes their own copy. Today Mark One asks
   the update server itself, presenting as OM Workspace with placeholder
   device details, and never shows the license.
-- [ ] **No Olympus bytes in the app.** `Firmware.installEndStock` holds
-  22 bytes of Olympus code to check before arming the restart; check a
-  hash instead.
-- [ ] **Before the repo goes public:** review the research notes
-  (`NOTES.md`, `asm/`) for firmware byte sequences and strings.
+- [x] **No Olympus bytes in the app** (2026-11-13): the app checks
+  Olympus's code before patching it by length and SHA-256 (`StockCode` in
+  `Firmware.swift`) instead of carrying a copy.
+- [x] **Firmware bytes in the repo** (2026-11-13): `scripts/build.py` and
+  `scripts/ptp.py` check stock code longer than 8 bytes by length and
+  SHA-256 too (2.7 KB was quoted, up to 1154 bytes at once); the edits
+  they build are unchanged. Shorter checks (addresses, operands) stay as
+  hex. `NOTES.md` and `asm/` quote only identifiers, addresses and single
+  instructions.
 
 ### Direct distribution
 
@@ -158,9 +162,7 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
 - [x] **Deploy** (2026-11-12): PR #29 merged and live, showing "Coming
   soon". `/mark-one/download` returns 404 until launch.
 - [ ] **Launch**, in this order:
-  - [ ] Settle the three open items under "Decide" (the firmware
-    download, Olympus bytes in the app, firmware bytes in the notes), or
-    decide to launch without them.
+  - [ ] The firmware download, under "Decide".
   - [ ] `/pre-release`: read-only hygiene checks (clean tree, leftover
     test code, firmware edits match `scripts/build.py`). `--fix` offers
     the mechanical fixes.
