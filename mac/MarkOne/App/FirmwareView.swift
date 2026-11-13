@@ -327,11 +327,15 @@ struct FirmwareView: View {
             lead("camera") {
                 Text("The card is ready. Now install from it on the camera. [Full steps and troubleshooting](https://superhighfives.com/mark-one/help#installing-it-from-the-card)")
             }
-            VStack(alignment: .leading, spacing: 10) {
-                numbered(1, "Put the card in the camera, unplug the USB cable and switch the camera off. Use a charged battery, not a dummy one.")
-                numbered(2, "Hold OK and switch the camera on. Let go when the orange light on the front comes on.")
-                numbered(3, "Wait about a minute, until the light blinks quickly. Then switch the camera off.")
-                numbered(4, "Switch the camera on, connect it to your Mac and choose Webcam on its screen.")
+            GroupBox {
+                VStack(alignment: .leading, spacing: 10) {
+                    numbered(1, "Put the card in the camera, unplug the USB cable and switch the camera off. Use a charged battery.")
+                    numbered(2, "Hold OK and switch the camera on. Let go when the orange light on the front comes on.")
+                    numbered(3, "Wait about a minute, until the light blinks quickly. Then switch the camera off.")
+                    numbered(4, "Switch the camera on, connect it to your Mac and choose Webcam on its screen.")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(8)
             }
             CardInstallSequence()
             Label("While the light is on, don't switch the camera off, open the battery door or take the card out.", systemImage: "exclamationmark.triangle.fill")
