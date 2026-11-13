@@ -135,6 +135,8 @@ extension ExtensionInstaller {
         guard !removing, !pending, let state = await Self.state() else { return }
         switch state {
         case .enabled:
+            // Already known: only a reopen changes what this process sees.
+            if needsReopen { return }
             if CameraSink.available {
                 allowed(reopen: false)
             } else if await Self.cameraInFreshProcess() {
@@ -178,7 +180,7 @@ extension ExtensionInstaller {
         failed = false
         needsRestart = false
         needsReopen = reopen
-        if newly { log.notice("The Mark One camera is on\(reopen ? "; Mark One needs reopening to use it" : "")") }
+        if newly { log.notice("The Mark One camera is on\(reopen ? "; Mark One needs reopening to use it" : "", privacy: .public)") }
         if newly && reopen { VideoServices.restartFaceTimeService() }
     }
 
@@ -194,15 +196,15 @@ extension ExtensionInstaller {
         needsReopen = false
     }
 
-    /// Asks macOS about the extension every 2 seconds until it's on, then
-    /// every 10, to follow it being switched on and off in System Settings.
-    /// Not while Mark One is waiting to be reopened.
+    /// Asks macOS about the extension every 2 seconds until it's on and
+    /// Mark One can use it, then every 10, to follow it being switched on
+    /// and off in System Settings.
     private func watch() {
         guard watching == nil else { return }
         watching = Task { @MainActor in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(installed && !needsRestart ? 10 : 2))
-                if !needsReopen { await refresh() }
+                try? await Task.sleep(for: .seconds(installed && !needsRestart && !needsReopen ? 10 : 2))
+                await refresh()
             }
         }
     }
