@@ -197,14 +197,17 @@ struct FirmwareView: View {
         VStack(alignment: .leading, spacing: 12) {
             switch action {
             case .setUp:
-                Text("Mark One adds a Webcam choice to your camera. Everything else works just as before.")
-                    .fixedSize(horizontal: false, vertical: true)
+                lead("camera") {
+                    Text("Mark One adds a Webcam choice to your camera. Everything else works just as before.")
+                }
             case .update:
-                Text("Mark One sends its firmware to the camera over USB. It takes about two minutes. [How updates work](https://superhighfives.com/mark-one/help#updates)")
-                    .fixedSize(horizontal: false, vertical: true)
+                lead("arrow.down.circle") {
+                    Text("Mark One sends its firmware to the camera over USB. It takes about two minutes. [How updates work](https://superhighfives.com/mark-one/help#updates)")
+                }
             case .restore:
-                Text("Mark One puts Olympus's firmware 2.3 back on the camera over USB. [How going back works](https://superhighfives.com/mark-one/help#going-back)")
-                    .fixedSize(horizontal: false, vertical: true)
+                lead("arrow.uturn.backward.circle") {
+                    Text("Mark One puts Olympus's firmware 2.3 back on the camera over USB. [How going back works](https://superhighfives.com/mark-one/help#going-back)")
+                }
             }
             GroupBox {
                 VStack(alignment: .leading, spacing: 8) {
@@ -289,8 +292,9 @@ struct FirmwareView: View {
 
     private var card: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Take the SD card out of your camera and put it in your Mac. Any card the camera already takes photos on works.")
-                .fixedSize(horizontal: false, vertical: true)
+            lead("sdcard") {
+                Text("Take the SD card out of your camera and put it in your Mac. Any card the camera already takes photos on works.")
+            }
             Text("Your photos stay on the card. Mark One adds one file, in a folder named DCOLYMP, replacing any older E-M5 firmware there. It reads the file back to check the card, then ejects it.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
@@ -313,7 +317,9 @@ struct FirmwareView: View {
 
     private var cameraSteps: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("The card is ready and ejected. Now install from it on the camera.")
+            lead("camera") {
+                Text("The card is ready and ejected. Now install from it on the camera.")
+            }
             VStack(alignment: .leading, spacing: 10) {
                 numbered(1, "Put the card in the camera and unplug the USB cable. Use a fully charged battery, not a dummy battery.")
                 numbered(2, "Switch the camera off.")
@@ -391,8 +397,9 @@ struct FirmwareView: View {
                             .keyboardShortcut(.defaultAction)
                     }
                 } else if install.phase == .switchOffFirst {
-                    Text("Mark One set the camera's USB Mode back to Auto, which Olympus's firmware needs. The camera saves it when it's switched off.")
-                        .fixedSize(horizontal: false, vertical: true)
+                    lead("power") {
+                        Text("Mark One set the camera's USB Mode back to Auto, which Olympus's firmware needs. The camera saves it when it's switched off.")
+                    }
                     numbered(1, "Switch the camera off and on.")
                     numbered(2, "Choose Webcam on its screen. The restore carries on by itself.", choose: .webcam)
                     HStack(spacing: 8) {
@@ -400,7 +407,9 @@ struct FirmwareView: View {
                         Text("Waiting for the camera.").foregroundStyle(.secondary)
                     }
                 } else if install.phase == .installing {
-                    Text("The camera has the firmware and is installing it.")
+                    lead("arrow.triangle.2.circlepath") {
+                        Text("The camera has the firmware and is installing it.")
+                    }
                     CameraUpdateScreen().frame(maxWidth: .infinity)
                     numbered(1, "Wait while the camera's screen shows this. If Mark One was using the camera, the screen flickers between this and the last picture. Don't switch the camera off or unplug it.")
                     if install.restarts {
@@ -453,6 +462,17 @@ struct FirmwareView: View {
                 Spacer()
                 Button("Done") { step = .start; closeWindow() }.keyboardShortcut(.defaultAction)
             }
+        }
+    }
+
+    /// A step's main line, with a large symbol beside it.
+    private func lead(_ symbol: String, @ViewBuilder _ text: () -> Text) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: symbol)
+                .font(.system(size: 24))
+                .foregroundStyle(.tint)
+                .frame(width: 32)
+            text().fixedSize(horizontal: false, vertical: true)
         }
     }
 
