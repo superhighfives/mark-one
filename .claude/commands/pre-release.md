@@ -42,7 +42,7 @@ Search `mac/MarkOne/` (Swift) and `scripts/`:
   ```sh
   cd mac/MarkOne && xcodebuild -project MarkOne.xcodeproj -scheme MarkOne -configuration Debug -derivedDataPath build build 2>&1 | grep -E "warning:|error:" | grep -v appintents
   ```
-- `uv run scripts/build.py --roundtrip fw/OLY_E_097_2300_0000_0000.BIN` passes (needs `fw/`).
+- `uv run --frozen scripts/build.py --roundtrip fw/OLY_E_097_2300_0000_0000.BIN` passes (needs `fw/`).
 
 ### 5. Website
 

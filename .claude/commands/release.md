@@ -82,7 +82,7 @@ Report the mode (live or dry run).
 
 1. **Firmware edits are current.** `WEBCAM_REVISION` in `scripts/build.py` matches `"revision"` in `webcam-firmware.json`, and rebuilding the edits gives the same file:
    ```sh
-   uv run scripts/build.py fw/OLY_E_097_2300_0000_0000.BIN /tmp/markone-check/E0972300.BIN usb-tools webcam --edits /tmp/markone-check/edits.json
+   uv run --frozen scripts/build.py fw/OLY_E_097_2300_0000_0000.BIN /tmp/markone-check/E0972300.BIN usb-tools webcam --edits /tmp/markone-check/edits.json
    cmp /tmp/markone-check/edits.json mac/MarkOne/App/Resources/webcam-firmware.json
    ```
    (Needs `fw/` from `scripts/setup.sh`.) If they differ, stop: the app would install firmware that doesn't match the source.
