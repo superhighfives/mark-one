@@ -229,7 +229,7 @@ struct WelcomeView: View {
                     }
                 }
             } else {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
                     allowStep(1) {
                         Button("Open System Settings") { ExtensionInstaller.openSystemSettings() }
                             .primary(true)
