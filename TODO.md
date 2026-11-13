@@ -160,6 +160,14 @@ Next.js on Cloudflare Workers through OpenNext), next to Pika.
 
 ## After launch
 
+- [ ] **A message after unplugging.** Unplugging mid-call leaves the
+  screen dark for up to 10 seconds before the camera goes back to
+  normal, which can look frozen. Show Olympus's own "Remove USB Cable"
+  style message (it already exists in the firmware; photo 2026-11-12)
+  from `asm/unplug.s` until the camera's back. Needs a firmware revision:
+  find the message call, add it to the stub, and test unplugging mid-call
+  and in Storage and MTP. Also find where the camera already shows that
+  message.
 - [ ] **Power.** The E-M5 doesn't run from USB power. Try the dummy
   battery and power adapter (on order) for long calls.
 - [ ] **Shorter restarts.** Mark One restarts the recording every 100
