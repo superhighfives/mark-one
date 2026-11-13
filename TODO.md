@@ -220,8 +220,9 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
   and in Storage and MTP. The camera shows it when you choose Exit in the
   USB menu, so start from the menu's OK handler (0x7eec70d7, patched by
   `asm/webcam/ok.s`) and follow the Exit path.
-- [ ] **Power.** The E-M5 doesn't run from USB power. Try the dummy
-  battery and power adapter (on order) for long calls.
+- [ ] **Power.** The E-M5 doesn't run from USB power. A card install
+  worked on the dummy battery (2026-11-13), so setup asks only for a
+  charged battery. Still to try: a long call on it.
 - [ ] **Shorter restarts.** Mark One restarts the recording every 100
   minutes, before the 2-hour cap, and the picture freezes for about 5 s,
   almost all of it waiting for the camera to report it's recording
