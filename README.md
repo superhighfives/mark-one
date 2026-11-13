@@ -43,7 +43,7 @@ xcodebuild -project MarkOne.xcodeproj -scheme MarkOne -configuration Debug \
 cp -R "build/Build/Products/Debug/Mark One.app" /Applications/
 ```
 
-The app has to run from `/Applications` to install its camera extension. It installs its camera extension when it opens; approve it the first time in System Settings > General > Login Items & Extensions > Camera Extensions. Quit Mark One normally rather than force-quitting it. Force-quitting it mid-session can leave macOS's camera service stuck, and then the camera doesn't show up again until you unplug it.
+The app has to run from `/Applications` to install its camera extension. It installs its camera extension when it opens; approve it the first time in System Settings > General > Login Items & Extensions: click ⓘ beside Mark One and turn on Media Extension (Camera Extensions on older versions of macOS). Quit Mark One normally rather than force-quitting it. Force-quitting it mid-session can leave macOS's camera service stuck, and then the camera doesn't show up again until you unplug it.
 
 ## Running it
 

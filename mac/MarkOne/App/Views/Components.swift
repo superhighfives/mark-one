@@ -524,3 +524,58 @@ struct CameraUSBMenu: View {
         .accessibilityLabel("The camera's USB menu: \(items.joined(separator: ", ")), with \(choose.rawValue) selected")
     }
 }
+
+/// The sheet System Settings shows for Mark One's extensions (macOS 27,
+/// General › Login Items & Extensions, Mark One's ⓘ), redrawn with the
+/// switch to turn on highlighted. macOS calls the camera a Media Extension.
+struct ExtensionApprovalSheet: View {
+    var body: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 28, height: 28)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Mark One Extensions").font(.system(size: 12, weight: .semibold))
+                    Text("1 extension installed").font(.system(size: 10)).foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(10)
+            .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            HStack(spacing: 10) {
+                Image(systemName: "video.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.white)
+                    .frame(width: 24, height: 24)
+                    .background(Color(white: 0.45), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Media Extension").font(.system(size: 12))
+                    Text("Provides additional functionality for media applications")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 8)
+                // The switch, on, ringed to show which one to turn on.
+                Capsule()
+                    .fill(Color.accentColor)
+                    .frame(width: 30, height: 17)
+                    .overlay(alignment: .trailing) {
+                        Circle().fill(.white).frame(width: 14, height: 14).padding(.trailing, 1.5)
+                    }
+                    .padding(3)
+                    .overlay(Capsule().strokeBorder(.orange, lineWidth: 2))
+            }
+            .padding(10)
+            .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .padding(10)
+        .frame(maxWidth: 380)
+        .background(Color(white: 0.17), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.white.opacity(0.1)))
+        .environment(\.colorScheme, .dark)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("System Settings' Mark One Extensions sheet, with Media Extension turned on")
+    }
+}

@@ -202,9 +202,29 @@ struct WelcomeView: View {
     private var allow: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Allow the Mark One camera").font(.title.weight(.bold))
-            Text("macOS asks before an app adds a camera. Open System Settings, go to **General › Login Items & Extensions › Camera Extensions**, and turn on Mark One.")
+            Text("macOS asks before an app adds a camera. It lists Mark One's camera as a Media Extension.")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            if !installer.installed && !installer.failed {
+                VStack(alignment: .leading, spacing: 12) {
+                    allowStep(1) {
+                        Button("Open System Settings") { ExtensionInstaller.openSystemSettings() }
+                    }
+                    allowStep(2) {
+                        Text("In Login Items & Extensions, find Mark One and click ⓘ beside it.")
+                    }
+                    allowStep(3) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Turn on Media Extension, then click Done.")
+                            ExtensionApprovalSheet()
+                        }
+                    }
+                    Text("On older versions of macOS, look under Camera Extensions instead, and turn on Mark One.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
             Card(padding: 14) {
                 HStack(spacing: 12) {
                     if installer.installed {
@@ -230,10 +250,16 @@ struct WelcomeView: View {
                             Text("This moves on by itself once you allow it.").font(.callout).foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Button("Open System Settings") { ExtensionInstaller.openSystemSettings() }
                     }
                 }
             }
+        }
+    }
+
+    private func allowStep(_ n: Int, @ViewBuilder _ content: () -> some View) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text("\(n)").font(.headline.monospacedDigit()).frame(width: 16)
+            content().fixedSize(horizontal: false, vertical: true)
         }
     }
 

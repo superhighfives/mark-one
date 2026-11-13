@@ -65,7 +65,7 @@ final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionReq
 
     nonisolated func requestNeedsUserApproval(_ request: OSSystemExtensionRequest) {
         Task { @MainActor in
-            status = "Allow it in System Settings › General › Login Items & Extensions › Camera Extensions."
+            status = "Allow it in System Settings › General › Login Items & Extensions: click ⓘ beside Mark One and turn on Media Extension."
             needsApproval = true
         }
     }

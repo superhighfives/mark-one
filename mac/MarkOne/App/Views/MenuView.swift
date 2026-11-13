@@ -96,7 +96,7 @@ struct MenuView: View {
                 .font(.title3.weight(.semibold))
             Text(installer.failed
                  ? installer.status
-                 : "macOS asks before an app adds a camera. Turn on Mark One under Camera Extensions in System Settings.")
+                 : "macOS asks before an app adds a camera. In System Settings › General › Login Items & Extensions, click ⓘ beside Mark One and turn on Media Extension.")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if installer.failed {
