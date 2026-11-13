@@ -26,9 +26,10 @@ Run `/pre-release` first if it hasn't been run since the last change.
 | Camera extension's build | `project.yml`, `MarkOneCamera`'s own `CURRENT_PROJECT_VERSION` |
 | Firmware edits | `mac/MarkOne/App/Resources/webcam-firmware.json`, from `scripts/build.py` |
 | Build script | `scripts/build-release.sh` (archive, Developer ID export, extension check, notarize the app) |
-| Release output | `mac/MarkOne/build/release/VERSION/` (gitignored) |
+| Release output | `mac/MarkOne/build/release/VERSION/` (gitignored), then filed in the releases repo |
+| Releases repo | `~/Development/pika-workspace/releases` ([superhighfives/releases](https://github.com/superhighfives/releases)), `Mark One/VERSION/`: DMG, delta, appcast, `VERSION.md` and `MarkOne-VERSION.xcarchive.zip` |
 | Sparkle tools | `mac/MarkOne/build/SourcePackages/artifacts/sparkle/Sparkle/bin` (after a build) |
-| releasecast | `~/Development/pika-workspace/releasecast` (or `npx releasecast`, 0.0.13 or later for `--account` and `--profile`) |
+| releasecast | `npx releasecast` (0.0.13 or later, for `--account` and `--profile`) |
 | Website | `~/Development/superhighfives.com`, `changelog/mark-one/VERSION.md` |
 | Feed | https://superhighfives.com/releases/mark-one/feed (skips `beta: true`) |
 | GitHub | `superhighfives/mark-one`, tag `VERSION`, assets `Mark-One-VERSION.dmg` and `Mark-OneBUILD-FROM.delta` |
@@ -50,6 +51,7 @@ Check quickly; if any fail, stop and say what's missing.
 5. The Sparkle key: `security find-generic-password -a mark-one -s https://sparkle-project.org` finds it.
 6. **Live releases only:** the GitHub repo is public (`gh repo view superhighfives/mark-one --json visibility`). Release downloads from a private repo fail for everyone else, so stop if it's private.
 7. The website repo is on `main`, clean apart from `bun.lock`, and up to date.
+8. The releases repo (`~/Development/pika-workspace/releases`) is on `main`, clean and up to date.
 
 Report the mode (live or dry run).
 
@@ -96,11 +98,12 @@ Report the mode (live or dry run).
    scripts/build-release.sh
    ```
    In dry run mode, notarizing the app still runs (it's what lets the DMG's app open); only the DMG's notarization is skipped.
-2. Get the previous release's DMG for a delta (skip for the first release):
+2. Copy the previous release's DMG for a delta (skip for the first release). It's in the releases repo:
    ```sh
    mkdir -p mac/MarkOne/build/release/VERSION/previous
-   gh release download PREVIOUS --repo superhighfives/mark-one --pattern 'Mark-One-*.dmg' --dir mac/MarkOne/build/release/VERSION/previous
+   cp ~/Development/pika-workspace/releases/"Mark One"/PREVIOUS/Mark-One-PREVIOUS.dmg mac/MarkOne/build/release/VERSION/previous/
    ```
+   If it's missing there, download it from the GitHub release instead (`gh release download PREVIOUS --repo superhighfives/mark-one --pattern 'Mark-One-*.dmg' --dir …`).
 3. Run releasecast from the export folder:
    ```sh
    export PATH="$PWD/mac/MarkOne/build/SourcePackages/artifacts/sparkle/Sparkle/bin:$PATH"
@@ -169,8 +172,19 @@ Confirm before each step. In dry run mode, make the GitHub release a draft and s
 ### Phase 6: Finalize
 
 1. `git fetch --tags` and check the tag exists on the remote.
-2. Add a dated line to `TODO.md` or `NOTES.md` only if something about the process changed or went wrong.
-3. Summary checklist:
+2. **File the release** in the releases repo (skip in dry run mode):
+   ```sh
+   R=~/Development/pika-workspace/releases/"Mark One"/VERSION
+   mkdir -p "$R"
+   cp mac/MarkOne/build/release/VERSION/{Mark-One-VERSION.dmg,VERSION.md,appcast.xml} "$R"/
+   cp mac/MarkOne/build/release/VERSION/*.delta "$R"/ 2>/dev/null || true
+   ditto -c -k --keepParent mac/MarkOne/build/release/MarkOne.xcarchive "$R/MarkOne-VERSION.xcarchive.zip"
+   cd ~/Development/pika-workspace/releases
+   git add "Mark One/VERSION" && git commit -m "Add release artifacts for Mark One VERSION" && git push origin main
+   ```
+   The archive has the debug symbols for reading crash reports from this build; the next build wipes `mac/MarkOne/build/release/`.
+3. Add a dated line to `TODO.md` or `NOTES.md` only if something about the process changed or went wrong.
+4. Summary checklist:
    - [ ] Version and build bumped and pushed (extension build: unchanged / bumped)
    - [ ] Firmware edits match the source
    - [ ] App notarized; DMG notarized and signed with Mark One's key
@@ -178,6 +192,7 @@ Confirm before each step. In dry run mode, make the GitHub release a draft and s
    - [ ] GitHub release and tag
    - [ ] Changelog on the website, deployed
    - [ ] Feed, DMG and download checked
+   - [ ] Release filed in the releases repo, with its archive
    - [ ] Website help matches the app
 
 ---

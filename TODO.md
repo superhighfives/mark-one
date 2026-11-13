@@ -118,11 +118,14 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
   releasecast makes the DMG, notarizes it, signs it with Mark One's key
   and makes a delta from the previous GitHub release. Dry runs of
   releasecast on Mark One (with a delta) and Pika check out.
-- [ ] **releasecast 0.0.13:** merge
-  [releasecast#4](https://github.com/superhighfives/releasecast/pull/4)
-  (`--account` for Mark One's key, `--profile`, names with spaces) and
-  publish it, so `/release` can use `npx releasecast`. Until then, run
-  it from `~/Development/pika-workspace/releasecast`.
+- [x] **releasecast 0.0.13** (2026-11-12): `--account` for Mark One's
+  key, `--profile`, and names with spaces
+  ([releasecast#4](https://github.com/superhighfives/releasecast/pull/4)).
+- [x] **The releases repo** (2026-11-12): `pika-releases` is now
+  [superhighfives/releases](https://github.com/superhighfives/releases)
+  (`~/Development/pika-workspace/releases`). `/release` files each
+  version in `Mark One/VERSION/` with its Xcode archive, and takes the
+  previous DMG from there for the delta.
 - [x] **Builds from source** (2026-11-11): the README's "Build it
   yourself". Those builds have no update feed.
 
@@ -131,8 +134,8 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
 - [x] **Release files on GitHub** (2026-11-12, was R2): the feed points
   at the DMG and deltas on each GitHub release in
   `superhighfives/mark-one`, and `/mark-one/download` redirects to the
-  latest DMG. The site's R2 binding is gone; the empty
-  `mark-one-releases` bucket can be deleted.
+  latest DMG. The site's R2 binding and the `mark-one-releases` bucket
+  are gone.
 - [x] **Appcast:** `changelog/mark-one/<version>.md`, in the same format
   as Pika's, and `/releases/mark-one/feed`. `generateAppcast.ts` now
   takes settings per app, and Pika's feeds are unchanged.
