@@ -233,10 +233,10 @@ struct WelcomeView: View {
                     allowStep(1) {
                         Button("Open System Settings") { ExtensionInstaller.openSystemSettings() }
                     }
-                    allowStep(2) { Text("Click ⓘ beside Mark One.") }
+                    allowStep(2) { Text("Scroll down to the extensions, and click ⓘ beside Mark One.") }
                     allowStep(3) {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Turn on Media Extension.")
+                            Text("Turn on Media Extension, then click Done.")
                             ExtensionApprovalSheet()
                         }
                     }
