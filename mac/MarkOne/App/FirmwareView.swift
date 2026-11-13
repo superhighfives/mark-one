@@ -216,11 +216,10 @@ struct FirmwareView: View {
                     if action != .restore {
                         point("checkmark.shield", "This firmware is unofficial, and not supported by Olympus or OM System.")
                     }
-                    Divider().padding(.vertical, 2)
-                    Toggle("I understand, and I accept the risk", isOn: $understood)
                 }
                 .padding(8)
             }
+            Toggle("I understand, and I accept the risk", isOn: $understood)
             if lowBattery {
                 Label("The camera's battery is low. Charge it before installing.", systemImage: "battery.25percent")
                     .foregroundStyle(.red)
