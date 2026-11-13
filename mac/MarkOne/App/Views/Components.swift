@@ -440,3 +440,87 @@ struct CameraUpdateScreen: View {
         .frame(width: size, height: size)
     }
 }
+
+/// The menu the camera shows when it's plugged in with USB Mode on Auto,
+/// redrawn from photos of its screen (as on the website's help page), with
+/// the choice to make highlighted. Olympus's firmware has no Webcam.
+struct CameraUSBMenu: View {
+    enum Choice: String { case mtp = "MTP", webcam = "Webcam" }
+    let choose: Choice
+    var width: CGFloat = 200
+
+    private var items: [String] {
+        choose == .webcam ? ["Storage", "MTP", "Webcam", "Print", "Exit"]
+                          : ["Storage", "MTP", "Print", "Exit"]
+    }
+
+    var body: some View {
+        // Sizes are fractions of the screen's width, as on the website.
+        let w = width
+        let height = w * 3 / 4
+        ZStack(alignment: .top) {
+            RadialGradient(stops: [.init(color: Color(red: 0.17, green: 0.37, blue: 0.85), location: 0),
+                                   .init(color: Color(red: 0.09, green: 0.23, blue: 0.58), location: 0.35),
+                                   .init(color: Color(red: 0.04, green: 0.09, blue: 0.22), location: 0.7),
+                                   .init(color: .black, location: 1)],
+                           center: UnitPoint(x: 0.5, y: 0.55), startRadius: 0, endRadius: w * 0.55)
+            VStack(spacing: w * 0.016) {
+                Text("USB").font(.system(size: w * 0.052, weight: .bold))
+                LinearGradient(colors: [.clear, .white.opacity(0.9), .clear], startPoint: .leading, endPoint: .trailing)
+                    .frame(height: max(1, w * 0.0035))
+            }
+            .padding(.horizontal, w * 0.12)
+            .padding(.top, height * 0.04)
+            VStack(spacing: 0) {
+                ForEach(items, id: \.self) { item in
+                    Text(item)
+                        .font(.system(size: w * 0.054, weight: .bold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, w * 0.0035)
+                        .background {
+                            if item == choose.rawValue {
+                                RoundedRectangle(cornerRadius: w * 0.004)
+                                    .fill(LinearGradient(colors: [Color(red: 0.56, green: 0.64, blue: 0.80),
+                                                                  Color(red: 0.29, green: 0.40, blue: 0.62)],
+                                                         startPoint: .top, endPoint: .bottom))
+                                    .overlay(RoundedRectangle(cornerRadius: w * 0.004)
+                                        .strokeBorder(Color(red: 0.90, green: 0.93, blue: 0.98), lineWidth: max(1, w * 0.0045)))
+                                    .shadow(color: Color(red: 0.78, green: 0.86, blue: 1).opacity(0.5), radius: w * 0.012)
+                            }
+                        }
+                }
+            }
+            .padding(.horizontal, w * 0.12)
+            .padding(.top, height * 0.28 - w * 0.02)
+            VStack {
+                Spacer()
+                HStack(spacing: w * 0.008) {
+                    Spacer()
+                    Text("Set")
+                    Text("OK")
+                        .font(.system(size: w * 0.034, weight: .medium))
+                        .foregroundStyle(Color(red: 0.24, green: 0.44, blue: 0.71))
+                        .padding(.horizontal, w * 0.008)
+                        .background(.white, in: RoundedRectangle(cornerRadius: w * 0.004))
+                }
+                .font(.system(size: w * 0.046, weight: .bold))
+                .padding(.horizontal, w * 0.03)
+                .frame(height: height * 0.1)
+                .background(LinearGradient(stops: [.init(color: Color(red: 0.65, green: 0.78, blue: 0.93), location: 0),
+                                                   .init(color: Color(red: 0.42, green: 0.61, blue: 0.85), location: 0.45),
+                                                   .init(color: Color(red: 0.25, green: 0.45, blue: 0.72), location: 1)],
+                                           startPoint: .top, endPoint: .bottom))
+            }
+        }
+        .foregroundStyle(.white)
+        .shadow(color: .white.opacity(0.35), radius: w * 0.006)
+        .frame(width: w, height: height)
+        .clipShape(RoundedRectangle(cornerRadius: 2))
+        .padding(w * 0.03)
+        .background(Color(white: 0.043), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(.white.opacity(0.1)))
+        .environment(\.colorScheme, .dark)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("The camera's USB menu: \(items.joined(separator: ", ")), with \(choose.rawValue) selected")
+    }
+}

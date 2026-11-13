@@ -312,7 +312,7 @@ struct FirmwareView: View {
                 numbered(5, "When the orange light on the front (the AF-assist light) comes on and stays on, let go of OK.")
                 numbered(6, "Wait about a minute while the light stays on. The camera is installing.")
                 numbered(7, "When the light starts blinking quickly, it's done. Take the battery out, put it back, and switch the camera on as usual.")
-                numbered(8, "Connect the camera to your Mac and choose Webcam on its screen.")
+                numbered(8, "Connect the camera to your Mac and choose Webcam on its screen.", choose: .webcam)
             }
             Label("While the light is on and not blinking, don't switch the camera off, open the battery door or take the card out. The camera is writing its firmware, and stopping it partway can leave it unable to start.", systemImage: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
@@ -384,7 +384,7 @@ struct FirmwareView: View {
                     Text("Mark One set the camera's USB Mode back to Auto, which Olympus's firmware needs. The camera saves it when it's switched off.")
                         .fixedSize(horizontal: false, vertical: true)
                     numbered(1, "Switch the camera off and on.")
-                    numbered(2, "Choose Webcam on its screen. The restore carries on by itself.")
+                    numbered(2, "Choose Webcam on its screen. The restore carries on by itself.", choose: .webcam)
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
                         Text("Waiting for the camera.").foregroundStyle(.secondary)
@@ -397,12 +397,14 @@ struct FirmwareView: View {
                         numbered(2, "When the screen shows OK, the camera restarts by itself, with the new firmware. It takes about a minute and a half.")
                         numbered(3, action == .restore ? "It asks how to connect again, as it did before Mark One. Choose MTP, so Mark One can check the firmware."
                                  : pipeline.connectAsWebcam ? "Mark One connects to it again. There's nothing to do."
-                                 : "Choose Webcam on its screen when it asks.")
+                                 : "Choose Webcam on its screen when it asks.",
+                                 choose: action == .restore ? .mtp : pipeline.connectAsWebcam ? nil : .webcam)
                     } else {
                         numbered(2, "When the screen shows OK, or goes back to the picture it showed before, the install is done. The camera keeps running the old firmware until it restarts, so switch it off and on.")
                         numbered(3, action == .restore ? "Connect the camera to your Mac again and choose MTP on its screen, so Mark One can check the firmware."
                                  : pipeline.connectAsWebcam ? "Connect the camera to your Mac again."
-                                 : "Connect the camera to your Mac again and choose Webcam on its screen.")
+                                 : "Connect the camera to your Mac again and choose Webcam on its screen.",
+                                 choose: action == .restore ? .mtp : pipeline.connectAsWebcam ? nil : .webcam)
                     }
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
@@ -444,10 +446,13 @@ struct FirmwareView: View {
         }
     }
 
-    private func numbered(_ n: Int, _ text: String) -> some View {
+    private func numbered(_ n: Int, _ text: String, choose: CameraUSBMenu.Choice? = nil) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text("\(n)").font(.headline.monospacedDigit()).frame(width: 16)
-            Text(text).fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(text).fixedSize(horizontal: false, vertical: true)
+                if let choose { CameraUSBMenu(choose: choose) }
+            }
         }
     }
 
