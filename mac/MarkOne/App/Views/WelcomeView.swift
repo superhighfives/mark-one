@@ -265,7 +265,7 @@ struct WelcomeView: View {
                         .frame(width: 72, height: 48)
                     if pipeline.firmware == .stock || pipeline.problem == .wrongFirmware {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("This camera needs the Mark One firmware").fontWeight(.semibold)
+                            Text("Install Mark One firmware").fontWeight(.semibold)
                             Text(pipeline.status).font(.callout).foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }

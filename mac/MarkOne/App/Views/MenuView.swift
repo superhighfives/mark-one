@@ -170,7 +170,7 @@ struct MenuView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if pipeline.firmware?.updateAvailable == true {
-                Button("Update Camera…") { openWindow.firmware() }
+                Button("Update Camera…") { closePanel(); openWindow.firmware() }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                     .frame(maxWidth: .infinity)
@@ -186,7 +186,7 @@ struct MenuView: View {
                  : "Leave the camera alone, and don't unplug it, until it's done. Mark One carries on by itself.")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Button("Show Progress") { openWindow.firmware() }
+            Button("Show Progress") { closePanel(); openWindow.firmware() }
                 .controlSize(.large)
                 .frame(maxWidth: .infinity)
         }
@@ -196,7 +196,7 @@ struct MenuView: View {
         VStack(alignment: .leading, spacing: 12) {
             Card {
                 VStack(alignment: .leading, spacing: 6) {
-                    Label("This camera needs the Mark One firmware", systemImage: "exclamationmark.triangle.fill")
+                    Label("Install Mark One firmware", systemImage: "exclamationmark.triangle.fill")
                         .font(.headline)
                         .symbolRenderingMode(.multicolor)
                     Text(pipeline.status)
@@ -204,7 +204,7 @@ struct MenuView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            Button("Set Up Camera…") { openWindow.firmware() }
+            Button("Set Up Camera…") { closePanel(); openWindow.firmware() }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .frame(maxWidth: .infinity)
@@ -244,7 +244,7 @@ struct MenuView: View {
                 HStack {
                     Label("New camera firmware", systemImage: "arrow.down.circle")
                     Spacer()
-                    Button("Update Camera…") { openWindow.firmware() }
+                    Button("Update Camera…") { closePanel(); openWindow.firmware() }
                 }
                 .font(.callout)
             }
@@ -292,6 +292,7 @@ struct MenuView: View {
             Divider().padding(.horizontal, -Self.padding)
             HStack {
                 Button("Settings…") {
+                    closePanel()
                     openSettings()
                     NSApp.activate(ignoringOtherApps: true)
                 }
@@ -305,5 +306,11 @@ struct MenuView: View {
             .buttonStyle(.borderless)
             .foregroundStyle(.primary)
         }
+    }
+
+    /// Closes this panel, so a window it opens isn't left behind it. While
+    /// it's open, the panel is the key window.
+    private func closePanel() {
+        NSApp.keyWindow?.close()
     }
 }
