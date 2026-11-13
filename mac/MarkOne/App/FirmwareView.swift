@@ -199,10 +199,10 @@ struct FirmwareView: View {
             switch action {
             case .setUp: EmptyView()
             case .update:
-                Text("Mark One sends its firmware to the camera over USB, and the camera checks it and installs it. It takes about two minutes.")
+                Text("Mark One sends its firmware to the camera over USB. It takes about two minutes. [How updates work](https://superhighfives.com/mark-one/help#updates)")
                     .fixedSize(horizontal: false, vertical: true)
             case .restore:
-                Text("Mark One downloads Olympus's firmware 2.3 and sends it to the camera over USB, unchanged. Afterward the camera is as it came from Olympus, and Mark One can set it up again from the card.")
+                Text("Mark One puts Olympus's firmware 2.3 back on the camera over USB. [How going back works](https://superhighfives.com/mark-one/help#going-back)")
                     .fixedSize(horizontal: false, vertical: true)
             }
             GroupBox {
@@ -210,9 +210,8 @@ struct FirmwareView: View {
                     Label("Installing firmware has a risk", systemImage: "exclamationmark.triangle.fill")
                         .font(.headline)
                         .foregroundStyle(.orange)
-                    Text(action == .restore
-                         ? "If the camera loses power or is disconnected while it installs, it may not turn on again, and you could lose the camera. Use a charged battery and leave the camera alone until it's done."
-                         : "This is unofficial firmware, not made or supported by Olympus or OM System. If the camera loses power or is disconnected while it installs, it may not turn on again, and you could lose the camera. Use a charged battery and leave the camera alone until it's done. Only continue if you accept the risk.")
+                    Text((action == .restore ? "" : "This firmware is unofficial, and not supported by Olympus or OM System. ")
+                         + "If the camera loses power or is unplugged while it installs, it may not start again. Use a charged battery and leave it alone until it's done.")
                         .fixedSize(horizontal: false, vertical: true)
                     Toggle("I understand, and I accept the risk", isOn: $understood)
                 }
