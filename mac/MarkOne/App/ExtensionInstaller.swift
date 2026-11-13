@@ -12,7 +12,7 @@ private let log = Logger(subsystem: "com.superhighfives.markone", category: "ext
 final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionRequestDelegate {
     static let shared = ExtensionInstaller()
 
-    @Published var status = "Not installed yet."
+    @Published var status = "Not installed"
     @Published var installed = false
     /// Whether macOS is waiting for the user to allow the camera in System Settings.
     @Published var needsApproval = false
@@ -67,7 +67,7 @@ final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionReq
             if result == .willCompleteAfterReboot {
                 status = "Restart your Mac to finish."
             } else {
-                status = removing ? "Removed." : "Installed."
+                status = removing ? "Not installed" : "Installed"
                 installed = !removing
                 needsApproval = false
                 if !removing { confirmCamera() }
@@ -79,7 +79,7 @@ final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionReq
         Task { @MainActor in
             // Cancelled above because this version is already installed.
             if !removing, (error as? OSSystemExtensionError)?.code == .requestCanceled {
-                status = "Installed."
+                status = "Installed"
                 installed = true
                 needsApproval = false
                 confirmCamera()
