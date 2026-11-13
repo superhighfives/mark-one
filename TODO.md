@@ -157,10 +157,23 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
   link, and `/mark-one/download` returns 404.
 - [x] **Deploy** (2026-11-12): PR #29 merged and live, showing "Coming
   soon". `/mark-one/download` returns 404 until launch.
-- [ ] **Launch:** make the repo public (GitHub release downloads need
-  it), then `/release` 1.0. It offers to set `available` to true in
-  `src/data/markone.ts` (a constant, not an environment variable, like
-  the rest of the site's settings).
+- [ ] **Launch**, in this order:
+  - [ ] Settle the three open items under "Decide" (the firmware
+    download, Olympus bytes in the app, firmware bytes in the notes), or
+    decide to launch without them.
+  - [ ] `/pre-release`: read-only hygiene checks (clean tree, leftover
+    test code, firmware edits match `scripts/build.py`). `--fix` offers
+    the mechanical fixes.
+  - [ ] `/release --dry`: builds and checks everything, makes only a
+    draft GitHub release, pushes nothing and undoes the version bump.
+    Works while the repo is private.
+  - [ ] Make the repo public. A live `/release` stops while it's private,
+    because release downloads from a private repo fail for everyone else.
+  - [ ] `/release` 1.0 (keeps build 2, the first release). It asks before
+    each irreversible step, drafts the notes for approval, and offers to
+    set `available` to true in `src/data/markone.ts` (a constant, not an
+    environment variable, like the rest of the site's settings) to turn
+    on the Download button.
 - [ ] **Test end to end:** download from the page, then publish an
   update and watch Sparkle install it. Check that downloads report their
   size, so browsers show progress.
