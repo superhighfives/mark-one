@@ -239,7 +239,6 @@ struct WelcomeView: View {
                     allowStep(2) { Text("Scroll down to the extensions, and click ⓘ beside Mark One.") }
                     allowStep(3) { Text("Turn on Media Extension, then click Done.") }
                 }
-                // Under the steps' text, past their numbers.
                 VStack(alignment: .leading, spacing: 16) {
                     Card(padding: 8) { ExtensionApprovalSteps() }
                     Text("On older versions of macOS, it's under Camera Extensions.")
@@ -251,7 +250,6 @@ struct WelcomeView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .padding(.leading, 26)
             }
         }
     }
