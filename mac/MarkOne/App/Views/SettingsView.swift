@@ -104,10 +104,13 @@ private struct CameraSettings: View {
                 // replaces the extension with a different version.
                 LabeledContent("Status") {
                     HStack {
-                        Text(installer.installed ? "Installed" : installer.needsApproval ? "Needs approval" : installer.status)
+                        Text(installer.needsReopen ? "Reopen Mark One to use it"
+                             : installer.installed ? "Installed" : installer.needsApproval ? "Needs approval" : installer.status)
                             .multilineTextAlignment(.trailing)
                             .fixedSize(horizontal: false, vertical: true)
-                        if installer.installed {
+                        if installer.needsReopen {
+                            Button("Reopen") { WelcomeWindow.reopen() }
+                        } else if installer.installed {
                             Button("Remove…", role: .destructive) { confirmRemove = true }
                         } else if installer.needsApproval {
                             Button("Open System Settings") { ExtensionInstaller.openSystemSettings() }

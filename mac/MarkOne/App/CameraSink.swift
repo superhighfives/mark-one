@@ -76,7 +76,21 @@ final class CameraSink {
     }
 
     /// Whether the Mark One camera exists, meaning its extension is running.
+    /// In a process that started before the extension was switched on, it
+    /// stays false (see "Processes don't see the camera come back" in
+    /// NOTES.md).
     static var available: Bool { installedDevice() != nil }
+
+    /// Whether any camera this process can see is in use, by any app.
+    static func anyInUse() -> Bool {
+        objectIDs(of: CMIOObjectID(kCMIOObjectSystemObject), kCMIOHardwarePropertyDevices).contains { device in
+            var addr = address(kCMIODevicePropertyDeviceIsRunningSomewhere)
+            var running: UInt32 = 0
+            var used: UInt32 = 0
+            return CMIOObjectGetPropertyData(device, &addr, 0, nil, UInt32(MemoryLayout<UInt32>.size), &used, &running) == 0
+                && running != 0
+        }
+    }
 
     private static func installedDevice() -> CMIODeviceID? {
         objectIDs(of: CMIOObjectID(kCMIOObjectSystemObject), kCMIOHardwarePropertyDevices)

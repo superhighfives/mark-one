@@ -9,6 +9,15 @@ struct MarkOneApp: App {
     @StateObject private var installer = ExtensionInstaller.shared
     @StateObject private var pipeline = Pipeline.shared
 
+    init() {
+        // Asked by a running Mark One, which can't see a camera that
+        // appeared after it started (see ExtensionInstaller).
+        if CommandLine.arguments.contains("--camera-present") {
+            print(CameraSink.available ? "1" : "0")
+            exit(0)
+        }
+    }
+
     var body: some Scene {
         MenuBarExtra {
             MenuView(installer: installer, pipeline: pipeline)
@@ -41,7 +50,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // The first time, the welcome window installs the extension and
             // starts looking for the camera at the steps that explain the
             // permissions they ask for.
-            if WelcomeWindow.needed {
+            if let step = WelcomeWindow.takeResumeStep() {
+                // Reopened during setup, so it can use the camera.
+                WelcomeWindow.start()
+                WelcomeWindow.show(at: step)
+            } else if WelcomeWindow.needed {
                 WelcomeWindow.show()
             } else {
                 WelcomeWindow.start()

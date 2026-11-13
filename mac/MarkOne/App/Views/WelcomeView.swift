@@ -46,6 +46,28 @@ enum WelcomeWindow {
         Pipeline.shared.run()
     }
 
+    private static let resumeKey = "WelcomeResume"
+
+    /// Quits and reopens Mark One, so it can use a camera switched on after
+    /// it opened. With a step, the welcome window comes back at that step.
+    static func reopen(at step: WelcomeView.Step? = nil) {
+        if let step { UserDefaults.standard.set(step.rawValue, forKey: resumeKey) }
+        // Opens the app again once this process has quit.
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", "while kill -0 \(getpid()) 2>/dev/null; do sleep 0.2; done; /usr/bin/open \"$0\"",
+                             Bundle.main.bundlePath]
+        try? process.run()
+        NSApp.terminate(nil)
+    }
+
+    /// The step to show after reopening, once.
+    static func takeResumeStep() -> WelcomeView.Step? {
+        guard let raw = UserDefaults.standard.object(forKey: resumeKey) as? Int else { return nil }
+        UserDefaults.standard.removeObject(forKey: resumeKey)
+        return WelcomeView.Step(rawValue: raw)
+    }
+
     private static func finish() {
         UserDefaults.standard.set(true, forKey: shownKey)
         window?.close()
@@ -159,7 +181,15 @@ struct WelcomeView: View {
             Button("Back") { move(-1) }
                 .disabled(step == .welcome)
             Spacer()
-            Button(nextTitle) { step == .done ? done() : move(1) }
+            Button(nextTitle) {
+                if step == .done {
+                    done()
+                } else if step == .allow && installer.needsReopen {
+                    WelcomeWindow.reopen(at: .firmware)
+                } else {
+                    move(1)
+                }
+            }
                 .primary(step != .firmware || installed)
                 // The rest of setup needs the camera allowed.
                 .disabled(step == .allow && !installer.installed)
@@ -206,7 +236,7 @@ struct WelcomeView: View {
     }
 
     private var allow: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 20) {
             Text("Allow the Mark One camera").font(.title.weight(.bold))
             if installer.installed || installer.failed {
                 Card(padding: 14) {
@@ -217,7 +247,12 @@ struct WelcomeView: View {
                                 .foregroundStyle(.green)
                             VStack(alignment: .leading) {
                                 Text("Camera allowed").fontWeight(.semibold)
-                                Text("“Mark One” now shows up in video apps.").font(.callout).foregroundStyle(.secondary)
+                                Text(installer.needsReopen
+                                     ? "Mark One reopens when you continue, so it can use the camera."
+                                     : "“Mark One” now shows up in video apps.")
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                             Spacer()
                         } else {
@@ -239,14 +274,17 @@ struct WelcomeView: View {
                     allowStep(2) { Text("Scroll down to the extensions, and click ⓘ beside Mark One.") }
                     allowStep(3) { Text("Turn on Media Extension, then click Done.") }
                 }
-                VStack(alignment: .leading, spacing: 16) {
-                    Card(padding: 8) {
-                        VStack(alignment: .leading, spacing: 8) {
+                // A text row is shorter than its 28 pt, so the space under
+                // the last one would add to the gap below.
+                .padding(.bottom, -6)
+                VStack(alignment: .leading, spacing: 20) {
+                    Card(padding: 12) {
+                        VStack(alignment: .leading, spacing: 10) {
                             ExtensionApprovalSteps()
                             Text("On older versions of macOS, it's under Camera Extensions.")
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
-                                .padding(.horizontal, 4)
+                                .padding(.horizontal, 2)
                         }
                     }
                     HStack(spacing: 8) {
@@ -360,6 +398,10 @@ struct WelcomeView: View {
             Text("You’re all set").font(.largeTitle.weight(.bold))
             Text("Open FaceTime, Zoom or any video app and choose **Mark One** as the camera, and your Mac’s microphone or a headset for sound. Mark One starts the camera when a call starts and stops it when the call ends. It lives in the menu bar.")
                 .font(.title3)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: 440, alignment: .leading)
+            Text("If a video app was open while you set up, quit and reopen it so it lists Mark One.")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: 440, alignment: .leading)

@@ -22,9 +22,13 @@ Mark One.
 - [ ] **FaceTime after an extension update** (2026-11-12, macOS 27):
   FaceTime ignored the Mark One camera until its video service
   (`avconferenced`) restarted, then worked (see "FaceTime" in
-  `NOTES.md`). Still to find out: whether a first install has the same
-  problem, on a Mac where `avconferenced` is already running. If it
-  does, setup should say to restart the Mac, or the help page should.
+  `NOTES.md`). A first install has the same problem (2026-11-13): no
+  running process, Mark One included, sees the camera appear once it's
+  switched on ("Processes don't see the camera come back" in
+  `NOTES.md`). Mark One now reopens itself during setup, restarts
+  `avconferenced` when no camera is in use, and the Done step says to
+  reopen other video apps. Still to see working: a FaceTime call
+  straight after a first install.
 
 ## Before launch
 
