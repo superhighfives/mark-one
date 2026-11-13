@@ -340,6 +340,7 @@ struct WelcomeView: View {
                         .primary(!installed)
                         .fixedSize()
                         .font(.callout)
+                        .padding(.top, 6)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
