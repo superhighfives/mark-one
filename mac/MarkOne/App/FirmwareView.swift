@@ -225,6 +225,8 @@ struct FirmwareView: View {
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            // Like the welcome window's buttons.
+            Divider().padding(.top, 8)
             HStack {
                 Button("Cancel") {
                     // Setting up from the card has no step before this one.
@@ -236,6 +238,8 @@ struct FirmwareView: View {
                     .keyboardShortcut(.defaultAction)
                     .disabled(!understood || lowBattery)
             }
+            .controlSize(.large)
+            .padding(.top, 2)
         }
     }
 
