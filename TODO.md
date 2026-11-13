@@ -166,8 +166,9 @@ Next.js on Cloudflare Workers through OpenNext), next to Pika.
   style message (it already exists in the firmware; photo 2026-11-12)
   from `asm/unplug.s` until the camera's back. Needs a firmware revision:
   find the message call, add it to the stub, and test unplugging mid-call
-  and in Storage and MTP. Also find where the camera already shows that
-  message.
+  and in Storage and MTP. The camera shows it when you choose Exit in the
+  USB menu, so start from the menu's OK handler (0x7eec70d7, patched by
+  `asm/webcam/ok.s`) and follow the Exit path.
 - [ ] **Power.** The E-M5 doesn't run from USB power. Try the dummy
   battery and power adapter (on order) for long calls.
 - [ ] **Shorter restarts.** Mark One restarts the recording every 100
