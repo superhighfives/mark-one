@@ -197,8 +197,15 @@ struct FirmwareView: View {
         VStack(alignment: .leading, spacing: 12) {
             switch action {
             case .setUp:
-                Text("Mark One adds a Webcam choice to your camera's firmware. Photos, movies and settings work as before. You install it once from an SD card, then updates come over USB. [How it works](https://superhighfives.com/mark-one/help#firmware)")
+                Text("Mark One adds a Webcam choice to your camera. Everything else works just as before.")
                     .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 8) {
+                    point("sdcard", "Install it once from an SD card, in about 10 minutes.")
+                    point("cable.connector", "Later updates come over USB.")
+                    point("arrow.uturn.backward", "Go back to Olympus's firmware any time.")
+                }
+                Link("How it works", destination: URL(string: "https://superhighfives.com/mark-one/help#firmware")!)
+                    .font(.callout)
             case .update:
                 Text("Mark One sends its firmware to the camera over USB. It takes about two minutes. [How updates work](https://superhighfives.com/mark-one/help#updates)")
                     .fixedSize(horizontal: false, vertical: true)
@@ -208,13 +215,16 @@ struct FirmwareView: View {
             }
             GroupBox {
                 VStack(alignment: .leading, spacing: 8) {
-                    Label("Installing firmware has a risk", systemImage: "exclamationmark.triangle.fill")
+                    Label("Before you install", systemImage: "exclamationmark.triangle.fill")
                         .font(.headline)
                         .foregroundStyle(.orange)
-                    Text((action == .restore ? "" : "This firmware is unofficial, and not supported by Olympus or OM System. ")
-                         + "If the camera loses power or is unplugged while it installs, it may not start again. Use a charged battery and leave it alone until it's done.")
-                        .fixedSize(horizontal: false, vertical: true)
+                    point("battery.100percent", "Use a charged battery.")
+                    point("hand.raised", "Leave the camera alone until it's done. If it loses power partway, it may not start again.")
+                    if action != .restore {
+                        point("checkmark.shield", "This firmware is unofficial, and not supported by Olympus or OM System.")
+                    }
                     Toggle("I understand, and I accept the risk", isOn: $understood)
+                        .padding(.top, 2)
                 }
                 .padding(4)
             }
@@ -284,9 +294,11 @@ struct FirmwareView: View {
     private var card: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Take the SD card out of your camera and put it in your Mac. Any card the camera already takes photos on works.")
+                .fixedSize(horizontal: false, vertical: true)
             Text("Your photos stay on the card. Mark One adds one file, in a folder named DCOLYMP, replacing any older E-M5 firmware there. It reads the file back to check the card, then ejects it.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             if let volume = cards.first {
                 HStack {
                     Label(volume.lastPathComponent, systemImage: "sdcard")
@@ -445,6 +457,15 @@ struct FirmwareView: View {
                 Spacer()
                 Button("Done") { step = .start; closeWindow() }.keyboardShortcut(.defaultAction)
             }
+        }
+    }
+
+    /// One line of a list, with a symbol.
+    private func point(_ symbol: String, _ text: String) -> some View {
+        Label {
+            Text(text).fixedSize(horizontal: false, vertical: true)
+        } icon: {
+            Image(systemName: symbol).foregroundStyle(.secondary).frame(width: 20)
         }
     }
 
