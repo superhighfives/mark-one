@@ -332,7 +332,7 @@ struct FirmwareView: View {
                     numbered(1, "Put the card in the camera, unplug the USB cable and switch the camera off. Use a charged battery.")
                     numbered(2, "Hold OK and switch the camera on. Let go when the orange light on the front comes on.")
                     numbered(3, "Wait about a minute, until the light blinks quickly. Then switch the camera off.")
-                    numbered(4, "Switch the camera on, connect it to your Mac and choose Webcam on its screen.")
+                    numbered(4, "Switch the camera on and connect it to your Mac. If it asks how to connect, choose Webcam.")
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(8)
@@ -499,17 +499,14 @@ struct FirmwareView: View {
     }
 }
 
-/// What the camera shows during a card install, in order: the orange light
-/// on while it installs, blinking when it's done, then its USB menu once
-/// it's connected, with Webcam to choose.
+/// The camera's orange light during a card install: on while it installs,
+/// then blinking when it's done.
 private struct CardInstallSequence: View {
     var body: some View {
         HStack(spacing: 6) {
             stage("Installing") { OrangeLight(state: .steady, size: 18) }
             arrow
             stage("Done") { OrangeLight(state: .blinking, size: 18) }
-            arrow
-            CameraUSBMenu(choose: .webcam, width: 112)
         }
         .frame(maxWidth: .infinity)
     }
