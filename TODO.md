@@ -72,15 +72,12 @@ lifts the time limits (see "Recording without a card" in `NOTES.md`).
   listing what's under other terms (FFmpeg's LGPL, Sparkle, om-emu's
   `olyfw.py`, which is downloaded rather than copied because it has no
   license).
-- [x] **The user downloads the firmware** (2026-11-13). Setup links to
-  the unofficial [firmware download page](https://ofu.infinityfreeapp.com/),
-  which gets the file from Olympus's servers, and takes the file the user
-  chooses or drops in, checked by hash. Mark One no longer contacts
-  Olympus's update server or presents as OM Workspace. A copy downloaded
-  before stays in use.
-- [ ] **Website:** the help page and FAQ describe the new firmware step,
-  and the privacy page no longer lists the Olympus firmware download
-  (Mark One makes no request to Olympus now).
+- [x] **Firmware download kept** (2026-11-13): Mark One still asks
+  Olympus's update server itself, presenting as OM Workspace. The
+  unofficial [firmware download page](https://ofu.infinityfreeapp.com/)
+  hands out the same files from Olympus's servers the same way. If
+  Olympus objects, switch to the user downloading the file and giving it
+  to Mark One: 88fbe60 does that, and the commit after it reverts it.
 - [x] **No Olympus bytes in the app** (2026-11-13): the app checks
   Olympus's code before patching it by length and SHA-256 (`StockCode` in
   `Firmware.swift`) instead of carrying a copy.

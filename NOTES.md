@@ -944,7 +944,7 @@ MTP, so the webcam connection gets the update commands too.
 Mark One's setup:
 
 - A stock camera gets its first install from the card. Mark One
-  takes stock 2.3 from the user, checks its hash, applies its
+  downloads stock 2.3 from Olympus's server, checks its hash, applies its
   changes as byte edits (`mac/MarkOne/App/Resources/webcam-firmware.json`,
   from `scripts/build.py --edits`, so the app ships no Olympus code),
   writes `DCOLYMP/E0972300.BIN` to the card and ejects it, then shows the
@@ -954,15 +954,12 @@ Mark One's setup:
 - A camera with an older revision gets the update over USB, after Mark
   One stops recording.
 
-The user downloads stock 2.3 (2026-11-13). Olympus only hands it to
-its own updater, so Mark One sends them to the unofficial
-[firmware download page](https://ofu.infinityfreeapp.com/), which gets a
-signed link to the file on Olympus's servers (`dl01.om-digitalsolutions.net`).
-The user chooses the file in Mark One or drops it on the window, and
-Mark One keeps a copy once its hash checks out. Before this, Mark One
-asked Olympus's update server itself, presenting as OM Workspace. The
-decompile of OM Workspace's Windows library in github.com/matozoid/em10_1
-matches the recorded sequence.
+Firmware comes from a POST of `<firmware_demand>` XML to
+`https://fw01.om-digitalsolutions.net/ww_inform/fcache.do`, documented
+for the E-M10 in github.com/matozoid/em10_1
+(`docs/firmware/update-server.md`); not tried for E-097. The same
+project's decompile of OM Workspace's Windows library matches the
+recorded sequence.
 
 A USB install works on a camera Mark One has set up (2026-11-09):
 shooting mode, movie dial, a recording started and stopped, keys reset.
@@ -1521,8 +1518,8 @@ still apply.
   downloading code that changes the app, and says nothing about
   firmware for an accessory. Mark One also modifies Olympus's firmware,
   whose license (shown by the update server) forbids modifying it.
-  Mark One ships only its own edits and the user downloads the firmware
-  from Olympus, but review may still object. Outside the App Store (Developer
+  Mark One ships only its own edits and downloads the firmware from
+  Olympus, but review may still object. Outside the App Store (Developer
   ID and notarization) neither applies.
 
 ## FaceTime (2026-11-12, macOS 27)

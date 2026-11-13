@@ -5,7 +5,6 @@
 
 import Combine
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct FirmwareView: View {
     @ObservedObject var pipeline: Pipeline
@@ -13,10 +12,11 @@ struct FirmwareView: View {
     @State private var action = Action.setUp
     @State private var understood = false
     @State private var image: FirmwareImage?
+    @State private var downloaded = 0.0
     @State private var cards: [URL] = []
     @State private var error: String?
 
-    enum Step { case start, confirm, stock, card, writing, camera, ready, usb, omWorkspace }
+    enum Step { case start, confirm, preparing, card, writing, camera, ready, usb, omWorkspace }
 
     enum Action {
         /// Mark One's firmware onto a stock camera, from the SD card.
@@ -57,7 +57,7 @@ struct FirmwareView: View {
     private var title: String {
         switch step {
         case .start where overUSB, .omWorkspace: "Camera firmware"
-        case .confirm, .stock, .usb:
+        case .confirm, .preparing, .usb:
             switch action {
             case .setUp: "Set up your camera"
             case .update: "Install Mark One's firmware"
@@ -74,7 +74,7 @@ struct FirmwareView: View {
             if overUSB { manage } else { setUpIntro }
         case .ready: ready
         case .confirm: confirm
-        case .stock: stock
+        case .preparing: preparing
         case .card: card
         case .writing: ProgressView("Writing to the card…")
         case .camera: cameraSteps
@@ -185,7 +185,7 @@ struct FirmwareView: View {
 
     private var setUpIntro: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Mark One needs its own firmware on your E-M5 (Mark I). It's Olympus's firmware 2.3 with a few changes that let the camera work as a webcam. You download Olympus's firmware, Mark One adds its changes, and puts the result on your SD card. You install it from the card once; later updates happen over USB.")
+            Text("Mark One needs its own firmware on your E-M5 (Mark I). It's Olympus's firmware 2.3 with a few changes that let the camera work as a webcam. Mark One downloads Olympus's firmware, adds its changes, and puts the result on your SD card. You install it from the card once; later updates happen over USB.")
                 .fixedSize(horizontal: false, vertical: true)
             HStack {
                 Spacer()
@@ -202,7 +202,7 @@ struct FirmwareView: View {
                 Text("Mark One sends its firmware to the camera over USB, and the camera checks it and installs it. It takes about two minutes.")
                     .fixedSize(horizontal: false, vertical: true)
             case .restore:
-                Text("Mark One sends Olympus's firmware 2.3 to the camera over USB, unchanged. Afterward the camera is as it came from Olympus, and Mark One can set it up again from the card.")
+                Text("Mark One downloads Olympus's firmware 2.3 and sends it to the camera over USB, unchanged. Afterward the camera is as it came from Olympus, and Mark One can set it up again from the card.")
                     .fixedSize(horizontal: false, vertical: true)
             }
             GroupBox {
@@ -242,70 +242,37 @@ struct FirmwareView: View {
         return CameraBattery(level: level) != .full
     }
 
-    /// Olympus only hands out its firmware through its own updater, so the
-    /// user downloads it and gives it to Mark One, once.
-    private var stock: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Mark One needs Olympus's firmware 2.3 for the E-M5. Olympus only offers it through its own updater, so download it from the unofficial firmware download page, which gets it from Olympus's servers.")
-                .fixedSize(horizontal: false, vertical: true)
-            VStack(alignment: .leading, spacing: 8) {
-                numbered(1, "On the download page, choose E-M, then E-M5 Mark I, then 2.3, and click Download.")
-                numbered(2, "Choose the file here, or drop it on this window. It's named \(FirmwareImage.stockFileName).")
-            }
-            Text("Mark One checks that it's Olympus's file, unchanged, and keeps a copy, so it only asks once.")
-                .font(.callout)
+    private var preparing: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ProgressView(value: downloaded) { Text("Getting Olympus's firmware…") }
+            Text("About 47 MB from Olympus's update server, the first time only.")
+                .font(.caption)
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            HStack {
-                Button("Cancel") { step = .start }.keyboardShortcut(.cancelAction)
-                Spacer()
-                Link("Open Download Page", destination: FirmwareImage.downloadPage)
-                Button("Choose File…") { chooseStock() }.keyboardShortcut(.defaultAction)
-            }
-        }
-        .onDrop(of: [.fileURL], isTargeted: nil) { providers in
-            guard let provider = providers.first else { return false }
-            _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                if let url { Task { @MainActor in useStock(url) } }
-            }
-            return true
-        }
-    }
-
-    private func chooseStock() {
-        let panel = NSOpenPanel()
-        panel.message = "Choose \(FirmwareImage.stockFileName)"
-        panel.directoryURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        useStock(url)
-    }
-
-    private func useStock(_ url: URL) {
-        do {
-            try FirmwareImage.useStock(from: url)
-            prepare()
-        } catch {
-            self.error = error.localizedDescription
         }
     }
 
     private func prepare() {
         error = nil
-        do {
-            let built = action == .restore ? try FirmwareImage.olympus() : try FirmwareImage.make()
-            image = built
-            if action == .setUp {
-                cards = FirmwareInstall.cards()
-                step = .card
-            } else {
-                step = .usb
-                pipeline.installOverUSB(built)
+        downloaded = 0
+        step = .preparing
+        let action = action
+        Task {
+            do {
+                let progress: @Sendable (Double) -> Void = { fraction in Task { @MainActor in downloaded = fraction } }
+                let built = action == .restore ? try await FirmwareImage.olympus(progress: progress)
+                                               : try await FirmwareImage.make(progress: progress)
+                image = built
+                if action == .setUp {
+                    cards = FirmwareInstall.cards()
+                    step = .card
+                } else {
+                    step = .usb
+                    pipeline.installOverUSB(built)
+                }
+            } catch {
+                self.error = error.localizedDescription
+                step = .confirm
             }
-        } catch FirmwareImageError.noStock {
-            step = .stock
-        } catch {
-            self.error = error.localizedDescription
-            step = .confirm
         }
     }
 
