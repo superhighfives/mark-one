@@ -19,6 +19,13 @@ struct FirmwareView: View {
     /// restart, so the window can be closed without waiting for MTP.
     @State private var restoreSettled = false
 
+    /// Opens on the first step; previews can start at any.
+    init(pipeline: Pipeline, start: Step = .start, action: Action = .setUp) {
+        _pipeline = ObservedObject(wrappedValue: pipeline)
+        _step = State(initialValue: start)
+        _action = State(initialValue: action)
+    }
+
     enum Step { case start, confirm, preparing, card, writing, camera, ready, usb, omWorkspace }
 
     enum Action {
@@ -550,4 +557,35 @@ private struct OrangeLight: View {
             .shadow(color: lit ? .orange.opacity(0.7) : .clear, radius: size / 3)
             .accessibilityHidden(true)
     }
+}
+
+// Open this file in Xcode to see each step in the canvas, with no camera.
+#Preview("Set up") {
+    FirmwareView(pipeline: .shared)
+}
+
+#Preview("Getting the firmware") {
+    FirmwareView(pipeline: .shared, start: .preparing)
+}
+
+#Preview("Waiting for the card") {
+    FirmwareView(pipeline: .shared, start: .card)
+}
+
+#Preview("Writing to the card") {
+    FirmwareView(pipeline: .shared, start: .writing)
+}
+
+#Preview("Install from the card") {
+    FirmwareView(pipeline: .shared, start: .camera)
+}
+
+#Preview("Ready") {
+    FirmwareView(pipeline: .shared, start: .ready)
+}
+
+#Preview("Camera installing over USB") {
+    let pipeline = Pipeline.shared
+    pipeline.install = .init(text: "", fraction: 0.5, phase: .installing, restarts: true)
+    return FirmwareView(pipeline: pipeline, start: .usb, action: .update)
 }
