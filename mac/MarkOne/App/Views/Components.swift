@@ -532,14 +532,14 @@ struct CameraUSBMenu: View {
 /// camera a Media Extension.
 struct ExtensionApprovalSteps: View {
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             panel {
                 Image(nsImage: NSApp.applicationIconImage)
                     .resizable()
                     .frame(width: 26, height: 26)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Mark One").font(.system(size: 12))
-                    Text("Media Extension").font(.system(size: 10)).foregroundStyle(.secondary)
+                    Text("Mark One").font(.system(size: 12)).fixedSize()
+                    Text("Media Extension").font(.system(size: 10)).foregroundStyle(.secondary).fixedSize()
                 }
                 Spacer(minLength: 4)
                 Image(systemName: "info.circle")
@@ -576,9 +576,9 @@ struct ExtensionApprovalSteps: View {
 
     /// One row as System Settings draws it.
     private func panel(@ViewBuilder _ content: () -> some View) -> some View {
-        HStack(spacing: 8) { content() }
-            .padding(.horizontal, 10)
-            .frame(maxWidth: .infinity, minHeight: 44)
+        HStack(spacing: 6) { content() }
+            .padding(.horizontal, 8)
+            .frame(minHeight: 44)
             .background(Color(white: 0.17), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(.white.opacity(0.1)))
     }

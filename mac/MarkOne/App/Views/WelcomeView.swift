@@ -143,12 +143,16 @@ struct WelcomeView: View {
         switch step {
         case .welcome: welcome
         // Each permission is asked for at the step that explains it.
-        case .allow: allow.task { installer.activateOnce() }
-        case .firmware: firmware.task { WelcomeWindow.start() }
-        case .connect: connect.task { WelcomeWindow.start() }
+        case .allow: allow.task { if !Self.previewing { installer.activateOnce() } }
+        case .firmware: firmware.task { if !Self.previewing { WelcomeWindow.start() } }
+        case .connect: connect.task { if !Self.previewing { WelcomeWindow.start() } }
         case .done: finished
         }
     }
+
+    /// Whether Xcode is drawing this in its canvas, where nothing should be
+    /// installed or looked for.
+    private static let previewing = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
 
     private var buttons: some View {
         HStack {
@@ -237,7 +241,7 @@ struct WelcomeView: View {
                 }
                 // Under the steps' text, past their numbers.
                 VStack(alignment: .leading, spacing: 16) {
-                    ExtensionApprovalSteps()
+                    Card(padding: 8) { ExtensionApprovalSteps() }
                     Text("On older versions of macOS, it's under Camera Extensions.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
@@ -378,4 +382,14 @@ private extension View {
             buttonStyle(.bordered)
         }
     }
+}
+
+// Open this file in Xcode to see the welcome window in the canvas. The
+// extension shows as not installed, so the Allow step shows its steps.
+#Preview("Allow the camera") {
+    WelcomeView(start: .allow, done: {})
+}
+
+#Preview("Firmware") {
+    WelcomeView(start: .firmware, done: {})
 }
