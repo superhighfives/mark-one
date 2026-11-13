@@ -15,7 +15,7 @@ Mark One works end to end, with nothing to click. It sits in the menu bar and ca
 
 Recording stops 5 seconds after the last app stops using the camera, and when you quit Mark One. Mark One notices when the camera is switched back on or plugged in again and sets it up again. The camera's power switch turns it off as usual, and Mark One says so. Video reaches the Mac about 200 ms after it happens.
 
-All of this rests on Mark One's firmware: `usb-tools`, which adds USB commands that read and write camera memory and run code, and `webcam`, which adds the Webcam connection, card-free recording and the frame list. Mark One installs it for you: it downloads Olympus's firmware 2.3, patches it on your Mac, and writes it to the card for the first install, then updates it over USB. Flashing modified firmware can brick a camera, so read the risks in `NOTES.md` first.
+All of this rests on Mark One's firmware: `usb-tools`, which adds USB commands that read and write camera memory and run code, and `webcam`, which adds the Webcam connection, card-free recording and the frame list. Both only add: Storage, MTP, photos, movies, menus and settings work as they did on Olympus's firmware. Mark One installs it for you: it downloads Olympus's firmware 2.3, patches it on your Mac, and writes it to the card for the first install, then updates it over USB. Flashing modified firmware can brick a camera, so read the risks in `NOTES.md` first.
 
 ## What's left
 

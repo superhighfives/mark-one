@@ -196,6 +196,12 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
   battery lasts" matches the 37-minute run to an empty battery, and "0
   files written to the SD card" the same run, which wrote nothing to the
   card. The 5-second stop and 0.2 s delay match the app and `NOTES.md`.
+- [ ] **Measure the delay again** with the release build: film a
+  millisecond clock with the camera and read it back in Photo Booth or
+  FaceTime. The site and README say about 200 ms, measured 2026-11-06 in
+  `mac/viewer` with PyAV, before Mark One, Apple's decoder and the frame
+  list. The spec "From the sensor to your call" also counts the video
+  app's own delay.
 - [x] Update the firmware box: "Going back: Olympus's firmware, over
   USB" and "Setup: about 10 minutes, once" are on the page.
 
