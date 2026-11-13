@@ -199,10 +199,10 @@ struct FirmwareView: View {
             case .setUp:
                 Text("Mark One adds a Webcam choice to your camera. Everything else works just as before.")
                     .fixedSize(horizontal: false, vertical: true)
-                VStack(alignment: .leading, spacing: 8) {
-                    point("sdcard", "Install it once from an SD card, in about 10 minutes.")
-                    point("cable.connector", "Later updates come over USB.")
-                    point("arrow.uturn.backward", "Go back to Olympus's firmware any time.")
+                VStack(alignment: .leading, spacing: 4) {
+                    bullet("Install it once from an SD card, in about 10 minutes.")
+                    bullet("Later updates come over USB.")
+                    bullet("Go back to Olympus's firmware any time.")
                 }
                 Link("How it works", destination: URL(string: "https://superhighfives.com/mark-one/help#firmware")!)
                     .font(.callout)
@@ -457,6 +457,13 @@ struct FirmwareView: View {
                 Spacer()
                 Button("Done") { step = .start; closeWindow() }.keyboardShortcut(.defaultAction)
             }
+        }
+    }
+
+    private func bullet(_ text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text("•")
+            Text(text).fixedSize(horizontal: false, vertical: true)
         }
     }
 
