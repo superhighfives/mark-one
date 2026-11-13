@@ -526,14 +526,14 @@ struct CameraUSBMenu: View {
 }
 
 /// The two things to click in System Settings to allow the camera (macOS
-/// 27, General › Login Items & Extensions), redrawn side by side with
-/// their step numbers: Mark One's row in the extensions list, with its ⓘ
-/// ringed, then the Media Extension switch in the sheet it opens, on and
-/// ringed. macOS calls the camera a Media Extension.
+/// 27, General › Login Items & Extensions), redrawn side by side: Mark
+/// One's row in the extensions list, with its ⓘ ringed, then the Media
+/// Extension switch in the sheet it opens, on and ringed. macOS calls the
+/// camera a Media Extension.
 struct ExtensionApprovalSteps: View {
     var body: some View {
         HStack(spacing: 8) {
-            panel(2) {
+            panel {
                 Image(nsImage: NSApp.applicationIconImage)
                     .resizable()
                     .frame(width: 26, height: 26)
@@ -551,7 +551,7 @@ struct ExtensionApprovalSteps: View {
             Image(systemName: "arrow.right")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.secondary)
-            panel(3) {
+            panel {
                 Image(systemName: "video.fill")
                     .font(.system(size: 11))
                     .foregroundStyle(.white)
@@ -574,20 +574,12 @@ struct ExtensionApprovalSteps: View {
         .accessibilityLabel("In System Settings, the ⓘ button beside Mark One, then the Media Extension switch, turned on")
     }
 
-    /// One row as System Settings draws it, tagged with its step.
-    private func panel(_ step: Int, @ViewBuilder _ content: () -> some View) -> some View {
+    /// One row as System Settings draws it.
+    private func panel(@ViewBuilder _ content: () -> some View) -> some View {
         HStack(spacing: 8) { content() }
             .padding(.horizontal, 10)
             .frame(maxWidth: .infinity, minHeight: 44)
             .background(Color(white: 0.17), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(.white.opacity(0.1)))
-            .overlay(alignment: .topLeading) {
-                Text("\(step)")
-                    .font(.system(size: 10, weight: .bold).monospacedDigit())
-                    .foregroundStyle(.black)
-                    .frame(width: 16, height: 16)
-                    .background(.white, in: Circle())
-                    .offset(x: -6, y: -6)
-            }
     }
 }
