@@ -204,8 +204,6 @@ struct WelcomeView: View {
     private var allow: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Allow the Mark One camera").font(.title.weight(.bold))
-            Text("macOS asks before an app adds a camera.")
-                .foregroundStyle(.secondary)
             if installer.installed || installer.failed {
                 Card(padding: 14) {
                     HStack(spacing: 12) {
@@ -237,16 +235,19 @@ struct WelcomeView: View {
                     allowStep(2) { Text("Scroll down to the extensions, and click ⓘ beside Mark One.") }
                     allowStep(3) { Text("Turn on Media Extension, then click Done.") }
                 }
-                ExtensionApprovalSteps()
-                    .padding(.leading, 26)
-                Text("On older versions of macOS, it's under Camera Extensions.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                HStack(spacing: 8) {
-                    ProgressView().controlSize(.small)
-                    Text("Waiting for your OK. This moves on by itself.")
+                // Under the steps' text, past their numbers.
+                VStack(alignment: .leading, spacing: 16) {
+                    ExtensionApprovalSteps()
+                    Text("On older versions of macOS, it's under Camera Extensions.")
+                        .font(.callout)
                         .foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("Waiting for your OK. This moves on by itself.")
+                            .foregroundStyle(.secondary)
+                    }
                 }
+                .padding(.leading, 26)
             }
         }
     }
