@@ -1,5 +1,5 @@
 // Debug builds only: draws each step of the Camera Firmware window to PNGs,
-// with no camera or card. Run the app with --snapshot-firmware <folder>.
+// with no camera or card. scripts/snapshot-firmware.sh runs it.
 
 #if DEBUG
 import SwiftUI
@@ -56,7 +56,7 @@ enum Snapshots {
         RunLoop.main.run(until: Date().addingTimeInterval(0.8))
         let capture = Process()
         capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-        capture.arguments = ["-x", "-l", String(window.windowNumber), url.path]
+        capture.arguments = ["-x", "-o", "-l", String(window.windowNumber), url.path]
         try? capture.run()
         capture.waitUntilExit()
         window.orderOut(nil)
