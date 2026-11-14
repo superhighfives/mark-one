@@ -7,9 +7,10 @@ cd "$(dirname "$0")/.."
 
 FW=fw/OLY_E_097_2300_0000_0000.BIN
 FW_SHA=cb158dbdd8092856e8060354b008369f7d33dff32a1204e966ef0d5bce85e535
-# Olympus's own server (dl01.om-digitalsolutions.net) refuses direct
-# downloads, so this uses the community mirror. The hash pins the exact file.
-FW_URL=http://xdel.ru/downloads/olympus-firmware/original/em5/OLY_E_097_2300_0000_0000.BIN.lzma
+# Olympus's update server hands out a signed link to the latest E-M5
+# firmware, 2.3, when asked the way OM Workspace asks (see "Doing it
+# from Mark One" in NOTES.md). The app asks the same way (FirmwareImage.swift).
+FW_SERVER=https://fw01.om-digitalsolutions.net/ww_inform/fcache.do
 
 OLYFW=tools/olyfw.py
 OLYFW_SHA=496500ed898a3aa1def3a183cf8d4ab26ee9e5ad9e39fc734ca8238925469e10
@@ -27,8 +28,32 @@ uv sync --quiet
 mkdir -p fw tools unpacked
 
 if [ ! -f "$FW" ]; then
-  curl -sSfL -o "$FW.lzma" "$FW_URL"
-  xz --format=lzma -d "$FW.lzma"
+  url=$(curl -sSf -A Olympus -H "Content-Type: text/xml; Charset=UTF-8" --data-binary @- "$FW_SERVER" <<EOF2 |
+<?xml version="1.0"?>
+<firmware_demand>
+<revision>0001</revision>
+<mac_address>00-00-00-00-00-00</mac_address>
+<time>$(date +%Y%m%d%H%M%S)</time>
+<language>ENU</language>
+<application>FWUT</application>
+<type>0000</type>
+<version>00005000</version>
+<os>WIN</os>
+<country_code>0001</country_code>
+<hardwares>
+<firmup_mode>0</firmup_mode>
+<hardware_info>
+<hard_code>OLYE097000000000</hard_code>
+<firmware_version>00001000</firmware_version>
+<serial_no>000000000</serial_no>
+<default_languages><code>ENU</code></default_languages>
+</hardware_info>
+</hardwares>
+</firmware_demand>
+EOF2
+    sed -n 's|.*<url>\(.*\)</url>.*|\1|p' | sed 's/&amp;/\&/g')
+  [ -n "$url" ] || { echo "Olympus's update server didn't offer the firmware" >&2; exit 1; }
+  curl -sSfL -o "$FW" "$url"
 fi
 check "$FW" "$FW_SHA"
 

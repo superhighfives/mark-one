@@ -18,7 +18,9 @@ Open work is in `TODO.md`.
 ## Firmware
 
 - `fw/OLY_E_097_2300_0000_0000.BIN` (v2.3), sha256 `cb158dbd…e535`, from the
-  xdel.ru mirror (the official OMDS URL returned 403).
+  xdel.ru mirror (the official OMDS URL returned 403). Since 2026-11-14,
+  `scripts/setup.sh` asks Olympus's update server for it instead, as the
+  app does ("Doing it from Mark One"): the same file.
 - Unpacked with `tools/olyfw.py` (from xulfr/om-emu) into `unpacked/`. All five
   block hashes match fishcu/oly_fw_analysis `provenance/firmware-inventory.json`.
   Block 0 (`main.bin`, 14 MB, container load 0x902c0000) is the main code.

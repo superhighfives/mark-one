@@ -27,7 +27,7 @@ Mark One is free. A signed, notarized build that keeps itself up to date is at [
 
 You need a Mac with Xcode and [XcodeGen](https://github.com/yonaskolb/XcodeGen), and an Apple developer team that can sign a camera extension, which uses the System Extension capability. A paid Apple Developer Program membership has it. Then follow the steps under "Mark One" below. Builds from source don't check for updates: to update, pull and build again. Only release builds (`scripts/build-release.sh`, run by `/release`) set the update feed, and updates are signed with Mark One's own key.
 
-Mark One downloads Olympus's firmware from Olympus's own update server and patches it on your Mac, so nothing from Olympus is in this repo or in the app.
+Mark One downloads Olympus's firmware from Olympus's own update server and patches it on your Mac, so nothing from Olympus is in this repo or in the app. Since December 2025 the server only hands out firmware the way OM Workspace asks for it; the [mu-43.com firmware thread](https://www.mu-43.com/threads/firmware-updates-for-om-and-em-cameras-january-2023.118773/page-6#post-1837553) shows how, and Mark One asks the same way.
 
 ## Mark One
 
@@ -47,7 +47,7 @@ The app has to run from `/Applications` to install its camera extension. It inst
 
 ## Running it
 
-You need [uv](https://docs.astral.sh/uv/), `curl` and `xz`. uv installs Python and the dependencies (`numpy`, and `pyusb` with a bundled libusb) for you.
+You need [uv](https://docs.astral.sh/uv/) and `curl`. uv installs Python and the dependencies (`numpy`, and `pyusb` with a bundled libusb) for you.
 
 Install the dependencies, then fetch and unpack the stock v2.3 firmware. The firmware is Olympus's, so it isn't in this repo; the script downloads it and checks its hash.
 
