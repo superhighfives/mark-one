@@ -44,6 +44,9 @@ struct MarkOneApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         Task { @MainActor in
+            #if DEBUG
+            Snapshots.takeIfAsked()
+            #endif
             DockIcon.start()
             Preferences.shared.start(Pipeline.shared)
             Updater.shared.start()

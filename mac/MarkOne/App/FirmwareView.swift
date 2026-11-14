@@ -20,10 +20,11 @@ struct FirmwareView: View {
     @State private var restoreSettled = false
 
     /// Opens on the first step; previews can start at any.
-    init(pipeline: Pipeline, start: Step = .start, action: Action = .setUp) {
+    init(pipeline: Pipeline, start: Step = .start, action: Action = .setUp, cards: [URL] = []) {
         _pipeline = ObservedObject(wrappedValue: pipeline)
         _step = State(initialValue: start)
         _action = State(initialValue: action)
+        _cards = State(initialValue: cards)
     }
 
     enum Step { case start, confirm, preparing, card, writing, camera, ready, usb, omWorkspace }
