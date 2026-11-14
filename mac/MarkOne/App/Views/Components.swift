@@ -265,10 +265,12 @@ struct BrightnessControl: View {
 
 /// Open at login, kept in step with what macOS reports.
 struct OpenAtLoginToggle: View {
+    /// Extra space between a checkbox and its label.
+    var labelGap: CGFloat = 0
     @State private var on = SMAppService.mainApp.status == .enabled
 
     var body: some View {
-        Toggle("Open at login", isOn: $on)
+        Toggle(isOn: $on) { Text("Open at login").padding(.leading, labelGap) }
             .onChange(of: on) { _, wanted in
                 do {
                     try wanted ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister()

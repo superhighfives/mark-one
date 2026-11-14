@@ -81,6 +81,12 @@ enum Snapshots {
                                                 framesPerSecond: 30, activeApp: "FaceTime") }),
             ("12-low-battery-and-update", { pipeline.pretend(.ready, status: readyStatus, firmware: .markOne(FirmwareImage.bundledRevision - 1), battery: 50) }),
         ]
+        // The first panel shown draws its blue button grey, as if inactive,
+        // so one is shown and thrown away first.
+        allow(needsApproval: true)
+        let first = panelWindow()
+        try? await Task.sleep(for: .seconds(1))
+        first.orderOut(nil)
         for (name, setUp) in shots {
             setUp()
             let panel = panelWindow()

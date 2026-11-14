@@ -226,15 +226,26 @@ struct MenuView: View {
                 .overlay(alignment: .topLeading) {
                     if live { LiveBadge().padding(8) }
                 }
-            VStack(alignment: .leading, spacing: 2) {
-                if live, let app = pipeline.activeApp {
-                    Text("In use by \(app)").fontWeight(.semibold)
-                }
-                Text(live ? "Nothing is saved to the card. Recording stops \(pipeline.grace.duration) after the call ends."
-                          : "Choose **Mark One** as the camera in FaceTime, Zoom or any video app. Mark One presses REC for you.")
+            // Both messages take the same space, so the panel keeps its size
+            // when a call starts.
+            ZStack(alignment: .topLeading) {
+                Text("Choose **Mark One** as the camera in FaceTime, Zoom or any video app. Mark One presses REC for you.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                    .opacity(live ? 0 : 1)
+                    .accessibilityHidden(live)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("In use by \(pipeline.activeApp ?? "")")
+                        .fontWeight(.semibold)
+                        .opacity(pipeline.activeApp == nil ? 0 : 1)
+                    Text("Nothing is saved to the card. Recording stops \(pipeline.grace.duration) after the call ends.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .opacity(live ? 1 : 0)
+                .accessibilityHidden(!live)
             }
             if let battery = pipeline.battery, CameraBattery(level: battery) != .full {
                 Label("The camera's battery is low. Charge it soon, or use a dummy battery with a power adapter.",

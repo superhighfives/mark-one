@@ -375,9 +375,10 @@ struct WelcomeView: View {
                     if pipeline.firmware == .stock || pipeline.problem == .wrongFirmware {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Install Mark One firmware").fontWeight(.semibold)
-                            Text(pipeline.status).font(.callout).foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
+                            Text("It still has Olympus's firmware.").font(.callout).foregroundStyle(.secondary)
                         }
+                        // Ahead of the button, so it doesn't wrap.
+                        .layoutPriority(1)
                         Spacer()
                         Button("Set Up Camera…") { openWindow.firmware() }
                     } else if pipeline.state != .waiting {
@@ -401,11 +402,14 @@ struct WelcomeView: View {
                 }
             }
             Toggle(isOn: $pipeline.connectAsWebcam) {
-                Text("Connect as a webcam without asking")
-                Text("Sets the camera's USB Mode to Webcam. To import photos over USB, set it back to Auto in the camera's Custom Menu, or turn this off.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Connect as a webcam without asking")
+                    Text("Sets the camera's USB Mode to Webcam. To import photos over USB, set it back to Auto in the camera's Custom Menu, or turn this off.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.leading, 4)
             }
             Text("The E-M5 (Mark I) runs on its battery, even over USB. For long calls, a dummy battery with a power adapter keeps it going.")
                 .font(.callout)
@@ -428,11 +432,11 @@ struct WelcomeView: View {
                 .frame(maxWidth: 440, alignment: .leading)
             Card(padding: 14) {
                 VStack(alignment: .leading, spacing: 2) {
-                    OpenAtLoginToggle()
+                    OpenAtLoginToggle(labelGap: 4)
                     Text("So the camera is ready whenever you plug it in.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
-                        .padding(.leading, 20)
+                        .padding(.leading, 24)
                 }
             }
         }

@@ -97,12 +97,13 @@ struct FirmwareView: View {
         case .preparing: preparing
         case .card: card
         case .writing:
-            VStack(spacing: 12) {
-                ProgressView()
-                Text("Writing to the card…").foregroundStyle(.secondary)
+            // As tall as the card step before it, so the window keeps its size.
+            card.hidden().disabled(true).overlay {
+                VStack(spacing: 12) {
+                    ProgressView()
+                    Text("Writing to the card…").foregroundStyle(.secondary)
+                }
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 28)
         case .camera: cameraSteps
         case .usb: usb
         case .omWorkspace: omWorkspace
@@ -237,7 +238,9 @@ struct FirmwareView: View {
                 }
                 .padding(8)
             }
-            Toggle("I understand, and I accept the risk", isOn: $understood)
+            Toggle(isOn: $understood) {
+                Text("I understand, and I accept the risk").padding(.leading, 4)
+            }
             if lowBattery {
                 Label("The camera's battery is low. Charge it before installing.", systemImage: "battery.25percent")
                     .foregroundStyle(.red)
@@ -314,18 +317,26 @@ struct FirmwareView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            if let volume = cards.first {
+            Divider().padding(.top, 4)
+            // Both rows take the same space, so the window keeps its size
+            // when the card shows up.
+            ZStack(alignment: .leading) {
                 HStack {
-                    Label(volume.lastPathComponent, systemImage: "sdcard")
+                    Label(cards.first?.lastPathComponent ?? "", systemImage: "sdcard")
                     Spacer()
-                    Button("Write to this card") { write(volume) }
+                    Button("Write to this card") { if let volume = cards.first { write(volume) } }
                         .keyboardShortcut(.defaultAction)
+                        .controlSize(.large)
                 }
-            } else {
+                .opacity(cards.isEmpty ? 0 : 1)
+                .disabled(cards.isEmpty)
+                .accessibilityHidden(cards.isEmpty)
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
                     Text("Waiting for the card…").foregroundStyle(.secondary)
                 }
+                .opacity(cards.isEmpty ? 1 : 0)
+                .accessibilityHidden(!cards.isEmpty)
             }
         }
     }
@@ -382,8 +393,7 @@ struct FirmwareView: View {
             if let install = pipeline.install {
                 if let failure = install.error {
                     Text(failure).fixedSize(horizontal: false, vertical: true)
-                    HStack {
-                        Spacer()
+                    footer {
                         Button("Close") { pipeline.install = nil; step = .start; closeWindow() }
                     }
                 } else if install.finished {
@@ -397,8 +407,7 @@ struct FirmwareView: View {
                          ? "Pick “Mark One” as the camera in any video app."
                          : "Choose Webcam on the camera when you connect it, then pick “Mark One” as the camera in any video app.")
                         .fixedSize(horizontal: false, vertical: true)
-                    HStack {
-                        Spacer()
+                    footer {
                         Button("Done") { pipeline.install = nil; step = .start; closeWindow() }
                             .keyboardShortcut(.defaultAction)
                     }
@@ -406,16 +415,21 @@ struct FirmwareView: View {
                     lead("power") {
                         Text("Mark One set the camera's USB Mode back to Auto, which Olympus's firmware needs. The camera saves it when it's switched off.")
                     }
-                    numbered(1, "Switch the camera off and on.")
-                    numbered(2, "Choose Webcam on its screen. The restore carries on by itself.", choose: .webcam)
+                    GroupBox {
+                        VStack(alignment: .leading, spacing: 10) {
+                            numbered(1, "Switch the camera off and on.")
+                            numbered(2, "Choose Webcam on its screen. The restore carries on by itself.", choose: .webcam)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(8)
+                    }
+                    Divider().padding(.top, 4)
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
                         Text("Waiting for the camera.").foregroundStyle(.secondary)
                     }
                 } else if install.phase == .installing {
-                    lead("arrow.triangle.2.circlepath") {
-                        Text("The camera has the firmware and is installing it.")
-                    }
+                    Text("The camera has the firmware and is installing it.")
                     CameraUpdateScreen().frame(maxWidth: .infinity)
                     numbered(1, "Wait while the camera's screen shows this. If Mark One was using the camera, the screen flickers between this and the last picture. Don't switch the camera off or unplug it.")
                     if install.restarts {
@@ -431,6 +445,7 @@ struct FirmwareView: View {
                                  : "Connect the camera to your Mac again and choose Webcam on its screen.",
                                  choose: action == .restore ? .mtp : pipeline.connectAsWebcam ? nil : .webcam)
                     }
+                    Divider().padding(.top, 4)
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
                         Text(action == .restore ? "Waiting for the camera to connect as MTP." : "Mark One carries on when it sees the camera.")
@@ -464,11 +479,24 @@ struct FirmwareView: View {
                 .foregroundStyle(.green)
             Text("When you connect the camera, choose Webcam on its screen. Then pick “Mark One” as the camera in any video app. Later updates install over USB from this window.")
                 .fixedSize(horizontal: false, vertical: true)
-            HStack {
-                Spacer()
+            footer {
                 Button("Done") { step = .start; closeWindow() }.keyboardShortcut(.defaultAction)
             }
         }
+    }
+
+    /// The last row of a step: a divider, then its button on the right, as
+    /// in the welcome window.
+    private func footer(@ViewBuilder _ button: () -> some View) -> some View {
+        VStack(spacing: 14) {
+            Divider()
+            HStack {
+                Spacer()
+                button()
+            }
+            .controlSize(.large)
+        }
+        .padding(.top, 4)
     }
 
     /// A step's main line, with a large symbol beside it.
