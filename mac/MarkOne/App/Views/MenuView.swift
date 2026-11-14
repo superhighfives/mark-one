@@ -197,15 +197,13 @@ struct MenuView: View {
 
     private var firmware: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Card {
-                VStack(alignment: .leading, spacing: 6) {
-                    Label("Install Mark One firmware", systemImage: "exclamationmark.triangle.fill")
-                        .font(.headline)
-                        .symbolRenderingMode(.multicolor)
-                    Text(pipeline.status)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+            VStack(alignment: .leading, spacing: 4) {
+                Label("Install Mark One firmware", systemImage: "exclamationmark.triangle.fill")
+                    .font(.title3.weight(.semibold))
+                    .symbolRenderingMode(.multicolor)
+                Text(pipeline.status)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Button("Set Up Camera…") { closePanel(); openWindow.firmware() }
                 .buttonStyle(.borderedProminent)
