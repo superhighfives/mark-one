@@ -155,8 +155,7 @@ struct FirmwareView: View {
                     }
                 }
             }
-            HStack {
-                Spacer()
+            footer {
                 Button("Close") { closeWindow() }.keyboardShortcut(.cancelAction)
             }
         }
@@ -180,7 +179,7 @@ struct FirmwareView: View {
             if pipeline.reportsOlderVersion {
                 Label("The camera now reports firmware 1.0", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
-                VStack(alignment: .leading, spacing: 8) {
+                steps {
                     numbered(1, "Keep the camera switched on from now on. Switching it off undoes this.")
                     numbered(2, "Quit Mark One, unplug the camera, and connect it to the computer with OM Workspace. Choose Storage on the camera.")
                     numbered(3, "In OM Workspace, choose Camera › Update. It offers firmware 2.3. Follow its steps, and leave the camera alone until it's done.")
@@ -195,8 +194,7 @@ struct FirmwareView: View {
                     Text("Changing the version the camera reports…")
                 }
             }
-            HStack {
-                Spacer()
+            footer {
                 Button("Done") { step = .start; closeWindow() }.keyboardShortcut(.defaultAction)
             }
         }
@@ -346,15 +344,11 @@ struct FirmwareView: View {
             lead("camera") {
                 Text("The card is ready. Now install from it on the camera. [Full steps and troubleshooting](https://superhighfives.com/mark-one/help#installing-it-from-the-card)")
             }
-            GroupBox {
-                VStack(alignment: .leading, spacing: 10) {
-                    numbered(1, "Put the card in the camera, unplug the USB cable and switch the camera off. Use a charged battery.")
-                    numbered(2, "Hold OK and switch the camera on. Let go when the orange light on the front comes on.")
-                    numbered(3, "Wait about a minute, until the light blinks quickly. Then switch the camera off.")
-                    numbered(4, "Switch the camera on and connect it to your Mac. If it asks how to connect, choose Webcam.")
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(8)
+            steps {
+                numbered(1, "Put the card in the camera, unplug the USB cable and switch the camera off. Use a charged battery.")
+                numbered(2, "Hold OK and switch the camera on. Let go when the orange light on the front comes on.")
+                numbered(3, "Wait about a minute, until the light blinks quickly. Then switch the camera off.")
+                numbered(4, "Switch the camera on and connect it to your Mac. If it asks how to connect, choose Webcam.")
             }
             CardInstallSequence()
             Label("While the light is on, don't switch the camera off, open the battery door or take the card out.", systemImage: "exclamationmark.triangle.fill")
@@ -415,13 +409,9 @@ struct FirmwareView: View {
                     lead("power") {
                         Text("Mark One set the camera's USB Mode back to Auto, which Olympus's firmware needs. The camera saves it when it's switched off.")
                     }
-                    GroupBox {
-                        VStack(alignment: .leading, spacing: 10) {
-                            numbered(1, "Switch the camera off and on.")
-                            numbered(2, "Choose Webcam on its screen. The restore carries on by itself.", choose: .webcam)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(8)
+                    steps {
+                        numbered(1, "Switch the camera off and on.")
+                        numbered(2, "Choose Webcam on its screen. The restore carries on by itself.", choose: .webcam)
                     }
                     Divider().padding(.top, 4)
                     HStack(spacing: 8) {
@@ -431,19 +421,21 @@ struct FirmwareView: View {
                 } else if install.phase == .installing {
                     Text("The camera has the firmware and is installing it.")
                     CameraUpdateScreen().frame(maxWidth: .infinity)
-                    numbered(1, "Wait while the camera's screen shows this. If Mark One was using the camera, the screen flickers between this and the last picture. Don't switch the camera off or unplug it.")
-                    if install.restarts {
-                        numbered(2, "When the screen shows OK, the camera restarts by itself, with the new firmware. It takes about a minute and a half.")
-                        numbered(3, action == .restore ? "It asks how to connect again, as it did before Mark One. Choose MTP, so Mark One can check the firmware."
-                                 : pipeline.connectAsWebcam ? "Mark One connects to it again. There's nothing to do."
-                                 : "Choose Webcam on its screen when it asks.",
-                                 choose: action == .restore ? .mtp : pipeline.connectAsWebcam ? nil : .webcam)
-                    } else {
-                        numbered(2, "When the screen shows OK, or goes back to the picture it showed before, the install is done. The camera keeps running the old firmware until it restarts, so switch it off and on.")
-                        numbered(3, action == .restore ? "Connect the camera to your Mac again and choose MTP on its screen, so Mark One can check the firmware."
-                                 : pipeline.connectAsWebcam ? "Connect the camera to your Mac again."
-                                 : "Connect the camera to your Mac again and choose Webcam on its screen.",
-                                 choose: action == .restore ? .mtp : pipeline.connectAsWebcam ? nil : .webcam)
+                    steps {
+                        numbered(1, "Wait while the camera's screen shows this. If Mark One was using the camera, the screen flickers between this and the last picture. Don't switch the camera off or unplug it.")
+                        if install.restarts {
+                            numbered(2, "When the screen shows OK, the camera restarts by itself, with the new firmware. It takes about a minute and a half.")
+                            numbered(3, action == .restore ? "It asks how to connect again, as it did before Mark One. Choose MTP, so Mark One can check the firmware."
+                                     : pipeline.connectAsWebcam ? "Mark One connects to it again. There's nothing to do."
+                                     : "Choose Webcam on its screen when it asks.",
+                                     choose: action == .restore ? .mtp : pipeline.connectAsWebcam ? nil : .webcam)
+                        } else {
+                            numbered(2, "When the screen shows OK, or goes back to the picture it showed before, the install is done. The camera keeps running the old firmware until it restarts, so switch it off and on.")
+                            numbered(3, action == .restore ? "Connect the camera to your Mac again and choose MTP on its screen, so Mark One can check the firmware."
+                                     : pipeline.connectAsWebcam ? "Connect the camera to your Mac again."
+                                     : "Connect the camera to your Mac again and choose Webcam on its screen.",
+                                     choose: action == .restore ? .mtp : pipeline.connectAsWebcam ? nil : .webcam)
+                        }
                     }
                     Divider().padding(.top, 4)
                     HStack(spacing: 8) {
@@ -516,6 +508,15 @@ struct FirmwareView: View {
             Text(text).fixedSize(horizontal: false, vertical: true)
         } icon: {
             Image(systemName: symbol).foregroundStyle(.secondary).frame(width: 20)
+        }
+    }
+
+    /// Numbered steps, in a box.
+    private func steps(@ViewBuilder _ content: () -> some View) -> some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 10, content: content)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(8)
         }
     }
 

@@ -153,18 +153,27 @@ enum Snapshots {
         pipeline.pretend(status: stockStatus, firmware: .stock)
         for (name, install, view) in shots {
             pipeline.install = install
-            // In a window of its own, so each can start at its step.
-            let window = NSWindow(contentRect: .zero, styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
-            window.title = "Camera Firmware"
-            window.isReleasedWhenClosed = false
-            let host = NSHostingView(rootView: view)
-            window.contentView = host
-            window.setContentSize(host.fittingSize)
-            window.center()
-            window.makeKeyAndOrderFront(nil)
-            await capture(window, to: folder, name)
-            window.orderOut(nil)
+            await capture(view, to: folder, name)
         }
+        // A camera with Mark One's firmware.
+        pipeline.pretend(.ready, status: readyStatus, firmware: latest, battery: 100)
+        await capture(FirmwareView(pipeline: pipeline), to: folder, "15-manage")
+        pipeline.pretend(.ready, status: readyStatus, firmware: latest, battery: 100, reportsOlderVersion: true)
+        await capture(FirmwareView(pipeline: pipeline, start: .omWorkspace), to: folder, "16-om-workspace")
+    }
+
+    /// Shows a step in a window of its own, so each can start at its step.
+    private static func capture(_ view: FirmwareView, to folder: URL, _ name: String) async {
+        let window = NSWindow(contentRect: .zero, styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
+        window.title = "Camera Firmware"
+        window.isReleasedWhenClosed = false
+        let host = NSHostingView(rootView: view)
+        window.contentView = host
+        window.setContentSize(host.fittingSize)
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        await capture(window, to: folder, name)
+        window.orderOut(nil)
     }
 
     // MARK: Helpers

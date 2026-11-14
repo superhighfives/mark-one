@@ -868,7 +868,8 @@ private final class Freeze {
 extension Pipeline {
     /// Shows a made-up camera, for the screenshots Snapshots takes.
     func pretend(_ state: State = .waiting, status: String, problem: Problem? = nil, firmware: CameraFirmware? = nil,
-                 battery: Int? = nil, framesPerSecond: Double = 0, activeApp: String? = nil, install: InstallProgress? = nil) {
+                 battery: Int? = nil, framesPerSecond: Double = 0, activeApp: String? = nil, install: InstallProgress? = nil,
+                 reportsOlderVersion: Bool = false) {
         self.state = state
         self.status = status
         self.problem = problem
@@ -877,6 +878,7 @@ extension Pipeline {
         self.framesPerSecond = framesPerSecond
         self.activeApp = activeApp
         self.install = install
+        self.reportsOlderVersion = reportsOlderVersion
     }
 }
 #endif
