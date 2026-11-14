@@ -184,7 +184,7 @@ struct FirmwareView: View {
                     numbered(2, "Quit Mark One, unplug the camera, and connect it to the computer with OM Workspace. Choose Storage on the camera.")
                     numbered(3, "In OM Workspace, choose Camera › Update. It offers firmware 2.3. Follow its steps, and leave the camera alone until it's done.")
                 }
-                Text("OM Workspace on a Mac needs a system extension and lowered security settings, so a Windows PC is the easier choice. Restore Olympus's Firmware here does the same job without OM Workspace.")
+                Text("OM Workspace on a Mac needs a system extension and lowered security settings, so a Windows PC is the easier choice. Restore Olympus's firmware here does the same job without OM Workspace.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

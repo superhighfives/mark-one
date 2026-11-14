@@ -41,7 +41,8 @@ Mark One.
   One checks that the Mark One camera appears within 10 s and otherwise
   asks for a restart, and it retries opening the camera's input every
   2 s instead of waiting for the camera to be reconnected. Not yet seen
-  working: the restart message only shows when the race happens.
+  working: the restart message only shows when the race happens. After
+  1.0: it matters from the first update that changes the extension.
 - [x] **Battery steps.** A full discharge (2026-11-10) read 100, 50 once
   the camera's icon flashes empty, then 5 nine seconds before it switched
   itself off: Full, Low and Empty. USB installs now wait for Full.
@@ -121,11 +122,13 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
 - [x] **Sparkle key backed up** (2026-11-12). To restore it on another
   Mac: `generate_keys --account mark-one -f <file>` (in
   `build/SourcePackages/artifacts/sparkle/Sparkle/bin`).
-- [ ] **Updates and the camera extension.** Sparkle only replaces the
+- [x] **Updates and the camera extension.** Sparkle only replaces the
   app. The extension changes only when Mark One asks the system to
   activate it, so updates that keep the extension's build number are
   safe. Release notes for updates that change the extension should say a
-  restart may be needed (see "Extension updates" above).
+  restart may be needed (see "Extension updates" above). `/release`
+  now asks for that line when the extension's build number goes up
+  (2026-11-14).
 - [x] **Release script** (2026-11-10): first full run 2026-11-12 (1.0
   build 2, not uploaded): app and DMG notarized and stapled, Gatekeeper
   accepts both, the Sparkle signature checks out against the app's
@@ -167,7 +170,7 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
 - [x] **Deploy** (2026-11-12): PR #29 merged and live, showing "Coming
   soon". `/mark-one/download` returns 404 until launch.
 - [ ] **Launch**, in this order:
-  - [ ] `/pre-release`: read-only hygiene checks (clean tree, leftover
+  - [x] `/pre-release` (2026-11-14): read-only hygiene checks (clean tree, leftover
     test code, firmware edits match `scripts/build.py`). `--fix` offers
     the mechanical fixes.
   - [ ] `/release --dry`: builds and checks everything, makes only a
@@ -182,7 +185,8 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
     on the Download button.
 - [ ] **Test end to end:** download from the page, then publish an
   update and watch Sparkle install it. Check that downloads report their
-  size, so browsers show progress.
+  size, so browsers show progress. Right after 1.0: the download from
+  the live page, then Sparkle with the first update.
 
 ### Release
 
@@ -205,7 +209,7 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
   FaceTime. The site and README say about 200 ms, measured 2026-11-06 in
   `mac/viewer` with PyAV, before Mark One, Apple's decoder and the frame
   list. The spec "From the sensor to your call" also counts the video
-  app's own delay.
+  app's own delay. Before 1.0, with the `/release --dry` build.
 - [x] Update the firmware box: "Going back: Olympus's firmware, over
   USB" and "Setup: about 10 minutes, once" are on the page.
 

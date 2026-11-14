@@ -136,6 +136,7 @@ The slow part is done; pause for the user.
    3. `### New features`: bullets, each starting with a bold label.
    4. `### Updates and bug fixes`: the same.
    Mention a new firmware revision when there is one (the camera offers the update over USB).
+   If `MarkOneCamera`'s build number in `project.yml` went up since the last release tag, the notes must say the Mac may need a restart before the camera appears: Sparkle replaces only the app, and the new extension replaces the old one when Mark One next opens (NOTES.md, "Camera extension updates"). Don't go on to step 2 without that line.
 2. Show the draft and ask the user to edit or approve it. The user writes the framing; don't publish notes they haven't seen.
 3. Write `superhighfives.com/changelog/mark-one/VERSION.md`: releasecast's front matter from `VERSION.md`, then the notes. Show the whole file for a final review.
 
