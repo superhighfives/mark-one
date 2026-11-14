@@ -44,10 +44,11 @@ struct MarkOneApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         Task { @MainActor in
-            #if DEBUG
-            Snapshots.takeIfAsked()
-            #endif
             DockIcon.start()
+            #if DEBUG
+            // Shows made-up states instead (see Snapshots).
+            if Snapshots.taking { return }
+            #endif
             Preferences.shared.start(Pipeline.shared)
             Updater.shared.start()
             // The first time, the welcome window installs the extension and

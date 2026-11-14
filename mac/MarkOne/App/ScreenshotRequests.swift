@@ -73,6 +73,11 @@ struct MenuBarLabel: View {
 
     var body: some View {
         Image(nsImage: MenuBarIcon.image(recording: recording))
-            .onAppear { ScreenshotRequests.start(openWindow: openWindow, openSettings: openSettings) }
+            .onAppear {
+                ScreenshotRequests.start(openWindow: openWindow, openSettings: openSettings)
+                #if DEBUG
+                Snapshots.run(openSettings: openSettings)
+                #endif
+            }
     }
 }

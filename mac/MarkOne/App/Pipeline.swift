@@ -863,3 +863,20 @@ private final class Freeze {
         queue.sync {}
     }
 }
+
+#if DEBUG
+extension Pipeline {
+    /// Shows a made-up camera, for the screenshots Snapshots takes.
+    func pretend(_ state: State = .waiting, status: String, problem: Problem? = nil, firmware: CameraFirmware? = nil,
+                 battery: Int? = nil, framesPerSecond: Double = 0, activeApp: String? = nil, install: InstallProgress? = nil) {
+        self.state = state
+        self.status = status
+        self.problem = problem
+        self.firmware = firmware
+        self.battery = battery
+        self.framesPerSecond = framesPerSecond
+        self.activeApp = activeApp
+        self.install = install
+    }
+}
+#endif

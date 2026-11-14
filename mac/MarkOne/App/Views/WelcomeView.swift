@@ -42,6 +42,9 @@ enum WelcomeWindow {
     /// let Mark One use removable volumes once it looks for the camera
     /// (Image Capture lists memory cards as cameras too).
     static func start() {
+        #if DEBUG
+        if Snapshots.taking { return }
+        #endif
         ExtensionInstaller.shared.activateOnce()
         Pipeline.shared.run()
     }
@@ -174,7 +177,12 @@ struct WelcomeView: View {
 
     /// Whether Xcode is drawing this in its canvas, where nothing should be
     /// installed or looked for.
-    private static let previewing = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
+    private static var previewing: Bool {
+        #if DEBUG
+        if Snapshots.taking { return true }
+        #endif
+        return ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
+    }
 
     private var buttons: some View {
         HStack {
