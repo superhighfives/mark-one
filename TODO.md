@@ -173,7 +173,7 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
   - [x] `/pre-release` (2026-11-14): read-only hygiene checks (clean tree, leftover
     test code, firmware edits match `scripts/build.py`). `--fix` offers
     the mechanical fixes.
-  - [ ] `/release --dry`: builds and checks everything, makes only a
+  - [x] `/release --dry` (2026-11-14): builds and checks everything, makes only a
     draft GitHub release, pushes nothing and undoes the version bump.
     Works while the repo is private.
   - [ ] Make the repo public. A live `/release` stops while it's private,
@@ -196,7 +196,9 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
   in HTML with its own captions.
 - [x] A support page (2026-11-13): the help page at `/mark-one/help`
   ends with "Still stuck? Email hi@superhighfives.com".
-- [ ] A Release build.
+- [x] A Release build (2026-11-14, `/release --dry`): 1.0 build 2, app
+  notarized and stapled, Gatekeeper accepts it from the DMG, and the
+  DMG's Sparkle signature checks out.
 
 ### Website
 
