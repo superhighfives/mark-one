@@ -91,15 +91,12 @@ struct MenuView: View {
     // MARK: States
 
     private var install: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(installer.notInApplications ? "Move Mark One to Applications"
-                 : installer.needsRestart ? "Restart to finish" : installer.failed ? "The camera didn’t install" : "Allow the Mark One camera")
-                .font(.title3.weight(.semibold))
-            Text(installer.failed
-                 ? installer.status
-                 : "macOS asks before an app adds a camera. In System Settings › General › Login Items & Extensions, click ⓘ beside Mark One and turn on Media Extension.")
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 12) {
+            message(installer.notInApplications ? "Move Mark One to Applications"
+                    : installer.needsRestart ? "Restart to finish" : installer.failed ? "The camera didn’t install" : "Allow the Mark One camera",
+                    Text(installer.failed
+                         ? installer.status
+                         : "macOS asks before an app adds a camera. In System Settings › General › Login Items & Extensions, click ⓘ beside Mark One and turn on Media Extension."))
             if installer.failed {
                 Button(installer.notInApplications ? "Quit Mark One" : installer.needsRestart ? "Check Again" : "Try Again") {
                     if installer.notInApplications { NSApp.terminate(nil) } else { installer.activate() }
@@ -118,10 +115,7 @@ struct MenuView: View {
 
     private var waiting: some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Connect your E-M5 (Mark I)").font(.title3.weight(.semibold))
-                Text("Mark One sets the camera up as soon as it sees it.").foregroundStyle(.secondary)
-            }
+            message("Connect your E-M5 (Mark I)", Text("Mark One sets the camera up as soon as it sees it."))
             Card {
                 VStack(alignment: .leading, spacing: 10) {
                     StepRow(number: 1, text: "Plug it into this Mac with a USB cable.")
@@ -140,12 +134,8 @@ struct MenuView: View {
     }
 
     private var photos: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Connected for photos").font(.title3.weight(.semibold))
-            Text("Mark One leaves the camera alone so photo apps can use it. To use it as a webcam, plug it in again and choose **Webcam** on its screen.")
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
+        message("Connected for photos",
+                Text("Mark One leaves the camera alone so photo apps can use it. To use it as a webcam, plug it in again and choose **Webcam** on its screen."))
     }
 
     private var off: some View {
@@ -155,23 +145,14 @@ struct MenuView: View {
                     .frame(height: 96)
                     .frame(maxWidth: .infinity)
             }
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Camera off").font(.title3.weight(.semibold))
-                Text("Switch it back on, or plug it in again, and Mark One sets it up again by itself.")
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            message("Camera off", Text("Switch it back on, or plug it in again, and Mark One sets it up again by itself."))
         }
     }
 
     private var noCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Put a card in the camera").font(.title3.weight(.semibold))
-                Text("The camera only records with a memory card in. Mark One doesn't save anything to it. With Mark One's latest camera firmware, it doesn't need one.")
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            message("Put a card in the camera",
+                    Text("The camera only records with a memory card in. Mark One doesn't save anything to it. With Mark One's latest camera firmware, it doesn't need one."))
             if pipeline.firmware?.updateAvailable == true {
                 Button("Update Camera…") { closePanel(); openWindow.firmware() }
                     .buttonStyle(.borderedProminent)
@@ -182,13 +163,11 @@ struct MenuView: View {
     }
 
     private var updating: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Updating the camera").font(.title3.weight(.semibold))
-            Text(pipeline.install?.phase == .switchOffFirst
-                 ? "Switch the camera off and on to carry on."
-                 : "Leave the camera alone, and don't unplug it, until it's done. Mark One carries on by itself.")
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 12) {
+            message("Updating the camera",
+                    Text(pipeline.install?.phase == .switchOffFirst
+                         ? "Switch the camera off and on to carry on."
+                         : "Leave the camera alone, and don't unplug it, until it's done. Mark One carries on by itself."))
             Button("Show Progress") { closePanel(); openWindow.firmware() }
                 .controlSize(.large)
                 .frame(maxWidth: .infinity)
@@ -197,14 +176,7 @@ struct MenuView: View {
 
     private var firmware: some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Label("Install Mark One firmware", systemImage: "exclamationmark.triangle.fill")
-                    .font(.title3.weight(.semibold))
-                    .symbolRenderingMode(.multicolor)
-                Text(pipeline.status)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            message("Install Mark One firmware", icon: "exclamationmark.triangle.fill", Text(pipeline.status))
             Button("Set Up Camera…") { closePanel(); openWindow.firmware() }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
@@ -294,6 +266,22 @@ struct MenuView: View {
                     }
                 }
             }
+        }
+    }
+
+    /// A state's title and what it means, spaced the same in every state.
+    private func message(_ title: String, icon: String? = nil, _ text: Text) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                if let icon {
+                    Image(systemName: icon).symbolRenderingMode(.multicolor)
+                }
+                Text(title)
+            }
+            .font(.title3.weight(.semibold))
+            text
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
