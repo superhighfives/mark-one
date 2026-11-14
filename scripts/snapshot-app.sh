@@ -18,6 +18,15 @@ out="$root/screenshots/app"
 cd "$root/mac/MarkOne"
 xcodebuild -project MarkOne.xcodeproj -scheme MarkOne -configuration Debug \
     -derivedDataPath build/snap build -quiet 2>&1 | grep -v "multiple matching destinations\|platform:macOS" || true
+# Taken into a new folder, which replaces the last ones only if every
+# screenshot worked. They all fail while the screen is locked.
+new="$(mktemp -d)"
+chmod 755 "$new"
+trap 'rm -rf "$new"' EXIT
+if ! "build/snap/Build/Products/Debug/Mark One.app/Contents/MacOS/Mark One" --snapshots "$new"; then
+    echo "Some screenshots failed, so screenshots/app is unchanged. Is the screen locked?"
+    exit 1
+fi
 rm -rf "$out"
-"build/snap/Build/Products/Debug/Mark One.app/Contents/MacOS/Mark One" --snapshots "$out"
+mv "$new" "$out"
 echo "Done. They're in screenshots/app."

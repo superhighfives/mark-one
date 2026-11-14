@@ -228,6 +228,7 @@ struct FirmwareView: View {
                     Label("Before you install", systemImage: "exclamationmark.triangle.fill")
                         .font(.headline)
                         .foregroundStyle(.orange)
+                        .padding(.bottom, 4)
                     point("battery.100percent", "Use a charged battery.")
                     point("hand.raised", "Leave the camera alone until it's done. If it loses power partway, it may not start again.")
                     if action != .restore {

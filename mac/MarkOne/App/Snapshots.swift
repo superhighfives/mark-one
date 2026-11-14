@@ -31,11 +31,14 @@ enum Snapshots {
             await panel(folder.appendingPathComponent("panel"))
             await settings(folder.appendingPathComponent("settings"), openSettings: openSettings)
             await firmware(folder.appendingPathComponent("firmware"))
-            exit(0)
+            exit(failed ? 1 : 0)
         }
     }
 
     private static var started = false
+    /// Whether any screenshot couldn't be taken, such as while the screen
+    /// is locked.
+    private static var failed = false
 
     // MARK: Windows
 
@@ -237,6 +240,7 @@ enum Snapshots {
         try? await Task.sleep(for: .seconds(0.8))
         guard let window else {
             print("Couldn't find the window for \(folder.lastPathComponent)/\(name).")
+            failed = true
             return
         }
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -245,6 +249,12 @@ enum Snapshots {
         capture.arguments = ["-x", "-o", "-l", String(window.windowNumber), folder.appendingPathComponent("\(name).png").path]
         try? capture.run()
         capture.waitUntilExit()
+        let file = folder.appendingPathComponent("\(name).png")
+        guard capture.terminationStatus == 0, FileManager.default.fileExists(atPath: file.path) else {
+            print("Couldn't take \(folder.lastPathComponent)/\(name).png.")
+            failed = true
+            return
+        }
         print("Saved \(folder.lastPathComponent)/\(name).png")
     }
 }
