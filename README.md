@@ -60,6 +60,7 @@ Build the patched firmware with any combination of patches. The script checks ev
 ```sh
 uv run scripts/build.py fw/OLY_E_097_2300_0000_0000.BIN patched/hdmi-liveview/E0972300.BIN hdmi-liveview
 uv run scripts/build.py fw/OLY_E_097_2300_0000_0000.BIN patched/usb-tools/E0972300.BIN usb-tools
+uv run scripts/build.py fw/OLY_E_097_2300_0000_0000.BIN patched/usb-tools+webcam/E0972300.BIN usb-tools webcam
 ```
 
 Check that repacking the unmodified firmware reproduces the original file:
@@ -68,7 +69,7 @@ Check that repacking the unmodified firmware reproduces the original file:
 uv run scripts/build.py --roundtrip fw/OLY_E_097_2300_0000_0000.BIN
 ```
 
-To flash, copy the `.BIN` into a `DCOLYMP` folder on the SD card, unplug USB, hold OK while turning the camera on, and let go when the light flashes. The light never signals the end: wait about 5 minutes, take the battery out and back in, and check the version under Settings > Firmware. Restore by flashing the stock file the same way, or with Olympus's updater. `NOTES.md` has the full test plan.
+To flash by hand, copy the `.BIN` into a `DCOLYMP` folder on the SD card, unplug USB and switch the camera off. Hold OK and switch it on, and let go when the orange light on the front comes on. After about a minute the light blinks quickly: switch the camera off, then on again. Don't switch it off, open the battery door or take the card out while the light is on. Mark One does all of this for you (and shows the same steps); Mark One's firmware is `usb-tools webcam`. Restore by flashing the stock file the same way, or from Mark One over USB. `NOTES.md` has the full test plan.
 
 ## Talking to the camera over USB
 
