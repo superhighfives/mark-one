@@ -14,7 +14,7 @@
 
 <p align="center">
   <br>
-  <img src="screenshots/raw/01-panel.png" width="320" alt="Mark One's menu bar panel, live, with its camera controls">
+  <a href="screenshots"><img src="screenshots/raw/01-panel.png" width="320" alt="Mark One's menu bar panel, live, with its camera controls"></a>
   <br>
   <br>
 </p>
