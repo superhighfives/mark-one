@@ -183,6 +183,12 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
     set `available` to true in `src/data/markone.ts` (a constant, not an
     environment variable, like the rest of the site's settings) to turn
     on the Download button.
+- [ ] **Homebrew cask.** `mark-one` is ready on the `mark-one` branch of
+  the local homebrew-cask tap (modelled on Pika's; livecheck reads the
+  Sparkle feed). `brew audit --new` passes except for notability: the
+  repo needs 75 stars, or 30 forks or watchers. Once it has them, fork
+  Homebrew/homebrew-cask, open the PR, and when it's merged set
+  `inHomebrew` to true in `superhighfives.com/src/data/markone.ts`.
 - [ ] **Test end to end:** download from the page, then publish an
   update and watch Sparkle install it. Check that downloads report their
   size, so browsers show progress. Right after 1.0: the download from
