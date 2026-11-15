@@ -206,7 +206,7 @@ struct WelcomeView: View {
     }
 
     /// Whether the camera reports Mark One's firmware. Until it does, the
-    /// firmware step's main action is Set Up Camera, not It's Installed.
+    /// firmware step's main action is Set Up Camera, not Continue.
     private var installed: Bool {
         if case .markOne = pipeline.firmware { return true }
         return false
@@ -215,7 +215,6 @@ struct WelcomeView: View {
     private var nextTitle: String {
         switch step {
         case .welcome: "Get Started"
-        case .firmware: "It’s Installed"
         case .done: "Done"
         default: "Continue"
         }
