@@ -78,9 +78,9 @@ lifts the time limits (see "Recording without a card" in `NOTES.md`).
   `olyfw.py`, which is downloaded rather than copied because it has no
   license).
 - [x] **Firmware download kept** (2026-11-13): Mark One still asks
-  Olympus's update server itself, presenting as OM Workspace. The
-  unofficial [firmware download page](https://ofu.infinityfreeapp.com/)
-  hands out the same files from Olympus's servers the same way. If
+  Olympus's update server itself, presenting as OM Workspace, the same
+  way the community's download script does (see the mu-43.com thread
+  linked from the README). If
   Olympus objects, switch to the user downloading the file and giving it
   to Mark One: 88fbe60 does that, and the commit after it reverts it.
 - [x] **No Olympus bytes in the app** (2026-11-13): the app checks

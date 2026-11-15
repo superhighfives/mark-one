@@ -967,9 +967,9 @@ Since 2025-12-20, Olympus firmware can't be downloaded directly, only
 by asking the update server the way OM Workspace does. The community
 firmware list kept by a mu-43.com member
 ([spreadsheet](https://docs.google.com/spreadsheets/d/10vaBZZrfVLeotlAjfGy5Vo_qtelXevRkdPMBd-VN53k/edit))
-says so, and points to a shell script on mu-43.com that does it and to
-the unofficial [firmware download page](https://ofu.infinityfreeapp.com/),
-which hands out signed links to the files on Olympus's servers
+says so, and points to a shell script in the
+[mu-43.com firmware thread](https://www.mu-43.com/threads/firmware-updates-for-om-and-em-cameras-january-2023.118773/page-6#post-1837553)
+that asks the server for a signed link to the file on Olympus's servers
 (`dl01.om-digitalsolutions.net`). Mark One's download works the same way.
 
 A USB install works on a camera Mark One has set up (2026-11-09):
