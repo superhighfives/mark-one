@@ -13,8 +13,8 @@
 </p>
 
 <p align="center">
-  <img src="screenshots/raw/02-call.png" width="62%" alt="A FaceTime call using the E-M5 through Mark One">
-  <img src="screenshots/raw/01-panel.png" width="25%" alt="Mark One's menu bar panel, live, with its camera controls">
+  <img src="screenshots/app/welcome/01-welcome.png" width="60%" alt="Mark One's welcome window, which walks through setting up the camera">
+  <img src="screenshots/raw/01-panel.png" width="28%" alt="Mark One's menu bar panel, live, with its camera controls">
 </p>
 
 Turns an original Olympus OM-D E-M5 (Mark I, 2012) into a Mac webcam over a single USB cable, with the camera's own lens, sensor and color. Out of the box the camera can't do this: it refuses to shoot while HDMI is plugged in, and its USB connection only transfers files. So this project changes its firmware, and a Mac app called Mark One turns the camera into a camera any video app can pick.
