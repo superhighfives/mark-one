@@ -169,16 +169,16 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
   link, and `/mark-one/download` returns 404.
 - [x] **Deploy** (2026-11-12): PR #29 merged and live, showing "Coming
   soon". `/mark-one/download` returns 404 until launch.
-- [ ] **Launch**, in this order:
+- [x] **Launch**, in this order:
   - [x] `/pre-release` (2026-11-14): read-only hygiene checks (clean tree, leftover
     test code, firmware edits match `scripts/build.py`). `--fix` offers
     the mechanical fixes.
   - [x] `/release --dry` (2026-11-14): builds and checks everything, makes only a
     draft GitHub release, pushes nothing and undoes the version bump.
     Works while the repo is private.
-  - [ ] Make the repo public. A live `/release` stops while it's private,
+  - [x] Make the repo public (2026-11-14). A live `/release` stops while it's private,
     because release downloads from a private repo fail for everyone else.
-  - [ ] `/release` 1.0 (keeps build 2, the first release). It asks before
+  - [x] `/release` 1.0 (2026-11-14, "Lights, Camera, Action"; keeps build 2, the first release). It asks before
     each irreversible step, drafts the notes for approval, and offers to
     set `available` to true in `src/data/markone.ts` (a constant, not an
     environment variable, like the rest of the site's settings) to turn
