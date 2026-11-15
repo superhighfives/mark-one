@@ -13,7 +13,10 @@
 </p>
 
 <p align="center">
+  <br>
   <img src="screenshots/raw/01-panel.png" width="320" alt="Mark One's menu bar panel, live, with its camera controls">
+  <br>
+  <br>
 </p>
 
 Turns an original Olympus OM-D E-M5 (Mark I, 2012) into a Mac webcam over a single USB cable, with the camera's own lens, sensor and color. Out of the box the camera can't do this: it refuses to shoot while HDMI is plugged in, and its USB connection only transfers files. So this project changes its firmware, and a Mac app called Mark One turns the camera into a camera any video app can pick.
