@@ -61,20 +61,20 @@ Report the mode (live or dry run).
 
 1. Read the current `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` from `project.yml`, and the latest release: the newest `changelog/mark-one/*.md` on the website and the newest tag (`git tag --sort=-v:refname | head -1`).
 2. Ask for:
-   - **New version** (`X.Y` or `X.Y.Z`; show the current one).
+   - **New version**, always three parts (`X.Y.Z`, like `1.0.1`; show the current one). The site sorts versions as semver, so `1.1` alone won't do.
    - **Release title** (a short name).
 3. **Build** = current `CURRENT_PROJECT_VERSION` + 1. It must be higher than every released build: Sparkle compares build numbers.
    - The very first release keeps the current build if nothing has been released yet (1.0 is build 2).
 4. **Camera extension:** if anything in `mac/MarkOne/Extension/` changed since the last release tag, ask whether to bump `MarkOneCamera`'s build too. Otherwise leave it alone: updating the extension can lose the camera until a restart (NOTES.md, "Camera extension updates").
 5. Confirm:
    ```
-   Version:    X.Y
+   Version:    X.Y.Z
    Build:      N
    Extension:  M (unchanged / bumped)
    Title:      "Title"
    Mode:       live / dry run
    ```
-6. Edit `project.yml`, check it with `git diff`, then commit: `Mark One: Version X.Y (build N)`. Push in live mode only, after confirming.
+6. Edit `project.yml`, check it with `git diff`, then commit: `Mark One: Version X.Y.Z (build N)`. Push in live mode only, after confirming.
 
 ---
 
