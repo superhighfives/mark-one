@@ -35,5 +35,4 @@ wait:
         mov     d2,d0
         mov     1,d1
         call    set_warning,[d2,d3,a2,a3],16
-        add     8,sp
-        ret     [d2],4
+        ret     [d2],12
