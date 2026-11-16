@@ -789,6 +789,41 @@ To check: plug in as Storage and MTP, unplug, and the dial and buttons
 still work. Still loaded at run time: the
 install restart (`asm/restart.s`), which only the install over USB uses.
 
+### A message after unplugging (in progress, 2026-11-16)
+
+After an unplug mid-call the screen stays dark for up to 10 s before the
+camera goes back to normal. The aim is to show "One Moment" over that gap.
+
+- The GUI's warnings are a table of 46 records, 20 bytes each, at
+  0x7ef0af60: byte 0 the index, byte 1 the style, halfword 2 an icon,
+  halfword 8 the string ID. 0x11 is "One Moment" (string 0x39a, no icon),
+  0x24 "Remove USB Cable" (0x3b6). 0x1a-0x1c, 0x26, 0x27, 0x2d and 0x2e
+  are empty, if another message is ever needed.
+- setDbWarningInfo (0x7edf38fc) shows one: a0 = the GUI's common object
+  (0x7edf3876 returns it), d0 = index, d1 = 1. It runs in the GUI task and
+  has no prologue of its own (the frame comes from `call [d2,d3,a2,a3],16`).
+- How Exit shows its message: the prompt's OK handler stores 36 (0x24)
+  at 0x602bceaf (0x7eec7379); checkPcMode (0x7edd59ea) posts 0x09000010,
+  SUB_EVENT_START_WAIT_USB_DISCONNECT (names at 0x7ef04714); its handler,
+  startWaitUsbDisconnect (0x7edd5b6f), makes request 135 with param 36,
+  and the USB GUI (0x7eeae6e2) passes the index at 0x602bceaf to
+  setDbWarningInfo.
+- `asm/wait.s` calls it from `run`, loaded at 0x7eaafa70 in the free end
+  of the `sdk api` dump after `asm/nocard.s` (free to 0x7eaafbb3).
+
+To try on the camera, with Mark One quit:
+
+1. In MTP: `ptp.py poke 0x7eaafa70 asm/wait.bin`, then `ptp.py run
+   0x7eaafa70 0x11`. Does "One Moment" show, and does `run ... 0` clear it?
+2. In a session (`ptp.py shoot`, recording): the same. This is the screen
+   the unplug stub would draw over.
+3. With `scripts/unplug.py --fix`, call it from the unplug stub (or right
+   after posting the event) and watch whether it stays up through the gap,
+   or the app change clears it. If it's cleared, it has to be shown again
+   later in the hand-off.
+4. Calling the GUI from the system event callback's task is untested;
+   watch for hangs.
+
 ### Before the fix (2026-11-08)
 
 Unplugging the cable while Mark One uses the camera leaves it stuck: it

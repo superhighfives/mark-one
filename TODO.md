@@ -234,13 +234,11 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
 
 - [ ] **A message after unplugging.** Unplugging mid-call leaves the
   screen dark for up to 10 seconds before the camera goes back to
-  normal, which can look frozen. Show Olympus's own "Remove USB Cable"
-  style message (it already exists in the firmware; photo 2026-11-12)
-  from `asm/unplug.s` until the camera's back. Needs a firmware revision:
-  find the message call, add it to the stub, and test unplugging mid-call
-  and in Storage and MTP. The camera shows it when you choose Exit in the
-  USB menu, so start from the menu's OK handler (0x7eec70d7, patched by
-  `asm/webcam/ok.s`) and follow the Exit path.
+  normal, which can look frozen. Show the camera's own "One Moment"
+  warning (0x11) from `asm/unplug.s` until the camera's back. Found how
+  to show it (2026-11-16, "A message after unplugging" in `NOTES.md`);
+  next, try `asm/wait.s` on the camera, then add it to the stub as a
+  firmware revision and test unplugging mid-call and in Storage and MTP.
 - [x] **Power.** The E-M5 doesn't run from USB power. A card install
   worked on the dummy battery (2026-11-13), so setup asks only for a
   charged battery. A long call on it worked (2026-11-16).
