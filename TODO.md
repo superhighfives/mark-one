@@ -248,6 +248,10 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
   again (see "Exact frame boundaries" in `NOTES.md`). Find out why that
   check takes nearly 5 s. Values above about 6.6 hours would likely
   overflow the muxer's 90 kHz clock.
+- [ ] **A sound when focusing (nice to have).** An optional click when
+  Focus or its shortcut focuses the camera, with a checkbox in Settings
+  to turn it on. Best would be the E-M5's own focus beep, recorded from
+  the camera.
 - [x] **Apple's video decoder.** Mark One decodes with VideoToolbox on
   revision 3 and libavcodec otherwise, or when the hardware fails:
   about 12% of a core while streaming, down from 37-41% (see "Apple's
