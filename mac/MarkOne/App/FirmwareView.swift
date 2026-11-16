@@ -323,7 +323,7 @@ struct FirmwareView: View {
                 HStack {
                     Label(cards.first?.lastPathComponent ?? "", systemImage: "sdcard")
                     Spacer()
-                    Button("Write to this card") { if let volume = cards.first { write(volume) } }
+                    Button("Write to This Card") { if let volume = cards.first { write(volume) } }
                         .keyboardShortcut(.defaultAction)
                         .controlSize(.large)
                 }
