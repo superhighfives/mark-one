@@ -259,7 +259,7 @@ struct MenuView: View {
                                     ProgressView().controlSize(.mini).opacity(pipeline.focusing ? 1 : 0)
                                 }
                             }
-                            .disabled(!live || pipeline.focusing || pipeline.continuousFocus)
+                            .disabled(!pipeline.canFocus)
                             .help("Focus now")
                             .accessibilityLabel(pipeline.focusing ? "Focusing" : "Focus now")
                         }
