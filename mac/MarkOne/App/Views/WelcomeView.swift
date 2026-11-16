@@ -277,7 +277,7 @@ struct WelcomeView: View {
                             Text(installer.status).fixedSize(horizontal: false, vertical: true)
                             Spacer()
                             if installer.notInApplications {
-                                Button("Quit Mark One") { NSApp.terminate(nil) }
+                                Button("Quit and Move") { NSApp.terminate(nil) }
                             } else {
                                 Button(installer.needsRestart ? "Check Again" : "Try Again") { installer.activate() }
                             }
