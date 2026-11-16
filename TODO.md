@@ -178,7 +178,10 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
     Works while the repo is private.
   - [x] Make the repo public (2026-11-14). A live `/release` stops while it's private,
     because release downloads from a private repo fail for everyone else.
-  - [x] `/release` 1.0 (2026-11-14, "Lights, Camera, Action"; keeps build 2, the first release). It asks before
+  - [x] `/release` 1.0 (2026-11-14, "Lights, Camera, Action"; keeps build 2, the first release).
+    Re-released as 1.0.0 on 2026-11-15, still build 2, before it was
+    announced: the site sorts versions as semver, so a later "1.1" would have
+    broken the feed. Versions are three parts from now on. It asks before
     each irreversible step, drafts the notes for approval, and offers to
     set `available` to true in `src/data/markone.ts` (a constant, not an
     environment variable, like the rest of the site's settings) to turn
