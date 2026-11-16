@@ -136,6 +136,10 @@ final class Pipeline: ObservableObject {
     /// Set while the overlay waits for the next picture to clear it.
     private let clearBusyOnFrame = Flag()
 
+    /// Whether Focus does anything now: only while recording, with
+    /// autofocus set to Once, and not while it's already focusing.
+    var canFocus: Bool { state == .streaming && !focusing && !continuousFocus }
+
     /// Focuses the camera, as a half press of its shutter button does.
     func focus() {
         focusing = true

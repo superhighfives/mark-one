@@ -159,6 +159,7 @@ Mark One's code, patches and notes are under the [MIT license](LICENSE). Some pi
 
 - FFmpeg's libavcodec and libavutil, which `scripts/build-libavcodec.sh` builds and the app ships as separate libraries, are under the LGPL 2.1 (`mac/MarkOne/Vendor/ffmpeg/COPYING.LGPLv2.1`).
 - [Sparkle](https://github.com/sparkle-project/Sparkle), for updates, is under the MIT license.
+- [KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts), for the Focus shortcut, is under the MIT license.
 - `olyfw.py` comes from [xulfr/om-emu](https://github.com/xulfr/om-emu), which has no license, so it isn't copied here: `scripts/setup.sh` downloads it.
 - Olympus's firmware isn't part of this repo or the app, and stays under OM Digital Solutions' own license.
 
