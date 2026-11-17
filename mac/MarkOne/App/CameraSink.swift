@@ -31,6 +31,8 @@ final class CameraSink {
     /// Whether an app was using the camera when last checked, and when.
     private var appUsing = false
     private var appCheckedAt = Date.distantPast
+    /// When the last app stopped, until the queue is emptied.
+    private var appStoppedAt: Date?
 
     /// Opens the sink, waiting up to five seconds for the extension's device.
     init() throws {
@@ -128,23 +130,32 @@ final class CameraSink {
         sendWaiting()
     }
 
-    /// Asks the extension at most every 0.05 s. When the last app stops,
-    /// empties the queue of the frames sent before Mark One noticed: the
-    /// extension would show them, and then repeat the last for up to 3 s,
-    /// when an app next starts the camera. Call with `lock` held.
+    /// Asks the extension at most every 0.05 s. Once the last app has
+    /// stopped, empties the queue of the frames sent before Mark One
+    /// noticed: the extension would show them, and then repeat the last for
+    /// up to 3 s, when an app next starts the camera. Call with `lock` held.
     private func appIsUsing() -> Bool {
         if Date().timeIntervalSince(appCheckedAt) >= 0.05 {
             let using = CameraSink.string(of: device, CameraSink.inUseSelector) == "1"
-            if appUsing, !using { empty() }
+            if appUsing, !using { appStoppedAt = Date() }
+            if using { appStoppedAt = nil }
             appUsing = using
             appCheckedAt = Date()
+            // The extension marks the camera unused before it stops taking
+            // frames: a request already on its way, or a retry it already
+            // scheduled (26 ms at most), can still take one. Waiting 0.2 s
+            // lets that finish, so nothing else dequeues while this does.
+            if let stopped = appStoppedAt, Date().timeIntervalSince(stopped) >= 0.2 {
+                empty()
+                appStoppedAt = nil
+            }
         }
         return appUsing
     }
 
-    /// Takes every frame back out of the queue. Only while no app uses the
-    /// camera, when the extension isn't taking frames from it, so nothing
-    /// else dequeues at the same time.
+    /// Takes every frame back out of the queue. Only once the extension has
+    /// stopped taking frames from it (see `appIsUsing`): two dequeuers at
+    /// once could release the same frame twice.
     private func empty() {
         while let element = CMSimpleQueueDequeue(queue) {
             Unmanaged<CMSampleBuffer>.fromOpaque(element).release()
