@@ -22,7 +22,7 @@ struct MarkOneApp: App {
         MenuBarExtra {
             MenuView(installer: installer, pipeline: pipeline)
         } label: {
-            MenuBarLabel(recording: pipeline.state == .streaming)
+            MenuBarLabel(recording: pipeline.state == .streaming, focusing: pipeline.focusing)
         }
         .menuBarExtraStyle(.window)
 
@@ -50,6 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if Snapshots.taking { return }
             #endif
             Preferences.shared.start(Pipeline.shared)
+            Shortcuts.start(Pipeline.shared)
             Updater.shared.start()
             // The first time, the welcome window installs the extension and
             // starts looking for the camera at the steps that explain the

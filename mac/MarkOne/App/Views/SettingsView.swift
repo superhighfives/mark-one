@@ -1,5 +1,6 @@
 // Mark One's Settings window.
 
+import KeyboardShortcuts
 import SwiftUI
 
 struct SettingsView: View {
@@ -122,8 +123,16 @@ private struct CameraSettings: View {
             }
             // Brightness, white balance, picture mode and autofocus are in
             // the menu bar panel.
-            Section("Picture") {
+            Section {
                 Toggle("Focus on faces", isOn: $pipeline.faceFocus)
+                KeyboardShortcuts.Recorder("Focus now", name: .focus)
+            } header: {
+                Text("Picture")
+            } footer: {
+                Text("The shortcut works from any app while a video app uses the camera. If Focus is set to Always, it switches to Once first, and the picture pauses for a second.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Section {
                 Toggle("Lock camera controls", isOn: $pipeline.lockControls)

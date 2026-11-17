@@ -14,12 +14,12 @@ Mark One.
   froze only at the two scheduled restarts and once for 0.43 s
   downstream of Mark One, against 27 freezes in 56 seconds on revision
   2. See "Exact frame boundaries" in `NOTES.md`.
-- [ ] **Hard freeze at 21.6 minutes** (2026-11-09, revision 2, card in):
+- [x] **Hard freeze at 21.6 minutes** (2026-11-09, revision 2, card in):
   the camera froze mid-stream and needed a battery pull. A 26-minute run
   afterwards didn't freeze, nor did a 71-minute run on revision 3
-  (2026-11-10). Watch for it in long sessions.
+  (2026-11-10), nor a long call on the dummy battery (2026-11-16).
 
-- [ ] **FaceTime after an extension update** (2026-11-12, macOS 27):
+- [x] **FaceTime after an extension update** (2026-11-12, macOS 27):
   FaceTime ignored the Mark One camera until its video service
   (`avconferenced`) restarted, then worked (see "FaceTime" in
   `NOTES.md`). A first install has the same problem (2026-11-13): no
@@ -27,8 +27,8 @@ Mark One.
   switched on ("Processes don't see the camera come back" in
   `NOTES.md`). Mark One now reopens itself during setup, restarts
   `avconferenced` when no camera is in use, and the Done step says to
-  reopen other video apps. Still to see working: a FaceTime call
-  straight after a first install.
+  reopen other video apps. A first install with 1.0.0 worked
+  (2026-11-16).
 
 ## Before launch
 
@@ -196,9 +196,9 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
   superhighfives/tools tap. Until then the site shows
   `brew install --cask superhighfives/tools/mark-one` (2026-11-14).
 - [ ] **Test end to end:** download from the page, then publish an
-  update and watch Sparkle install it. Check that downloads report their
-  size, so browsers show progress. Right after 1.0: the download from
-  the live page, then Sparkle with the first update.
+  update and watch Sparkle install it. The download from the live page
+  works (2026-11-16, 1.0.0). Still to see: Sparkle with the first
+  update.
 
 ### Release
 
@@ -234,29 +234,37 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
 
 - [ ] **A message after unplugging.** Unplugging mid-call leaves the
   screen dark for up to 10 seconds before the camera goes back to
-  normal, which can look frozen. Show Olympus's own "Remove USB Cable"
-  style message (it already exists in the firmware; photo 2026-11-12)
-  from `asm/unplug.s` until the camera's back. Needs a firmware revision:
-  find the message call, add it to the stub, and test unplugging mid-call
-  and in Storage and MTP. The camera shows it when you choose Exit in the
-  USB menu, so start from the menu's OK handler (0x7eec70d7, patched by
-  `asm/webcam/ok.s`) and follow the Exit path.
-- [ ] **Power.** The E-M5 doesn't run from USB power. A card install
+  normal, which can look frozen. Show the camera's own "One Moment"
+  warning (0x11) from `asm/unplug.s` until the camera's back. Found how
+  to show it (2026-11-16, "A message after unplugging" in `NOTES.md`);
+  next, try `asm/wait.s` on the camera, then add it to the stub as a
+  firmware revision and test unplugging mid-call and in Storage and MTP.
+- [x] **Power.** The E-M5 doesn't run from USB power. A card install
   worked on the dummy battery (2026-11-13), so setup asks only for a
-  charged battery. Still to try: a long call on it.
+  charged battery. A long call on it worked (2026-11-16).
 - [ ] **Shorter restarts.** Mark One restarts the recording every 100
   minutes, before the 2-hour cap, and the picture freezes for about 5 s,
   almost all of it waiting for the camera to report it's recording
   again (see "Exact frame boundaries" in `NOTES.md`). Find out why that
   check takes nearly 5 s. Values above about 6.6 hours would likely
   overflow the muxer's 90 kHz clock.
+- [ ] **A flicker when video comes back on.** After a short break
+  (under 3 s), turning video back on in a call shows the picture from
+  when it was turned off for a moment. The extension repeats the last
+  frame it had through gaps, and that one is old by then. Mark One no
+  longer leaves old frames in the queue (1.0.1), but the rest has to be
+  fixed in the extension: forget the last frame when the last app stops,
+  and skip frames more than about 0.2 s old. Changing the extension can
+  need a restart to finish updating, so do it with the next extension
+  change.
+- [ ] **A sound when focusing (nice to have).** An optional click when
+  Focus or its shortcut focuses the camera, with a checkbox in Settings
+  to turn it on. Best would be the E-M5's own focus beep, recorded from
+  the camera.
 - [x] **Apple's video decoder.** Mark One decodes with VideoToolbox on
   revision 3 and libavcodec otherwise, or when the hardware fails:
   about 12% of a core while streaming, down from 37-41% (see "Apple's
   decoder on exact frames" in `NOTES.md`).
-- [ ] **HDMI live view (optional).** The `hdmi-liveview` patch is built
-  but has never been tried on a camera. It would help anyone using a
-  capture card.
 
 ## Done recently
 

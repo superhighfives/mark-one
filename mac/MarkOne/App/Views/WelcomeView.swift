@@ -3,6 +3,7 @@
 // finds a camera without the right firmware.
 
 import AppKit
+import KeyboardShortcuts
 import SwiftUI
 
 @MainActor
@@ -277,7 +278,7 @@ struct WelcomeView: View {
                             Text(installer.status).fixedSize(horizontal: false, vertical: true)
                             Spacer()
                             if installer.notInApplications {
-                                Button("Quit Mark One") { NSApp.terminate(nil) }
+                                Button("Quit and Move") { NSApp.terminate(nil) }
                             } else {
                                 Button(installer.needsRestart ? "Check Again" : "Try Again") { installer.activate() }
                             }
@@ -430,12 +431,26 @@ struct WelcomeView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: 440, alignment: .leading)
             Card(padding: 14) {
-                VStack(alignment: .leading, spacing: 2) {
-                    OpenAtLoginToggle(labelGap: 4)
-                    Text("So the camera is ready whenever you plug it in.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .padding(.leading, 24)
+                VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        OpenAtLoginToggle(labelGap: 4)
+                        Text("So the camera is ready whenever you plug it in.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .padding(.leading, 24)
+                    }
+                    Divider()
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Focus shortcut")
+                            Text("Focuses the camera from any app, and sets Focus to Once.")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 0)
+                        KeyboardShortcuts.Recorder(for: .focus)
+                    }
                 }
             }
         }

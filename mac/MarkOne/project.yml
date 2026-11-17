@@ -7,6 +7,9 @@ packages:
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     from: "2.10.1"
+  KeyboardShortcuts:
+    url: https://github.com/sindresorhus/KeyboardShortcuts
+    from: "3.1.0"
 configFiles:
   Debug: Local.xcconfig
   Release: Local.xcconfig
@@ -54,6 +57,7 @@ targets:
       - target: MarkOneCamera
         embed: true
       - package: Sparkle
+      - package: KeyboardShortcuts
       - framework: Vendor/ffmpeg/lib/libavcodec.63.dylib
         embed: true
         codeSign: true
