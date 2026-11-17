@@ -128,13 +128,27 @@ final class CameraSink {
         sendWaiting()
     }
 
-    /// Asks the extension at most every 0.1 s. Call with `lock` held.
+    /// Asks the extension at most every 0.05 s. When the last app stops,
+    /// empties the queue of the frames sent before Mark One noticed: the
+    /// extension would show them, and then repeat the last for up to 3 s,
+    /// when an app next starts the camera. Call with `lock` held.
     private func appIsUsing() -> Bool {
-        if Date().timeIntervalSince(appCheckedAt) >= 0.1 {
-            appUsing = CameraSink.string(of: device, CameraSink.inUseSelector) == "1"
+        if Date().timeIntervalSince(appCheckedAt) >= 0.05 {
+            let using = CameraSink.string(of: device, CameraSink.inUseSelector) == "1"
+            if appUsing, !using { empty() }
+            appUsing = using
             appCheckedAt = Date()
         }
         return appUsing
+    }
+
+    /// Takes every frame back out of the queue. Only while no app uses the
+    /// camera, when the extension isn't taking frames from it, so nothing
+    /// else dequeues at the same time.
+    private func empty() {
+        while let element = CMSimpleQueueDequeue(queue) {
+            Unmanaged<CMSampleBuffer>.fromOpaque(element).release()
+        }
     }
 
     private func sendWaiting() {
