@@ -1,6 +1,7 @@
 // The menu bar icon: the app icon's dial as a ring with its index line,
 // and the red LED beside it while the camera is recording. While the
-// camera focuses, the index line swings from side to side.
+// camera focuses, the index line reaches in to the centre and swings from
+// side to side.
 
 import AppKit
 
@@ -12,13 +13,16 @@ enum MenuBarIcon {
 
     /// The icon with its index line turned `turn` of the way round,
     /// clockwise from the top (negative turns go anticlockwise), or hidden
-    /// when nil, for focusing.
-    static func image(recording: Bool, turn: Double?) -> NSImage { image(live: recording, turn: turn) }
+    /// when nil, and `reach` of the way in to the centre (0 is the usual
+    /// short line, 1 reaches the centre), for focusing.
+    static func image(recording: Bool, turn: Double?, reach: Double) -> NSImage {
+        image(live: recording, turn: turn, reach: reach)
+    }
 
     /// Not a template image, so the LED can be red. The dial is drawn in
     /// the menu bar's own label colour each time it's drawn, so it still
     /// follows light and dark menu bars.
-    private static func image(live: Bool, turn: Double? = 0) -> NSImage {
+    private static func image(live: Bool, turn: Double? = 0, reach: Double = 0) -> NSImage {
         let image = NSImage(size: NSSize(width: 20, height: 18), flipped: true) { _ in
             let ink = NSColor.labelColor.withAlphaComponent(live ? 1 : 0.55)
             ink.setStroke()
@@ -36,7 +40,7 @@ enum MenuBarIcon {
                 }
                 let index = NSBezierPath()
                 index.move(to: point(radius - 0.5))
-                index.line(to: point(radius - 4.2))
+                index.line(to: point((radius - 4.2) * (1 - reach)))
                 index.lineWidth = 1.8
                 index.lineCapStyle = .round
                 index.stroke()

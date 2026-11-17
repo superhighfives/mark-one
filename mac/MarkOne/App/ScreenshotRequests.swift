@@ -74,30 +74,43 @@ struct MenuBarLabel: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// How far the index line has turned, or nil while it blinks off.
     @State private var turn: Double? = 0
+    /// How far in to the centre it reaches.
+    @State private var reach = 0.0
     /// Two o'clock: the index line swings this far each way.
     private static let swing = 2.0 / 12
     /// Seconds for a swing from 2 o'clock to 10 and back.
-    private static let swingTime = 1.2
+    private static let swingTime = 1.8
 
     var body: some View {
-        Image(nsImage: MenuBarIcon.image(recording: recording, turn: turn))
-            // Swings between 2 and 10 o'clock while focusing, or blinks
-            // with Reduce Motion on, then eases back to 12.
+        Image(nsImage: MenuBarIcon.image(recording: recording, turn: turn, reach: reach))
+            // Reaches in to the centre and swings between 2 and 10 o'clock
+            // while focusing, or blinks with Reduce Motion on, then eases
+            // back to 12.
             .task(id: focusing) {
                 let start = Date()
                 if focusing {
                     while !Task.isCancelled {
                         let elapsed = Date().timeIntervalSince(start)
-                        turn = reduceMotion ? (Int(elapsed * 4) % 2 == 0 ? 0 : nil)
-                            : Self.swing * sin(elapsed / Self.swingTime * 2 * .pi)
+                        if reduceMotion {
+                            turn = Int(elapsed * 4) % 2 == 0 ? 0 : nil
+                        } else {
+                            turn = Self.swing * sin(elapsed / Self.swingTime * 2 * .pi)
+                            reach = 1 - pow(1 - min(1, elapsed / 0.2), 3)
+                        }
                         try? await Task.sleep(for: .milliseconds(reduceMotion ? 250 : 16))
                     }
                 } else {
-                    guard let from = turn, from != 0, !reduceMotion else { turn = 0; return }
+                    guard let from = turn, from != 0 || reach != 0, !reduceMotion else {
+                        turn = 0
+                        reach = 0
+                        return
+                    }
+                    let fromReach = reach
                     let duration = 0.3
                     while !Task.isCancelled {
                         let done = min(1, Date().timeIntervalSince(start) / duration)
                         turn = from * pow(1 - done, 3)
+                        reach = fromReach * pow(1 - done, 3)
                         if done == 1 { return }
                         try? await Task.sleep(for: .milliseconds(16))
                     }
