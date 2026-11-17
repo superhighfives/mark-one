@@ -43,6 +43,11 @@ Mark One.
   2 s instead of waiting for the camera to be reconnected. Not yet seen
   working: the restart message only shows when the race happens. After
   1.0: it matters from the first update that changes the extension.
+  Updates that don't change it now leave it alone: 1.0.0 compared the
+  extension's version as well as its build, and the version follows
+  the app's, so every update would have replaced it. 1.0.1 compares the
+  build only, and updating 1.0.0 to 1.0.1 kept the running 1.0.0/4
+  extension (2026-11-16).
 - [x] **Battery steps.** A full discharge (2026-11-10) read 100, 50 once
   the camera's icon flashes empty, then 5 nine seconds before it switched
   itself off: Full, Low and Empty. USB installs now wait for Full.
@@ -195,10 +200,10 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
   `brew install --cask mark-one` and remove the cask from the
   superhighfives/tools tap. Until then the site shows
   `brew install --cask superhighfives/tools/mark-one` (2026-11-14).
-- [ ] **Test end to end:** download from the page, then publish an
+- [x] **Test end to end:** download from the page, then publish an
   update and watch Sparkle install it. The download from the live page
-  works (2026-11-16, 1.0.0). Still to see: Sparkle with the first
-  update.
+  works (2026-11-16, 1.0.0), and 1.0.0 updated itself to 1.0.1
+  (2026-11-16).
 
 ### Release
 
