@@ -80,40 +80,56 @@ struct MenuBarLabel: View {
     private static let swing = 2.0 / 12
     /// Seconds for a swing from 2 o'clock to 10 and back.
     private static let swingTime = 1.8
+    /// Seconds to reach in to the centre, or draw back.
+    private static let reachTime = 0.2
+    /// Seconds to swing back to 12 o'clock.
+    private static let returnTime = 0.3
+
+    /// Calls `step` with 0 to 1, eased out, for `duration` seconds or until
+    /// the task is cancelled.
+    private func ease(over duration: TimeInterval, _ step: (Double) -> Void) async {
+        let start = Date()
+        while !Task.isCancelled {
+            let done = min(1, Date().timeIntervalSince(start) / duration)
+            step(1 - pow(1 - done, 3))
+            if done == 1 { return }
+            try? await Task.sleep(for: .milliseconds(16))
+        }
+    }
 
     var body: some View {
         Image(nsImage: MenuBarIcon.image(recording: recording, turn: turn, reach: reach))
-            // Reaches in to the centre and swings between 2 and 10 o'clock
-            // while focusing, or blinks with Reduce Motion on, then eases
-            // back to 12.
+            // While focusing, the index line reaches in to the centre, then
+            // swings between 2 and 10 o'clock. After, it swings back to 12,
+            // then draws back to its usual short line. With Reduce Motion
+            // on, it blinks instead.
             .task(id: focusing) {
-                let start = Date()
-                if focusing {
+                if reduceMotion {
+                    reach = 0
+                    guard focusing else { turn = 0; return }
+                    let start = Date()
                     while !Task.isCancelled {
-                        let elapsed = Date().timeIntervalSince(start)
-                        if reduceMotion {
-                            turn = Int(elapsed * 4) % 2 == 0 ? 0 : nil
-                        } else {
-                            turn = Self.swing * sin(elapsed / Self.swingTime * 2 * .pi)
-                            reach = 1 - pow(1 - min(1, elapsed / 0.2), 3)
-                        }
-                        try? await Task.sleep(for: .milliseconds(reduceMotion ? 250 : 16))
+                        turn = Int(Date().timeIntervalSince(start) * 4) % 2 == 0 ? 0 : nil
+                        try? await Task.sleep(for: .milliseconds(250))
                     }
-                } else {
-                    guard let from = turn, from != 0 || reach != 0, !reduceMotion else {
-                        turn = 0
-                        reach = 0
-                        return
+                } else if focusing {
+                    // Out to the centre at 12 o'clock, then swing.
+                    let fromTurn = turn ?? 0, fromReach = reach
+                    await ease(over: Self.reachTime) {
+                        turn = fromTurn * (1 - $0)
+                        reach = fromReach + (1 - fromReach) * $0
                     }
-                    let fromReach = reach
-                    let duration = 0.3
+                    let start = Date()
                     while !Task.isCancelled {
-                        let done = min(1, Date().timeIntervalSince(start) / duration)
-                        turn = from * pow(1 - done, 3)
-                        reach = fromReach * pow(1 - done, 3)
-                        if done == 1 { return }
+                        turn = Self.swing * sin(Date().timeIntervalSince(start) / Self.swingTime * 2 * .pi)
                         try? await Task.sleep(for: .milliseconds(16))
                     }
+                } else {
+                    // Back to 12 o'clock, then in to the usual short line.
+                    let fromTurn = turn ?? 0
+                    await ease(over: Self.returnTime) { turn = fromTurn * (1 - $0) }
+                    let fromReach = reach
+                    await ease(over: Self.reachTime) { reach = fromReach * (1 - $0) }
                 }
             }
             .onAppear {
