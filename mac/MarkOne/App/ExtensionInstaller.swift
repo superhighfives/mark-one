@@ -84,7 +84,9 @@ final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionReq
                              withExtension ext: OSSystemExtensionProperties) -> OSSystemExtensionRequest.ReplacementAction {
         // Replacing a running camera extension can leave none running until
         // a restart (see NOTES.md), so only replace it with a different one.
-        let same = existing.bundleVersion == ext.bundleVersion && existing.bundleShortVersion == ext.bundleShortVersion
+        // Only the build number says so: the version follows the app's, so
+        // it changes with every release, extension or not.
+        let same = existing.bundleVersion == ext.bundleVersion
         return same && existing.isEnabled && !existing.isAwaitingUserApproval ? .cancel : .replace
     }
 

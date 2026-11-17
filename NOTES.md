@@ -1533,8 +1533,11 @@ forums thread 756234). Mark One no longer replaces the extension with
 the same version. To keep users clear of it otherwise (in `TODO.md`):
 
 - Give the extension its own version, and change it only when the
-  extension changes, so app-only updates don't replace it. Today it
-  inherits `CURRENT_PROJECT_VERSION`.
+  extension changes, so app-only updates don't replace it. Done: its
+  build number is set in `project.yml`. Its version still follows the
+  app's (`MARKETING_VERSION`), so until 1.0.1 Mark One would have
+  replaced it on every release; it now compares the build number only
+  (2026-11-16).
 - After activating, check that the Mark One device appears. If it
   doesn't, say a restart is needed to finish the update. movembercam
   also recovers with deactivate, wait, activate, which costs the user
