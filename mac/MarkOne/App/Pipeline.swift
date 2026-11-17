@@ -136,7 +136,7 @@ final class Pipeline: ObservableObject {
     /// Set while the overlay waits for the next picture to clear it.
     private let clearBusyOnFrame = Flag()
 
-    /// Whether Focus does anything now: only while recording, with
+    /// Whether the panel's Focus button works now: only while recording, with
     /// autofocus set to Once, and not while it's already focusing.
     var canFocus: Bool { state == .streaming && !focusing && !continuousFocus }
 
@@ -144,6 +144,15 @@ final class Pipeline: ObservableObject {
     func focus() {
         focusing = true
         focusRequested.value = true
+    }
+
+    /// For the shortcut: focuses while recording, switching autofocus to
+    /// Once first if it's on Always. Switching pauses the picture for about a
+    /// second, and the camera focuses once it's back.
+    func focusOnce() {
+        guard state == .streaming, !focusing else { return }
+        if continuousFocus { continuousFocus = false }
+        focus()
     }
 
     /// Which firmware the connected camera has, once Mark One has checked.
@@ -513,11 +522,15 @@ final class Pipeline: ObservableObject {
         }
         // Focus holds the shutter button half down until the picture
         // settles, and keeps streaming meanwhile.
+        // After the recording restarts, such as to switch autofocus, it waits
+        // for the picture to come back, so the camera is recording again.
         if focusRequested.value {
-            focusRequested.value = false
-            if !applied.focus.active {
-                try Firmware.startFocus(camera)
-                applied.focus.start()
+            if !clearBusyOnFrame.value {
+                focusRequested.value = false
+                if !applied.focus.active {
+                    try Firmware.startFocus(camera)
+                    applied.focus.start()
+                }
             }
         } else if applied.focus.active && applied.focus.done {
             applied.focus.stop()
