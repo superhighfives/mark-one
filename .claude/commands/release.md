@@ -33,6 +33,7 @@ Run `/pre-release` first if it hasn't been run since the last change.
 | Website | `~/Development/superhighfives.com`, `changelog/mark-one/VERSION.md` |
 | Feed | https://superhighfives.com/releases/mark-one/feed (skips `beta: true`) |
 | GitHub | `superhighfives/mark-one`, tag `VERSION`, assets `Mark-One-VERSION.dmg` and `Mark-OneBUILD-FROM.delta` |
+| Homebrew | `superhighfives/homebrew-tools` (local clone: `$(brew --repo superhighfives/tools)`), `Casks/mark-one.rb`; and the unsubmitted `mark-one` branch of `$(brew --repo homebrew/cask)` |
 
 Configuration: Apple ID `hi@superhighfives.com`, notary keychain profile
 `mark-one`, Sparkle key in the keychain under account `mark-one` (the app's
@@ -167,6 +168,26 @@ Confirm before each step. In dry run mode, make the GitHub release a draft and s
    - https://superhighfives.com/releases/mark-one/feed lists VERSION, with the GitHub URLs for the DMG and delta.
    - The DMG and delta URLs answer 200 (`curl -sIL`).
    - https://superhighfives.com/mark-one/download redirects to the DMG (once `available` is on).
+5. **Homebrew** (live only). Nothing bumps the tap's cask by itself, so new
+   installs would get the old version until it's updated. Check the
+   published DMG's checksum matches the local one, then:
+   ```sh
+   SHA=$(curl -sL https://github.com/superhighfives/mark-one/releases/download/VERSION/Mark-One-VERSION.dmg | shasum -a 256 | cut -d' ' -f1)
+   cd "$(brew --repo superhighfives/tools)"
+   # set version "VERSION" and sha256 "$SHA" in Casks/mark-one.rb
+   brew audit --cask superhighfives/tools/mark-one
+   brew livecheck --cask superhighfives/tools/mark-one   # VERSION ==> VERSION
+   git commit -am "Mark One VERSION"
+   git -c credential.helper= -c credential.helper='!gh auth git-credential' push origin main
+   ```
+   The clone's HTTPS remote has no git credentials of its own, hence the
+   one-off helper. Also bump the `mark-one` branch of
+   `$(brew --repo homebrew/cask)`, kept as one `mark-one VERSION (new cask)`
+   commit ready to submit, without checking it out: edit it in a temporary
+   `git worktree`, then fold it back into a single commit with
+   `git commit-tree`. Once the cask is in Homebrew/homebrew-cask, Homebrew's
+   autobump keeps it current from `livecheck`: drop this step then, and the
+   tap's cask.
 
 ---
 
@@ -193,6 +214,7 @@ Confirm before each step. In dry run mode, make the GitHub release a draft and s
    - [ ] GitHub release and tag
    - [ ] Changelog on the website, deployed
    - [ ] Feed, DMG and download checked
+   - [ ] Homebrew cask bumped (tap pushed; local homebrew-cask branch updated)
    - [ ] Release filed in the releases repo, with its archive
    - [ ] Website help matches the app
 
