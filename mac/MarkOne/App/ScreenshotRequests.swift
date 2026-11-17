@@ -74,18 +74,33 @@ struct MenuBarLabel: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// How far the index line has turned, or nil while it blinks off.
     @State private var turn: Double? = 0
+    /// Two o'clock: the index line swings this far each way.
+    private static let swing = 2.0 / 12
+    /// Seconds for a swing from 2 o'clock to 10 and back.
+    private static let swingTime = 1.2
 
     var body: some View {
         Image(nsImage: MenuBarIcon.image(recording: recording, turn: turn))
-            // Turns once a second while focusing, or blinks with Reduce
-            // Motion on, then settles back at the top.
+            // Swings between 2 and 10 o'clock while focusing, or blinks
+            // with Reduce Motion on, then eases back to 12.
             .task(id: focusing) {
-                guard focusing else { turn = 0; return }
                 let start = Date()
-                while !Task.isCancelled {
-                    let elapsed = Date().timeIntervalSince(start)
-                    turn = reduceMotion ? (Int(elapsed * 4) % 2 == 0 ? 0 : nil) : elapsed.truncatingRemainder(dividingBy: 1)
-                    try? await Task.sleep(for: .milliseconds(reduceMotion ? 250 : 33))
+                if focusing {
+                    while !Task.isCancelled {
+                        let elapsed = Date().timeIntervalSince(start)
+                        turn = reduceMotion ? (Int(elapsed * 4) % 2 == 0 ? 0 : nil)
+                            : Self.swing * sin(elapsed / Self.swingTime * 2 * .pi)
+                        try? await Task.sleep(for: .milliseconds(reduceMotion ? 250 : 16))
+                    }
+                } else {
+                    guard let from = turn, from != 0, !reduceMotion else { turn = 0; return }
+                    let duration = 0.3
+                    while !Task.isCancelled {
+                        let done = min(1, Date().timeIntervalSince(start) / duration)
+                        turn = from * pow(1 - done, 3)
+                        if done == 1 { return }
+                        try? await Task.sleep(for: .milliseconds(16))
+                    }
                 }
             }
             .onAppear {

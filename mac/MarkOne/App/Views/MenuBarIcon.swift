@@ -1,6 +1,6 @@
 // The menu bar icon: the app icon's dial as a ring with its index line,
 // and the red LED beside it while the camera is recording. While the
-// camera focuses, the index line turns around the ring.
+// camera focuses, the index line swings from side to side.
 
 import AppKit
 
@@ -10,8 +10,9 @@ enum MenuBarIcon {
 
     static func image(recording: Bool) -> NSImage { recording ? live : idle }
 
-    /// The icon with its index line `turn` of the way round (0 to 1,
-    /// clockwise from the top), or hidden when nil, for focusing.
+    /// The icon with its index line turned `turn` of the way round,
+    /// clockwise from the top (negative turns go anticlockwise), or hidden
+    /// when nil, for focusing.
     static func image(recording: Bool, turn: Double?) -> NSImage { image(live: recording, turn: turn) }
 
     /// Not a template image, so the LED can be red. The dial is drawn in
