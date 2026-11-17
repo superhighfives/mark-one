@@ -22,7 +22,7 @@ struct MarkOneApp: App {
         MenuBarExtra {
             MenuView(installer: installer, pipeline: pipeline)
         } label: {
-            MenuBarLabel(recording: pipeline.state == .streaming)
+            MenuBarLabel(recording: pipeline.state == .streaming, focusing: pipeline.focusing)
         }
         .menuBarExtraStyle(.window)
 
