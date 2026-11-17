@@ -248,6 +248,15 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
   again (see "Exact frame boundaries" in `NOTES.md`). Find out why that
   check takes nearly 5 s. Values above about 6.6 hours would likely
   overflow the muxer's 90 kHz clock.
+- [ ] **A flicker when video comes back on.** After a short break
+  (under 3 s), turning video back on in a call shows the picture from
+  when it was turned off for a moment. The extension repeats the last
+  frame it had through gaps, and that one is old by then. Mark One no
+  longer leaves old frames in the queue (1.0.1), but the rest has to be
+  fixed in the extension: forget the last frame when the last app stops,
+  and skip frames more than about 0.2 s old. Changing the extension can
+  need a restart to finish updating, so do it with the next extension
+  change.
 - [ ] **A sound when focusing (nice to have).** An optional click when
   Focus or its shortcut focuses the camera, with a checkbox in Settings
   to turn it on. Best would be the E-M5's own focus beep, recorded from
