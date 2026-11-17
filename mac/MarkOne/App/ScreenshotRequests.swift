@@ -68,11 +68,26 @@ enum ScreenshotRequests {
 /// The menu bar icon. It's always on screen, so it starts the listener.
 struct MenuBarLabel: View {
     let recording: Bool
+    let focusing: Bool
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// How far the index line has turned, or nil while it blinks off.
+    @State private var turn: Double? = 0
 
     var body: some View {
-        Image(nsImage: MenuBarIcon.image(recording: recording))
+        Image(nsImage: MenuBarIcon.image(recording: recording, turn: turn))
+            // Turns once a second while focusing, or blinks with Reduce
+            // Motion on, then settles back at the top.
+            .task(id: focusing) {
+                guard focusing else { turn = 0; return }
+                let start = Date()
+                while !Task.isCancelled {
+                    let elapsed = Date().timeIntervalSince(start)
+                    turn = reduceMotion ? (Int(elapsed * 4) % 2 == 0 ? 0 : nil) : elapsed.truncatingRemainder(dividingBy: 1)
+                    try? await Task.sleep(for: .milliseconds(reduceMotion ? 250 : 33))
+                }
+            }
             .onAppear {
                 ScreenshotRequests.start(openWindow: openWindow, openSettings: openSettings)
                 #if DEBUG
