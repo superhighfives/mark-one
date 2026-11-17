@@ -12,8 +12,7 @@ extension KeyboardShortcuts.Name {
 enum Shortcuts {
     static func start(_ pipeline: Pipeline) {
         KeyboardShortcuts.onKeyUp(for: .focus) { [weak pipeline] in
-            guard let pipeline, pipeline.canFocus else { return }
-            pipeline.focus()
+            pipeline?.focusOnce()
         }
     }
 }

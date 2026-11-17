@@ -129,7 +129,7 @@ private struct CameraSettings: View {
             } header: {
                 Text("Picture")
             } footer: {
-                Text("The shortcut works from any app, while a video app uses the camera and Focus is set to Once.")
+                Text("The shortcut works from any app while a video app uses the camera. If Focus is set to Always, it switches to Once first, and the picture pauses for a second.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

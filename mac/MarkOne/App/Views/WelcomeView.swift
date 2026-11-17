@@ -443,7 +443,7 @@ struct WelcomeView: View {
                     HStack(alignment: .firstTextBaseline, spacing: 12) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Focus shortcut")
-                            Text("Focuses the camera from any app, when Focus is set to Once.")
+                            Text("Focuses the camera from any app, and sets Focus to Once.")
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
