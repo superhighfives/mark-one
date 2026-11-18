@@ -98,9 +98,19 @@ struct MenuView: View {
                          ? installer.status
                          : "macOS asks before an app adds a camera. In System Settings › General › Login Items & Extensions, click ⓘ beside Mark One and turn on Media Extension."))
             if installer.failed {
-                Button(installer.notInApplications ? "Quit and Move" : installer.needsRestart ? "Check Again" : "Try Again") {
+                Button {
                     if installer.notInApplications { NSApp.terminate(nil) } else { installer.activate() }
+                } label: {
+                    if installer.checking {
+                        HStack(spacing: 6) {
+                            ProgressView().controlSize(.small)
+                            Text("Checking…")
+                        }
+                    } else {
+                        Text(installer.notInApplications ? "Quit and Move" : installer.needsRestart ? "Check Again" : "Try Again")
+                    }
                 }
+                    .disabled(installer.checking)
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                     .frame(maxWidth: .infinity)

@@ -24,6 +24,9 @@ final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionReq
     /// Whether the extension was switched on after Mark One opened, so Mark
     /// One has to be reopened to use the camera.
     @Published var needsReopen = false
+    /// Whether Check Again is waiting for macOS, which keeps the restart
+    /// message up meanwhile.
+    @Published var checking = false
     /// Whether Mark One is running from somewhere other than Applications,
     /// where macOS won't install its camera. Also sets `failed`.
     @Published var notInApplications = false
@@ -50,10 +53,15 @@ final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionReq
             return
         }
         watch()
-        status = "Installing the camera…"
         removing = false
-        failed = false
-        needsRestart = false
+        // Checking again after a restart was asked for leaves its message up
+        // until macOS answers, rather than flashing the setup steps.
+        if needsRestart {
+            checking = true
+        } else {
+            status = "Installing the camera…"
+            failed = false
+        }
         pending = true
         let request = OSSystemExtensionRequest.activationRequest(forExtensionWithIdentifier: identifier, queue: .main)
         request.delegate = self
@@ -94,6 +102,7 @@ final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionReq
         Task { @MainActor in
             status = "Allow it in System Settings › General › Login Items & Extensions: click ⓘ beside Mark One and turn on Media Extension."
             needsApproval = true
+            needsRestart = false
             checked = true
         }
     }
@@ -103,6 +112,7 @@ final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionReq
         Task { @MainActor in
             pending = false
             if result == .willCompleteAfterReboot {
+                checking = false
                 status = "Restart your Mac to finish."
             } else {
                 if removing {
@@ -127,6 +137,7 @@ final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionReq
                 confirmCamera()
                 return
             }
+            checking = false
             if (error as? OSSystemExtensionError)?.code == .unsupportedParentBundleLocation {
                 outsideApplications()
                 return
@@ -145,7 +156,10 @@ extension ExtensionInstaller {
     /// Checks on the extension once an install request is done.
     private func confirmCamera() {
         check?.cancel()
-        check = Task { @MainActor in await refresh() }
+        check = Task { @MainActor in
+            await refresh()
+            checking = false
+        }
     }
 
     /// Brings the status in line with macOS's answer. Whether the extension
@@ -183,12 +197,14 @@ extension ExtensionInstaller {
             installed = false
             needsApproval = true
             failed = false
+            needsRestart = false
             status = "Allow it in System Settings › General › Login Items & Extensions: click ⓘ beside Mark One and turn on Media Extension."
         case .disabled:
             turnedOff()
         case .missing:
             installed = false
             needsApproval = false
+            needsRestart = false
             if !failed { status = "Not installed" }
         }
     }

@@ -280,7 +280,19 @@ struct WelcomeView: View {
                             if installer.notInApplications {
                                 Button("Quit and Move") { NSApp.terminate(nil) }
                             } else {
-                                Button(installer.needsRestart ? "Check Again" : "Try Again") { installer.activate() }
+                                Button {
+                                    installer.activate()
+                                } label: {
+                                    if installer.checking {
+                                        HStack(spacing: 6) {
+                                            ProgressView().controlSize(.small)
+                                            Text("Checking…")
+                                        }
+                                    } else {
+                                        Text(installer.needsRestart ? "Check Again" : "Try Again")
+                                    }
+                                }
+                                .disabled(installer.checking)
                             }
                         }
                     }

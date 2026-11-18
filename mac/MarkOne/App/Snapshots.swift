@@ -219,6 +219,7 @@ enum Snapshots {
                               needsRestart: Bool = false, needsReopen: Bool = false, notInApplications: Bool = false,
                               status: String = "Not installed") {
         installer.checked = checked
+        installer.checking = false
         installer.installed = installed
         installer.needsApproval = needsApproval
         installer.failed = failed
