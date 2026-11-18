@@ -25,6 +25,11 @@ let inUseProperty = CMIOExtensionProperty(rawValue: "4cc_used_glob_0000")
 /// while none is. Mark One shows its name in the panel.
 let clientProperty = CMIOExtensionProperty(rawValue: "4cc_clnt_glob_0000")
 
+/// Frames from Mark One older than this, in seconds, are skipped. Mark One
+/// queues each as it decodes it, so only frames left over from before an
+/// app started are this old.
+let maxFrameAge = 0.2
+
 
 final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
     private(set) var device: CMIOExtensionDevice!
@@ -150,6 +155,10 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
                 notifyClient()
                 placeholderTimer?.cancel()
                 placeholderTimer = nil
+                // Otherwise the next app to start within 3 s sees this
+                // picture first, from when the camera was last used.
+                lastSample = nil
+                lastSinkFrame = .distantPast
             }
         }
     }
@@ -222,7 +231,11 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
         sink.stream.consumeSampleBuffer(from: client) { [weak self] sample, sequence, _, _, error in
             guard let self else { return }
             self.queue.async {
-                if let sample {
+                if let sample, DeviceSource.age(of: sample) > maxFrameAge {
+                    // Left in the queue from before this app started: skip
+                    // it, and take the next one straight away.
+                    self.consume(from: client)
+                } else if let sample {
                     self.lastSinkFrame = Date()
                     self.lastSample = sample
                     self.send(sample)
@@ -241,6 +254,14 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
                 }
             }
         }
+    }
+
+    /// Seconds since Mark One queued a frame, from the host time it stamps
+    /// on each one; 0 if it has none.
+    private static func age(of sample: CMSampleBuffer) -> Double {
+        let stamped = CMSampleBufferGetPresentationTimeStamp(sample)
+        guard stamped.isValid, stamped.seconds > 0 else { return 0 }
+        return CMClockGetTime(CMClockGetHostTimeClock()).seconds - stamped.seconds
     }
 
     /// A dark gray frame shown while no video is coming in.

@@ -78,7 +78,7 @@ targets:
         # The extension's own build number. Change it only when the
         # extension changes: replacing it can lose the camera until the
         # Mac restarts (see "Camera extension updates" in NOTES.md).
-        CURRENT_PROJECT_VERSION: "4"
+        CURRENT_PROJECT_VERSION: "5"
   markone-feed:
     type: tool
     platform: macOS
