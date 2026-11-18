@@ -11,6 +11,8 @@ Set the camera's USB mode to MTP (Custom menu, USB Mode), connect it, then:
   uv run scripts/ptp.py output evf                # 800x600 live view instead of 568x480
   uv run scripts/ptp.py trace                     # print what the mode manager logs
   uv run scripts/ptp.py versions                  # firmware versions (needs the webcam patch)
+  uv run scripts/ptp.py setting 0x2f 0xb2         # a setting's allowed values (read only)
+  uv run scripts/ptp.py set 0xb2 240              # change a setting until the camera's switched off
   uv run scripts/ptp.py update E0972300.BIN       # install firmware over USB
 
 `peek`, `poke` and `run` need the usb-tools patch (commands 0x9484-0x9486).
@@ -480,6 +482,62 @@ def update(cam, path):
     print('When it shows OK, switch the camera off and on.')
 
 
+# Settings (see "Setting IDs" in NOTES.md): a hash table of 128 buckets of
+# {descriptor, next} nodes; each descriptor starts {u16 id, u16 flags, value
+# pointer, pointer to the allowed values, ...}.
+SETTING_BUCKETS = 0x605CA034
+SETTINGS_OBJECT = 0x602B2598
+GET_SETTING = 0x7EAD08AA
+SETTING_OUT = 0x7EAAF5F0
+
+
+def find_setting(cam, wanted):
+    for bucket in range(128):
+        node = read32(cam, SETTING_BUCKETS + 4 * bucket)
+        while node:
+            descriptor = read32(cam, node)
+            if descriptor and read32(cam, descriptor) & 0xFFFF == wanted:
+                return descriptor
+            node = read32(cam, node + 4)
+    return None
+
+
+def setting(cam, ids):
+    """Prints each setting's descriptor, the start of its allowed values and
+    its current value. Reads only."""
+    install_helpers(cam)
+    settings = read32(cam, SETTINGS_OBJECT)
+    for wanted in ids:
+        descriptor = find_setting(cam, wanted)
+        if descriptor is None:
+            print(f'{wanted:#x}: not found')
+            continue
+        words = [read32(cam, descriptor + 4 * i) for i in range(5)]
+        call(cam, GET_SETTING, (wanted, 0, settings, SETTING_OUT))
+        current = read32(cam, SETTING_OUT)
+        print(f'{wanted:#x}: descriptor {descriptor:#010x}: ' + ' '.join(f'{w:08x}' for w in words))
+        print(f'  current value {current:#x} ({current})')
+        allowed = words[2]
+        if allowed:
+            values = [read32(cam, allowed + 4 * i) for i in range(12)]
+            print('  allowed values (first 12 words): ' + ' '.join(f'{v:#x}' for v in values))
+
+
+SET_SETTING = 0x7EAD1020
+
+
+def set_setting(cam, wanted, value):
+    """Writes a setting through the camera's own setter, then reads it back.
+    The camera keeps it in memory and saves it when it's switched off."""
+    install_helpers(cam)
+    settings = read32(cam, SETTINGS_OBJECT)
+    call(cam, GET_SETTING, (wanted, 0, settings, SETTING_OUT))
+    before = read32(cam, SETTING_OUT)
+    call(cam, SET_SETTING, (wanted, 0, settings, value))
+    call(cam, GET_SETTING, (wanted, 0, settings, SETTING_OUT))
+    print(f'{wanted:#x}: {before} -> {read32(cam, SETTING_OUT)}')
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest='cmd', required=True)
@@ -497,6 +555,11 @@ def main():
     tr = sub.add_parser('trace', help="print the mode manager's log messages")
     tr.add_argument('seconds', type=float, nargs='?', default=120)
     sub.add_parser('versions', help='print the firmware versions the camera reports (read only)')
+    st = sub.add_parser('setting', help="print settings' allowed and current values (read only)")
+    st.add_argument('ids', nargs='+', type=lambda s: int(s, 0))
+    se = sub.add_parser('set', help="change a setting; the camera saves it when it's switched off")
+    se.add_argument('id', type=lambda s: int(s, 0))
+    se.add_argument('value', type=lambda s: int(s, 0))
     up = sub.add_parser('update', help='install a firmware file over USB')
     up.add_argument('file')
     up.add_argument('--yes', action='store_true', help="don't ask before installing")
@@ -524,6 +587,10 @@ def main():
             output(cam, args.name)
         elif args.cmd == 'versions':
             versions(cam)
+        elif args.cmd == 'setting':
+            setting(cam, args.ids)
+        elif args.cmd == 'set':
+            set_setting(cam, args.id, args.value)
         elif args.cmd == 'update':
             update(cam, args.file)
             return
