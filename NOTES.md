@@ -600,6 +600,12 @@ seconds of "0".
     keeps the brightness the same, as in Shutter priority.
   - The slowest shutter for 30 fps movies is 1/30 s.
   - Image stabilization 0x1b5: off 0, IS1 1, IS2 2, IS3 3.
+  - Apertures the lens can't reach are safe (2026-11-18, a lens that
+    opens to f/1.4): the camera keeps whatever 0x04 is given, even f/1.0
+    (0) or f/32 (0xa00), and reads it back the same while recording,
+    while the lens goes as near as it can. f/1.0 looked the same as
+    f/1.4; f/22 stopped down, and went darker at 1/30 s. The descriptor
+    has no list of allowed values to limit the menu by.
   - The camera reads the movie mode, aperture, shutter and ISO when a
     recording starts. Written while recording, nothing changes, and the
     camera restarted itself when that recording stopped. Stopping,

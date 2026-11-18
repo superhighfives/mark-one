@@ -89,8 +89,6 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
     battery came out ("Movie exposure and art filters" in `NOTES.md`).
     Try them with a recording restart, without Diorama, and check the
     frame rate.
-  - The aperture list doesn't know the lens: check what the camera does
-    with an f-number the lens can't reach (f/1.4 on a kit zoom).
   - Contrast, sharpness, saturation and gradation; metering mode; AE
     lock. Find each ID as for the others (`scripts/ptp.py settings`).
 - [ ] **Center Stage (future idea).** Keep the person in frame as they

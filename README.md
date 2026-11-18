@@ -124,7 +124,7 @@ The camera saves settings when it's switched off, so a value set over USB stays 
 | ID | Setting | Values | Notes |
 |---|---|---|---|
 | 0x03 | Exposure compensation | 0x100 is +1 stop; thirds 0x55, 0xab; negative is two's complement | Works mid-recording. Mark One: Brightness |
-| 0x04 | Aperture | APEX × 256, rounded down (f = √2^Av): f/1.4 0x100, f/5.6 0x500 | Read when a recording starts. Mark One: Settings › Picture |
+| 0x04 | Aperture | APEX × 256, rounded down (f = √2^Av): f/1.4 0x100, f/5.6 0x500 | Read when a recording starts. Kept as written; a lens that can't reach it goes as near as it can. Mark One: Settings › Picture |
 | 0x05 | Shutter speed | APEX × 256 (1/2^Tv): 1/100 0x6aa, 1/250 0x800 | Slowest is 1/30 at 30 fps. Read when a recording starts |
 | 0x08 | ISO | 0 Auto, 2 (likely Low), then the ISO itself, 200 to 25600 in thirds | Read when a recording starts |
 | 0x0b | White balance | Auto 0, Incandescent 1, Fluorescent 3, Sunny 6, Cloudy 7, Shade 8, Custom 9, One-touch 13 and 14, Flash 17, Underwater 18 | Works at once |
