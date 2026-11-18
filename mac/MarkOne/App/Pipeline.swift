@@ -109,6 +109,16 @@ final class Pipeline: ObservableObject {
     }
     private let pictureModeWanted = Locked(PictureMode.natural.rawValue)
 
+    /// Whether the camera focuses once as soon as an app starts using it,
+    /// when autofocus is set to Once.
+    @Published var focusOnStart = UserDefaults.standard.object(forKey: "FocusOnStart") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(focusOnStart, forKey: "FocusOnStart")
+            focusOnStartWanted.value = focusOnStart
+        }
+    }
+    private let focusOnStartWanted = Flag()
+
     /// Whether autofocus looks for faces first.
     @Published var faceFocus = UserDefaults.standard.object(forKey: "FacePriority") as? Bool ?? true {
         didSet {
@@ -260,6 +270,7 @@ final class Pipeline: ObservableObject {
         whiteBalanceWanted.value = whiteBalance.rawValue
         pictureModeWanted.value = pictureMode.rawValue
         faceWanted.value = faceFocus
+        focusOnStartWanted.value = focusOnStart
         let thread = Thread { [weak self] in self?.loop() }
         thread.qualityOfService = .userInteractive
         thread.start()
@@ -617,6 +628,11 @@ final class Pipeline: ObservableObject {
         try Firmware.setScreen(camera, true)
         try Firmware.setRecording(camera, true)
         var recordingSince = Date()
+        // Focus once the first picture is in: updateControls waits for it
+        // while "Starting the camera…" is up.
+        if focusOnStartWanted.value && !continuousWanted.value {
+            Task { @MainActor in if self.state == .streaming && !self.focusing { self.focus() } }
+        }
         defer {
             freeze?.stop()
             // Quitting keeps "Stopping the camera…" up until Mark One is gone.

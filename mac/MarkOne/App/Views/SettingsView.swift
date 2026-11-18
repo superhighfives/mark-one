@@ -134,6 +134,7 @@ private struct CameraSettings: View {
             // the menu bar panel.
             Section {
                 Toggle("Focus on faces", isOn: $pipeline.faceFocus)
+                Toggle("Focus when a call starts", isOn: $pipeline.focusOnStart)
                 KeyboardShortcuts.Recorder("Focus now", name: .focus)
             } header: {
                 Text("Picture")
