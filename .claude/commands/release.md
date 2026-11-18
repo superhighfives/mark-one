@@ -190,11 +190,19 @@ Confirm before each step. In dry run mode, make the GitHub release a draft and s
    The clone's HTTPS remote has no git credentials of its own, hence the
    one-off helper. Also bump the `mark-one` branch of
    `$(brew --repo homebrew/cask)`, kept as one `mark-one VERSION (new cask)`
-   commit ready to submit, without checking it out: edit it in a temporary
-   `git worktree`, then fold it back into a single commit with
-   `git commit-tree`. Once the cask is in Homebrew/homebrew-cask, Homebrew's
-   autobump keeps it current from `livecheck`: drop this step then, and the
-   tap's cask.
+   commit ready to submit, without checking it out:
+   ```sh
+   C="$(brew --repo homebrew/cask)"; W=SCRATCHPAD/cask-wt; OLD=$(git -C "$C" rev-parse mark-one)
+   git -C "$C" worktree add -q --detach "$W" mark-one
+   # set version and sha256 in "$W/Casks/m/mark-one.rb", then:
+   git -C "$W" add Casks/m/mark-one.rb
+   NEW=$(git -C "$W" commit-tree -S "$(git -C "$W" write-tree)" -p mark-one^ -m "mark-one VERSION (new cask)")
+   git -C "$C" worktree remove --force "$W"   # it still holds the staged edit
+   git -C "$C" update-ref refs/heads/mark-one "$NEW" "$OLD"
+   ```
+   Check `git -C "$C" rev-list --count mark-one^..mark-one` is 1. Once the
+   cask is in Homebrew/homebrew-cask, Homebrew's autobump keeps it current
+   from `livecheck`: drop this step then, and the tap's cask.
 
 ---
 
