@@ -584,6 +584,41 @@ seconds of "0".
 - The camera reads the movie AF mode when a recording starts. Changing
   it mid-recording does nothing until the next one, so Mark One restarts
   the recording when the setting changes.
+- Movie exposure and art filters (2026-11-17, `ptp.py settings` before
+  and after each change on the camera, then the same writes from Mark
+  One while QuickTime used the camera):
+  - Movie mode 0xff: P 76, A 77, S 89, M 90, then the art filters Pop
+    Art 79, Soft Focus 78, Pale & Light Color 80, Light Tone 81, Grainy
+    Film 83, Pin Hole 82, Diorama 88, Cross Process 87, Gentle Sepia 93,
+    Dramatic Tone 97, Key Line 164. 0x22 and 0x24 follow it but writing
+    them does nothing.
+  - Aperture 0x04 and shutter 0x05 are APEX values × 256: f/1.4 is
+    0x100, f/5.6 0x500 (f = √2^Av); 1/100 is 0x6aa, 1/250 0x800 (1/2^Tv).
+    In P and S the camera sets the aperture, in P and A the shutter.
+  - ISO 0x08 is the ISO itself (200 is 200); 0 is Auto, then 2 (likely
+    Low), 200 to 25600 in thirds. In Manual with ISO on Auto, the camera
+    keeps the brightness the same, as in Shutter priority.
+  - The slowest shutter for 30 fps movies is 1/30 s.
+  - Image stabilization 0x1b5: off 0, IS1 1, IS2 2, IS3 3.
+  - The camera reads the movie mode, aperture, shutter and ISO when a
+    recording starts. Written while recording, nothing changes, and the
+    camera restarted itself when that recording stopped. Stopping,
+    writing and starting again works, with about 5 s without video;
+    Mark One holds the last picture meanwhile (1.0.3, Settings › Picture
+    › Exposure). Stabilization goes the same way, and works (2026-11-17).
+  - Choosing an art filter on the camera also sets picture mode 0xac:
+    Pop Art 8 through Key Line 18, in the order above. The effect comes
+    from 0xac alone: 0xff set to an art filter with 0xac at Portrait
+    shows no effect, and 0xac at Gentle Sepia in M is sepia. Like the
+    other picture modes it takes effect at once mid-recording, but the
+    camera then stops recording by itself within a few seconds (Grainy
+    Film after 5 s; Mark One started it again). Diorama stopped after
+    2 s, and starting again hung the camera: no answer over USB, the
+    power switch did nothing, and only taking the battery out brought it
+    back. The 2026-11-08 list had 8 as e-Portrait; in movie mode 8 is
+    Pop Art.
+  - Without a held frame, the ~5 s restart shows the extension's gray
+    placeholder, and QuickTime stops its recording.
 
 ### Keys
 

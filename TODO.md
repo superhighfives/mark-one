@@ -84,20 +84,18 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
   and skip frames more than about 0.2 s old. Changing the extension can
   need a restart to finish updating, so do it with the next extension
   change.
-- [ ] **More camera controls (future idea).** The panel has brightness
-  (exposure compensation), white balance, picture mode and autofocus;
-  Settings has face priority. Candidates for video, none tried yet:
-  - Exposure mode for movies (P, A, S, M), then aperture in A and M (for
-    a blurred background), shutter speed in S and M (1/50 or 1/60 to
-    match the room's lights and avoid flicker), and ISO.
-  - Image stabilization, and the 2x digital teleconverter as a zoom.
-  - Contrast, sharpness, saturation and gradation, the picture mode's
-    own adjustments.
-  - Metering mode, and AE lock.
-  First, find which the camera honours while recording a movie: find
-  each setting's ID by reading every setting before and after a change
-  on the camera (as for white balance, see "Setting IDs" in `NOTES.md`;
-  `scripts/ptp.py setting` reads one), then change it while recording.
+- [ ] **More camera controls.** Exposure (Auto, Aperture and Shutter
+  priority, Manual, with aperture, shutter speed and ISO) and
+  stabilization are in Settings › Picture (1.0.3). Left:
+  - Art filters: they're picture mode 0xac 8-18, and switch at once, but
+    the camera then stops recording, and Diorama hung it until the
+    battery came out ("Movie exposure and art filters" in `NOTES.md`).
+    Try them with a recording restart, without Diorama, and check the
+    frame rate.
+  - The aperture list doesn't know the lens: check what the camera does
+    with an f-number the lens can't reach (f/1.4 on a kit zoom).
+  - Contrast, sharpness, saturation and gradation; metering mode; AE
+    lock. Find each ID as for the others (`scripts/ptp.py settings`).
 - [ ] **Center Stage (future idea).** Keep the person in frame as they
   move, like Center Stage on Apple's cameras. macOS only offers Center
   Stage for Apple's own cameras, so Mark One would do it itself: find
