@@ -104,7 +104,8 @@ enum Snapshots {
             ("02-camera", 1, {}),
             ("03-camera-update", 1, { pipeline.pretend(.ready, status: readyStatus, firmware: .markOne(FirmwareImage.bundledRevision - 1), battery: 50) }),
             ("04-camera-not-set-up", 1, { allow(needsApproval: true); pipeline.pretend(status: waitingStatus) }),
-            ("05-about", 2, {}),
+            ("05-picture", 2, {}),
+            ("06-about", 3, {}),
         ]
         openSettings()
         NSApp.activate(ignoringOtherApps: true)
@@ -113,7 +114,7 @@ enum Snapshots {
         var window: NSWindow?
         for _ in 0..<30 where window == nil {
             // Titled after the tab it opens on: the last one shown.
-            window = NSApp.windows.first { $0.isVisible && ["General", "Camera", "About"].contains($0.title) }
+            window = NSApp.windows.first { $0.isVisible && ["General", "Camera", "Picture", "About"].contains($0.title) }
             if window == nil { try? await Task.sleep(for: .seconds(0.1)) }
         }
         for (name, tab, setUp) in shots {

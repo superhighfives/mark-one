@@ -82,7 +82,7 @@ private struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
-        .fixedSize(horizontal: false, vertical: true)
+        .settingsTab()
     }
 }
 
@@ -145,7 +145,7 @@ private struct CameraSettings: View {
             }
         }
         .formStyle(.grouped)
-        .fixedSize(horizontal: false, vertical: true)
+        .settingsTab()
         .confirmationDialog("Remove the Mark One camera?", isPresented: $confirmRemove) {
             Button("Remove", role: .destructive) { installer.deactivate() }
         } message: {
@@ -198,14 +198,14 @@ private struct PictureSettings: View {
             } header: {
                 Text("Exposure")
             } footer: {
-                Text("A low f-number blurs the background. 1/50 or 1/100 s stops lights flickering on 50 Hz power, 1/60 or 1/125 s on 60 Hz. In Shutter priority the camera keeps the brightness the same; Manual sets it. Changes during a call pause the picture for about 5 seconds.")
+                Text("A low f-number blurs the background. 1/50 or 1/100 s stops lights flickering on 50 Hz power, 1/60 or 1/125 s on 60 Hz. In Shutter priority the camera keeps the brightness the same; Manual sets it. Changes during a call pause the picture for about 2 seconds.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
         .formStyle(.grouped)
-        .fixedSize(horizontal: false, vertical: true)
+        .settingsTab()
     }
 }
 
@@ -264,6 +264,16 @@ private struct AboutSettings: View {
         }
         .padding(.vertical, 20)
         .sheet(isPresented: $showLicense) { LicenseSheet() }
+    }
+}
+
+private extension View {
+    /// Sizes a tab's form to fit, without scrolling. The form's height
+    /// comes out in fractions of a point, which the window rounds down,
+    /// and that sliver was enough for a scroll bar (#13).
+    func settingsTab() -> some View {
+        fixedSize(horizontal: false, vertical: true)
+            .scrollDisabled(true)
     }
 }
 
