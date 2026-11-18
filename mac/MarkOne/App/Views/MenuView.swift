@@ -119,7 +119,10 @@ struct MenuView: View {
             Card {
                 VStack(alignment: .leading, spacing: 10) {
                     StepRow(number: 1, text: "Plug it into this Mac with a USB cable.")
-                    StepRow(number: 2, text: "Switch the camera on.")
+                    // Left on without Mark One, the camera drops off USB
+                    // after a while and stays off until it's switched off
+                    // and on (2026-11-18).
+                    StepRow(number: 2, text: "Switch the camera on. If it’s already on, switch it off and on again.")
                     StepRow(number: 3, text: "If it asks how to connect, choose **Webcam**.")
                 }
             }
