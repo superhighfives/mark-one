@@ -1594,6 +1594,16 @@ the same version. To keep users clear of it otherwise (in `TODO.md`):
   also recovers with deactivate, wait, activate, which costs the user
   a second approval.
 
+Seen in a release (2026-11-18, work laptop, 1.0.0 to 1.0.4 through
+Sparkle, extension 4 to 5): 1.0.0's extension was left "terminated
+waiting to uninstall on reboot", 1.0.4's was "activated enabled" but
+never ran, and Mark One asked for a restart as it should. This time
+`sudo killall com.apple.cmio.registerassistantservice cameracaptured`
+(SIGTERM) didn't start it: Mark One went to "Waiting for the Mark One
+camera to start" and back to "Needs a restart". Nor did the SIGKILL
+above on registerassistantservice alone, so killing it isn't a
+reliable fix: a restart is the only one known to work.
+
 ## FFmpeg and entitlements (2026-11-09)
 
 Written while preparing for the App Store. Mark One is free and ships
