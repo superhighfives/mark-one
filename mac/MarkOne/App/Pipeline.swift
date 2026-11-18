@@ -316,7 +316,10 @@ final class Pipeline: ObservableObject {
             let camera = Camera()
             report("Waiting for the camera. Connect it by USB and switch it on.", .waiting)
             do {
-                try camera.connect { !self.stopRequested.value }
+                try camera.connect {
+                    Diagnostics.heartbeat("Looking for the camera on USB")
+                    return !self.stopRequested.value
+                }
                 note(nil)
                 let firmware = try Firmware.identify(camera)
                 Task { @MainActor in
@@ -388,7 +391,11 @@ final class Pipeline: ObservableObject {
                 // Wait for the camera to go away before trying it again, so a
                 // camera Mark One can't use doesn't get set up over and over.
                 if case CameraError.disconnected = error {} else {
-                    while camera.connected && !stopRequested.value { Thread.sleep(forTimeInterval: 0.5) }
+                    log.notice("Waiting for the camera to be switched off or unplugged before trying again")
+                    while camera.connected && !stopRequested.value {
+                        Diagnostics.heartbeat("Still waiting for the camera to be switched off or unplugged, after: \(error.localizedDescription)")
+                        Thread.sleep(forTimeInterval: 0.5)
+                    }
                 }
             }
             let closed = DispatchSemaphore(value: 0)
@@ -556,6 +563,7 @@ final class Pipeline: ObservableObject {
                 if installImage.value != nil { throw PipelineInterrupt.install }
                 if !camera.connected { throw CameraError.disconnected }
                 try updateControls(camera, &applied)
+                Diagnostics.heartbeat("Ready, and the camera answered \(Int(Date().timeIntervalSince(applied.batteryChecked))) s ago")
                 Thread.sleep(forTimeInterval: 0.25)
             }
             try stream(camera, to: sink, frameList: frameList, applied: &applied)

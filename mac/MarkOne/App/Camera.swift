@@ -8,6 +8,9 @@
 
 import Foundation
 import ImageCaptureCore
+import os.log
+
+private let log = Logger(subsystem: "com.superhighfives.markone", category: "camera")
 
 enum CameraError: LocalizedError {
     case notFound, disconnected, session(Error?), command(UInt16, String), timeout
@@ -50,8 +53,15 @@ final class Camera: NSObject, ICDeviceBrowserDelegate, ICCameraDeviceDelegate {
         }
         guard let device else { throw CameraError.disconnected }
         DispatchQueue.main.async { device.requestOpenSession() }
-        guard opened.wait(timeout: .now() + 10) == .success else { throw CameraError.timeout }
-        if let openError { throw CameraError.session(openError) }
+        guard opened.wait(timeout: .now() + 10) == .success else {
+            log.notice("The camera didn't open a session within 10 s")
+            throw CameraError.timeout
+        }
+        if let openError {
+            log.notice("The camera couldn't open a session: \(openError.localizedDescription, privacy: .public)")
+            throw CameraError.session(openError)
+        }
+        log.notice("Opened a session with the camera")
     }
 
     /// False once the camera has been turned off or unplugged.
@@ -120,8 +130,14 @@ final class Camera: NSObject, ICDeviceBrowserDelegate, ICCameraDeviceDelegate {
         // A camera that turns off mid-command answers with an empty
         // response, just before ImageCaptureCore reports it gone.
         if removed.value || (answered && failure == nil && response.count < 8) { throw CameraError.disconnected }
-        guard answered else { throw CameraError.timeout }
-        if failure != nil { throw CameraError.session(failure) }
+        guard answered else {
+            log.notice("No answer from the camera to \(name, privacy: .public) within 10 s")
+            throw CameraError.timeout
+        }
+        if let failure {
+            log.notice("Sending \(name, privacy: .public) failed: \(failure.localizedDescription, privacy: .public)")
+            throw CameraError.session(failure)
+        }
         // Response container: length, type, code, transaction, parameters.
         let rcode = response.count >= 8 ? response.le(UInt16.self, at: 6) : 0
         guard rcode == 0x2001 else { throw CameraError.command(rcode, name) }
@@ -167,6 +183,7 @@ final class Camera: NSObject, ICDeviceBrowserDelegate, ICCameraDeviceDelegate {
     func deviceBrowser(_ browser: ICDeviceBrowser, didAdd device: ICDevice, moreComing: Bool) {
         guard self.device == nil, let camera = device as? ICCameraDevice,
               camera.usbVendorID == Camera.olympusVendorID else { return }
+        log.notice("The camera is on USB")
         camera.delegate = self
         self.device = camera
         found.signal()
@@ -174,6 +191,7 @@ final class Camera: NSObject, ICDeviceBrowserDelegate, ICCameraDeviceDelegate {
 
     func deviceBrowser(_ browser: ICDeviceBrowser, didRemove device: ICDevice, moreGoing: Bool) {
         if device === self.device {
+            log.notice("The camera left USB")
             device.delegate = nil
             self.device = nil
             removed.value = true
