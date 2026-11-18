@@ -432,13 +432,7 @@ struct WelcomeView: View {
                 .frame(maxWidth: 440, alignment: .leading)
             Card(padding: 14) {
                 VStack(alignment: .leading, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        OpenAtLoginToggle(labelGap: 4)
-                        Text("So the camera is ready whenever you plug it in.")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .padding(.leading, 24)
-                    }
+                    OpenAtLoginToggle(caption: "So the camera is ready whenever you plug it in.")
                     Divider()
                     HStack(alignment: .firstTextBaseline, spacing: 12) {
                         VStack(alignment: .leading, spacing: 2) {
@@ -476,4 +470,8 @@ private extension View {
 
 #Preview("Firmware") {
     WelcomeView(start: .firmware, done: {})
+}
+
+#Preview("Done") {
+    WelcomeView(start: .done, done: {})
 }

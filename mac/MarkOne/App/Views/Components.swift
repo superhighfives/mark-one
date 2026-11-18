@@ -263,14 +263,14 @@ struct BrightnessControl: View {
     }
 }
 
-/// Open at login, kept in step with what macOS reports.
+/// Open at login, kept in step with what macOS reports. With a caption, it's
+/// a switch on the right, lined up with other controls in a card.
 struct OpenAtLoginToggle: View {
-    /// Extra space between a checkbox and its label.
-    var labelGap: CGFloat = 0
+    var caption: String?
     @State private var on = SMAppService.mainApp.status == .enabled
 
     var body: some View {
-        Toggle(isOn: $on) { Text("Open at login").padding(.leading, labelGap) }
+        toggle
             .onChange(of: on) { _, wanted in
                 do {
                     try wanted ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister()
@@ -278,6 +278,26 @@ struct OpenAtLoginToggle: View {
                     on = SMAppService.mainApp.status == .enabled
                 }
             }
+    }
+
+    @ViewBuilder private var toggle: some View {
+        if let caption {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Open at login")
+                    Text(caption)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Toggle("Open at login", isOn: $on)
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+            }
+        } else {
+            Toggle("Open at login", isOn: $on)
+        }
     }
 }
 
