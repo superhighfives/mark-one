@@ -1,7 +1,7 @@
 # To do
 
 Everything left to do for Mark One, in one place. `NOTES.md` has the
-research behind each item.
+research behind each item, and the git history has what's done.
 
 The goal is software that feels like magic: plug in the camera, open a
 video call, and it works, with nothing to press on the camera or in
@@ -9,188 +9,47 @@ Mark One.
 
 ## Next
 
-- [x] **Video pauses.** Fixed by revision 3, which lists each frame's
-  address and size (`asm/frames.s`). A 71-minute recording (2026-11-10)
-  froze only at the two scheduled restarts and once for 0.43 s
-  downstream of Mark One, against 27 freezes in 56 seconds on revision
-  2. See "Exact frame boundaries" in `NOTES.md`.
-- [x] **Hard freeze at 21.6 minutes** (2026-11-09, revision 2, card in):
-  the camera froze mid-stream and needed a battery pull. A 26-minute run
-  afterwards didn't freeze, nor did a 71-minute run on revision 3
-  (2026-11-10), nor a long call on the dummy battery (2026-11-16).
+- [ ] **Not recording after a night idle** (2026-11-17, 1.0.0, work
+  laptop): ready from 20:20, the camera ignored REC at 08:01 though it
+  still answered over USB, until it was switched off and on. Not
+  reproduced on this Mac:
+  - Not the camera's own sleep (0x2f, 6) or auto power off (0xb2, 240
+    minutes): with auto power off at 1 minute, it still recorded after 3
+    minutes idle, both with Mark One checking the battery and with Mark
+    One paused (SIGSTOP), sending nothing.
+  - Not a Mac sleep of 10 minutes, or of 3 hours (2026-11-17). In the
+    3 hours this Mac only reached dark wake: Mark One kept running and
+    the camera answered every 30 s, so the camera was never left alone.
 
-- [x] **FaceTime after an extension update** (2026-11-12, macOS 27):
-  FaceTime ignored the Mark One camera until its video service
-  (`avconferenced`) restarted, then worked (see "FaceTime" in
-  `NOTES.md`). A first install has the same problem (2026-11-13): no
-  running process, Mark One included, sees the camera appear once it's
-  switched on ("Processes don't see the camera come back" in
-  `NOTES.md`). Mark One now reopens itself during setup, restarts
-  `avconferenced` when no camera is in use, and the Done step says to
-  reopen other video apps. A first install with 1.0.0 worked
-  (2026-11-16).
-
-## Before launch
-
-### Mark One
-
+  Next: run 1.0.2 on the work laptop with Detailed logging on (Settings
+  › General › Troubleshooting). It logs the Mac's sleep and wake, and a
+  line a minute while Mark One waits. If REC is ignored again, don't
+  switch the camera off and on before reading its state.
 - [ ] **Extension updates.** Replacing the camera extension can leave no
   camera until the Mac restarts (see "Camera extension updates" in
   `NOTES.md`). The extension has its own build number in `project.yml`
-  (4), changed only when the extension changes. After installing, Mark
-  One checks that the Mark One camera appears within 10 s and otherwise
-  asks for a restart, and it retries opening the camera's input every
-  2 s instead of waiting for the camera to be reconnected. Not yet seen
-  working: the restart message only shows when the race happens. After
-  1.0: it matters from the first update that changes the extension.
-  Updates that don't change it now leave it alone: 1.0.0 compared the
-  extension's version as well as its build, and the version follows
-  the app's, so every update would have replaced it. 1.0.1 compares the
-  build only, and updating 1.0.0 to 1.0.1 kept the running 1.0.0/4
-  extension (2026-11-16).
-- [x] **Battery steps.** A full discharge (2026-11-10) read 100, 50 once
-  the camera's icon flashes empty, then 5 nine seconds before it switched
-  itself off: Full, Low and Empty. USB installs now wait for Full.
+  (4), changed only when the extension changes, and updates that don't
+  change it leave it alone (1.0.0 to 1.0.1 kept the running extension,
+  2026-11-16). After installing, Mark One checks that the Mark One camera
+  appears within 10 s and otherwise asks for a restart, and it retries
+  opening the camera's input every 2 s instead of waiting for the camera
+  to be reconnected. Not yet seen working: the restart message only
+  shows when the race happens. It matters from the first update that
+  changes the extension.
 
-### Webcam firmware
-
-Revision 2 records in webcam mode with no card, creates no movie file and
-lifts the time limits (see "Recording without a card" in `NOTES.md`).
-
-- [x] **Restart after a USB install** (2026-11-10): the camera restarts
-  itself after OK (see "Restarting after a USB install" in `NOTES.md`).
-  Tested with a script; still to try from Mark One's Reinstall.
-- [x] **Connect as a webcam without asking** (2026-11-10): USB Mode
-  Webcam, on by default, in setup and Settings. Docs: to import photos
-  over USB, set Custom Menu > USB Mode back to Auto, or turn it off.
-- [x] **Long session with no card** (2026-11-10): 71 minutes, past two
-  scheduled restarts.
-- [x] **Long session with a card in, past 4 GB with no restart**
-  (2026-11-11, revision 4): 1 GB every 8 minutes, past 4 GB at 31.9
-  minutes, and on until the battery ran out at 37 minutes (about 4.6
-  GB). No hang, so the 3.5 GB restart is gone; the 100-minute one stays.
-  The first try (2026-11-10) ended at the 3.5 GB restart, when QuickTime
-  stopped at the gray placeholder (fixed in a9b0a2f).
-  The card holds 2.3 GB in all, so the session wrote nothing to it.
-- [x] **Empty movie files** from earlier sessions: only on the test card
-  (only pre-release firmware made them), so delete them there; Mark One
-  doesn't.
-
-### Decide
-
-- [x] **License** (2026-11-12): MIT, in `LICENSE`, with the README
-  listing what's under other terms (FFmpeg's LGPL, Sparkle, om-emu's
-  `olyfw.py`, which is downloaded rather than copied because it has no
-  license).
-- [x] **Firmware download kept** (2026-11-13): Mark One still asks
-  Olympus's update server itself, presenting as OM Workspace, the same
-  way the community's download script does (see the mu-43.com thread
-  linked from the README). If
-  Olympus objects, switch to the user downloading the file and giving it
-  to Mark One: 88fbe60 does that, and the commit after it reverts it.
-- [x] **No Olympus bytes in the app** (2026-11-13): the app checks
-  Olympus's code before patching it by length and SHA-256 (`StockCode` in
-  `Firmware.swift`) instead of carrying a copy.
-- [x] **Firmware bytes in the repo** (2026-11-13): `scripts/build.py` and
-  `scripts/ptp.py` check stock code longer than 8 bytes by length and
-  SHA-256 too (2.7 KB was quoted, up to 1154 bytes at once); the edits
-  they build are unchanged. Shorter checks (addresses, operands) stay as
-  hex. `NOTES.md` and `asm/` quote only identifiers, addresses and single
-  instructions.
-
-### Direct distribution
+## Distribution
 
 Downloads live on superhighfives.com (`~/Development/superhighfives.com`,
-Next.js on Cloudflare Workers through OpenNext), next to Pika.
+Next.js on Cloudflare Workers through OpenNext), next to Pika. `/release`
+does the rest.
 
 ```
-/mark-one                       product page, Download (or Coming soon)
+/mark-one                       product page, Download
 /mark-one/download              redirects to the latest DMG on GitHub
 /releases/mark-one/feed         Sparkle appcast, from changelog/mark-one/
 github.com/superhighfives/mark-one/releases   DMGs and deltas
 ```
 
-**In the app**
-
-- [x] **Developer ID build** with the system extension entitlement,
-  notarized. The archive and export work (2026-11-10): every nested
-  binary is signed with Developer ID, the hardened runtime and a
-  timestamp. The notarytool profile `mark-one` is saved
-  (hi@superhighfives.com, 2026-11-12).
-- [x] **Sparkle** 2.10 through Swift Package Manager (2026-11-10).
-  `App/Updater.swift`, with "Check for Updates…" under Settings > About
-  and the automatic check under Settings > General. Scheduled checks
-  wait while the camera is streaming, so an update prompt never lands
-  mid-call. `SUFeedURL` and `SUPublicEDKey` are in `App/Info.plist`. The
-  key is Mark One's own, in the login keychain under the account
-  `mark-one`.
-- [x] **Sparkle key backed up** (2026-11-12). To restore it on another
-  Mac: `generate_keys --account mark-one -f <file>` (in
-  `build/SourcePackages/artifacts/sparkle/Sparkle/bin`).
-- [x] **Updates and the camera extension.** Sparkle only replaces the
-  app. The extension changes only when Mark One asks the system to
-  activate it, so updates that keep the extension's build number are
-  safe. Release notes for updates that change the extension should say a
-  restart may be needed (see "Extension updates" above). `/release`
-  now asks for that line when the extension's build number goes up
-  (2026-11-14).
-- [x] **Release script** (2026-11-10): first full run 2026-11-12 (1.0
-  build 2, not uploaded): app and DMG notarized and stapled, Gatekeeper
-  accepts both, the Sparkle signature checks out against the app's
-  public key, and installed from the DMG it streams live at 30 fps.
-- [x] **Releases like Pika's** (2026-11-12): `/release` and
-  `/pre-release` (`.claude/commands/`), modelled on Pika's.
-  `scripts/build-release.sh` (was `release.sh`) archives, exports with
-  Developer ID, checks the extension is inside and notarizes the app;
-  releasecast makes the DMG, notarizes it, signs it with Mark One's key
-  and makes a delta from the previous GitHub release. Dry runs of
-  releasecast on Mark One (with a delta) and Pika check out.
-- [x] **releasecast 0.0.13** (2026-11-12): `--account` for Mark One's
-  key, `--profile`, and names with spaces
-  ([releasecast#4](https://github.com/superhighfives/releasecast/pull/4)).
-- [x] **The releases repo** (2026-11-12): `pika-releases` is now
-  [superhighfives/releases](https://github.com/superhighfives/releases)
-  (`~/Development/pika-workspace/releases`). `/release` files each
-  version in `Mark One/VERSION/` with its Xcode archive, and takes the
-  previous DMG from there for the delta.
-- [x] **Builds from source** (2026-11-11): the README's "Build it
-  yourself". Those builds have no update feed.
-
-**On superhighfives.com**
-
-- [x] **Release files on GitHub** (2026-11-12, was R2): the feed points
-  at the DMG and deltas on each GitHub release in
-  `superhighfives/mark-one`, and `/mark-one/download` redirects to the
-  latest DMG. The site's R2 binding and the `mark-one-releases` bucket
-  are gone.
-- [x] **Appcast:** `changelog/mark-one/<version>.md`, in the same format
-  as Pika's, and `/releases/mark-one/feed`. `generateAppcast.ts` now
-  takes settings per app, and Pika's feeds are unchanged.
-- [x] **Privacy page** covers Cloudflare, GitHub Sponsors, update checks
-  and the Olympus firmware download. No live page loads an analytics
-  script.
-- [x] **Coming soon** (2026-11-11): `available` in `src/data/markone.ts`
-  is off, so the page shows "Coming soon" with no download or source
-  link, and `/mark-one/download` returns 404.
-- [x] **Deploy** (2026-11-12): PR #29 merged and live, showing "Coming
-  soon". `/mark-one/download` returns 404 until launch.
-- [x] **Launch**, in this order:
-  - [x] `/pre-release` (2026-11-14): read-only hygiene checks (clean tree, leftover
-    test code, firmware edits match `scripts/build.py`). `--fix` offers
-    the mechanical fixes.
-  - [x] `/release --dry` (2026-11-14): builds and checks everything, makes only a
-    draft GitHub release, pushes nothing and undoes the version bump.
-    Works while the repo is private.
-  - [x] Make the repo public (2026-11-14). A live `/release` stops while it's private,
-    because release downloads from a private repo fail for everyone else.
-  - [x] `/release` 1.0 (2026-11-14, "Lights, Camera, Action"; keeps build 2, the first release).
-    Re-released as 1.0.0 on 2026-11-15, still build 2, before it was
-    announced: the site sorts versions as semver, so a later "1.1" would have
-    broken the feed. Versions are three parts from now on. It asks before
-    each irreversible step, drafts the notes for approval, and offers to
-    set `available` to true in `src/data/markone.ts` (a constant, not an
-    environment variable, like the rest of the site's settings) to turn
-    on the Download button.
 - [ ] **Homebrew cask.** `mark-one` is ready on the `mark-one` branch of
   the local homebrew-cask tap (modelled on Pika's; livecheck reads the
   Sparkle feed). `brew audit --new` passes except for notability: the
@@ -200,52 +59,9 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
   `brew install --cask mark-one` and remove the cask from the
   superhighfives/tools tap. Until then the site shows
   `brew install --cask superhighfives/tools/mark-one` (2026-11-14).
-- [x] **Test end to end:** download from the page, then publish an
-  update and watch Sparkle install it. The download from the live page
-  works (2026-11-16, 1.0.0), and 1.0.0 updated itself to 1.0.1
-  (2026-11-16).
 
-### Release
+## Later
 
-- [x] Screenshots (2026-11-12): `swift scripts/capture-screenshots.swift`
-  walks through the shots in `screenshots/shots.json`, opens each
-  window and grabs it into `screenshots/raw/`. The website lays them out
-  in HTML with its own captions.
-- [x] A support page (2026-11-13): the help page at `/mark-one/help`
-  ends with "Still stuck? Email hi@superhighfives.com".
-- [x] A Release build (2026-11-14, `/release --dry`): 1.0 build 2, app
-  notarized and stapled, Gatekeeper accepts it from the DMG, and the
-  DMG's Sparkle signature checks out.
-
-### Website
-
-- [x] Check its claims once the tests pass (2026-11-13): "as long as a
-  battery lasts" matches the 37-minute run to an empty battery, and "0
-  files written to the SD card" the same run, which wrote nothing to the
-  card. The 5-second stop and 0.2 s delay match the app and `NOTES.md`.
-- [x] **Measure the delay again** with the release build: film a
-  millisecond clock with the camera and read it back in Photo Booth or
-  FaceTime. The site and README say about 200 ms, measured 2026-11-06 in
-  `mac/viewer` with PyAV, before Mark One, Apple's decoder and the frame
-  list. The spec "From the sensor to your call" also counts the video
-  app's own delay. Before 1.0, with the `/release --dry` build.
-  Measured 2026-11-14 with 1.0 build 2 and Photo Booth: 150-190 ms
-  in three shots (each frame catches two clock values, so ±30 ms), so
-  "about 200 ms" stands.
-- [x] Update the firmware box: "Going back: Olympus's firmware, over
-  USB" and "Setup: about 10 minutes, once" are on the page.
-
-## After launch
-
-- [ ] **Not recording after a night idle** (2026-11-17, 1.0.0): ready
-  from 20:20, the camera ignored REC at 08:01 though it still answered
-  over USB, until it was switched off and on. Not the camera's own sleep
-  (0x2f, 6) or auto power off (0xb2, 240 minutes): with auto power off at
-  1 minute, it still recorded after 3 minutes idle, both with Mark One
-  checking the battery and with Mark One paused (SIGSTOP), sending
-  nothing. Next: put the Mac to sleep for a few minutes with the camera
-  ready, which suspends USB, then ask for video. Mark One now logs sleep
-  and wake, and Detailed logging (Settings) adds a line a minute.
 - [ ] **A message after unplugging.** Unplugging mid-call leaves the
   screen dark for up to 10 seconds before the camera goes back to
   normal, which can look frozen. Show the camera's own "One Moment"
@@ -253,9 +69,6 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
   to show it (2026-11-16, "A message after unplugging" in `NOTES.md`);
   next, try `asm/wait.s` on the camera, then add it to the stub as a
   firmware revision and test unplugging mid-call and in Storage and MTP.
-- [x] **Power.** The E-M5 doesn't run from USB power. A card install
-  worked on the dummy battery (2026-11-13), so setup asks only for a
-  charged battery. A long call on it worked (2026-11-16).
 - [ ] **Shorter restarts.** Mark One restarts the recording every 100
   minutes, before the 2-hour cap, and the picture freezes for about 5 s,
   almost all of it waiting for the camera to report it's recording
@@ -295,23 +108,3 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
   Focus or its shortcut focuses the camera, with a checkbox in Settings
   to turn it on. Best would be the E-M5's own focus beep, recorded from
   the camera.
-- [x] **Apple's video decoder.** Mark One decodes with VideoToolbox on
-  revision 3 and libavcodec otherwise, or when the hardware fails:
-  about 12% of a core while streaming, down from 37-41% (see "Apple's
-  decoder on exact frames" in `NOTES.md`).
-
-## Done recently
-
-- No sandbox: Mark One writes the firmware to the card itself, with no
-  file panel (2026-11-09).
-- Recording with no card, no empty movie files and no time limits in
-  webcam mode: firmware revision 2 (2026-11-09).
-- Battery shown as full, low or empty (2026-11-09).
-- The 30-minute stop, the Mach port leak, QuickTime failing on repeated
-  timestamps, gray frames, and asking for a missing card (2026-11-09).
-- Unplugging mid-call leaves the camera usable, and plugging back in
-  works (2026-11-09).
-- USB firmware installs work on a camera Mark One has set up
-  (2026-11-09).
-- FFmpeg credit and license in the app, no Downloads entitlement
-  (2026-11-09).

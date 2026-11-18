@@ -54,7 +54,7 @@ In `~/Development/superhighfives.com`:
 
 ### 6. Open items
 
-- List unchecked items in `TODO.md` under "Before launch" (or the current release's section) so the user can decide whether any block this release.
+- List unchecked items in `TODO.md` under "Next" so the user can decide whether any block this release.
 
 ### Out of scope
 
