@@ -82,7 +82,7 @@ private struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
-        .fixedSize(horizontal: false, vertical: true)
+        .settingsTab()
     }
 }
 
@@ -145,7 +145,7 @@ private struct CameraSettings: View {
             }
         }
         .formStyle(.grouped)
-        .fixedSize(horizontal: false, vertical: true)
+        .settingsTab()
         .confirmationDialog("Remove the Mark One camera?", isPresented: $confirmRemove) {
             Button("Remove", role: .destructive) { installer.deactivate() }
         } message: {
@@ -205,7 +205,7 @@ private struct PictureSettings: View {
             }
         }
         .formStyle(.grouped)
-        .fixedSize(horizontal: false, vertical: true)
+        .settingsTab()
     }
 }
 
@@ -264,6 +264,16 @@ private struct AboutSettings: View {
         }
         .padding(.vertical, 20)
         .sheet(isPresented: $showLicense) { LicenseSheet() }
+    }
+}
+
+private extension View {
+    /// Sizes a tab's form to fit, without scrolling. The form's height
+    /// comes out in fractions of a point, which the window rounds down,
+    /// and that sliver was enough for a scroll bar (#13).
+    func settingsTab() -> some View {
+        fixedSize(horizontal: false, vertical: true)
+            .scrollDisabled(true)
     }
 }
 
