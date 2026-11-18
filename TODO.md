@@ -21,10 +21,20 @@ Mark One.
     3 hours this Mac only reached dark wake: Mark One kept running and
     the camera answered every 30 s, so the camera was never left alone.
 
-  Next: run 1.0.2 on the work laptop with Detailed logging on (Settings
-  › General › Troubleshooting). It logs the Mac's sleep and wake, and a
-  line a minute while Mark One waits. If REC is ignored again, don't
-  switch the camera off and on before reading its state.
+  - Not a night with the display asleep (2026-11-18, 1.0.3, work laptop,
+    Detailed logging): ready from 22:57, it recorded at 07:13. Only the
+    display slept (23:00 to 07:12); the Mac stayed awake, Mark One logged
+    every minute and the camera answered every 30 s all night.
+
+  - Not a short real sleep (2026-11-18, 1.0.3, this Mac): with the
+    camera's auto power off at 1 minute, the lid shut and on battery, the
+    Mac slept 07:29 to 07:41 (one maintenance wake at 07:39), and it
+    recorded 8 s after waking. Auto power off is back at 240.
+
+  Next: a night where the Mac itself sleeps, as it may have the first
+  time (lid closed, or nothing keeping it awake), with Detailed logging
+  on. The log should show "The Mac is going to sleep". If REC is ignored
+  again, don't switch the camera off and on before reading its state.
 - [ ] **Extension updates.** Replacing the camera extension can leave no
   camera until the Mac restarts (see "Camera extension updates" in
   `NOTES.md`). The extension has its own build number in `project.yml`
@@ -33,9 +43,11 @@ Mark One.
   2026-11-16). After installing, Mark One checks that the Mark One camera
   appears within 10 s and otherwise asks for a restart, and it retries
   opening the camera's input every 2 s instead of waiting for the camera
-  to be reconnected. Not yet seen working: the restart message only
-  shows when the race happens. It matters from the first update that
-  changes the extension.
+  to be reconnected. Seen working (2026-11-18, extension 4 to 5 in a
+  Debug build): the new extension was activated and the old one left
+  "waiting to uninstall on reboot", the camera didn't appear, and Mark
+  One asked for a restart after 10 s. 1.0.4 changes the extension, so
+  its notes need the restart line.
 
 ## Distribution
 
@@ -69,21 +81,6 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
   to show it (2026-11-16, "A message after unplugging" in `NOTES.md`);
   next, try `asm/wait.s` on the camera, then add it to the stub as a
   firmware revision and test unplugging mid-call and in Storage and MTP.
-- [ ] **Shorter restarts.** Mark One restarts the recording every 100
-  minutes, before the 2-hour cap, and the picture freezes for about 5 s,
-  almost all of it waiting for the camera to report it's recording
-  again (see "Exact frame boundaries" in `NOTES.md`). Find out why that
-  check takes nearly 5 s. Values above about 6.6 hours would likely
-  overflow the muxer's 90 kHz clock.
-- [ ] **A flicker when video comes back on.** After a short break
-  (under 3 s), turning video back on in a call shows the picture from
-  when it was turned off for a moment. The extension repeats the last
-  frame it had through gaps, and that one is old by then. Mark One no
-  longer leaves old frames in the queue (1.0.1), but the rest has to be
-  fixed in the extension: forget the last frame when the last app stops,
-  and skip frames more than about 0.2 s old. Changing the extension can
-  need a restart to finish updating, so do it with the next extension
-  change.
 - [ ] **More camera controls.** Exposure (Auto, Aperture and Shutter
   priority, Manual, with aperture, shutter speed and ISO) and
   stabilization are in Settings › Picture (1.0.3). Left:
