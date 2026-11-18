@@ -53,6 +53,7 @@ Check quickly; if any fail, stop and say what's missing.
 6. **Live releases only:** the GitHub repo is public (`gh repo view superhighfives/mark-one --json visibility`). Release downloads from a private repo fail for everyone else, so stop if it's private.
 7. The website repo is on `main`, clean apart from `bun.lock`, and up to date.
 8. The releases repo (`~/Development/pika-workspace/releases`) is on `main`, clean and up to date.
+9. Screenshots: `which cwebp webpinfo` (`brew install webp`), and the terminal has Screen Recording permission (`swift` with `import CoreGraphics; print(CGPreflightScreenCaptureAccess())` prints `true`). Without it, ask the user to turn it on in System Settings › Privacy & Security and reopen the terminal.
 
 Report the mode (live or dry run).
 
@@ -89,6 +90,12 @@ Report the mode (live or dry run).
    (Needs `fw/` from `scripts/setup.sh`.) If they differ, stop: the app would install firmware that doesn't match the source.
 2. **No test settings left in code:** `UserDefaults` keys used only for testing (`RestartAfter`, `SaveCapture`) are fine; flag anything new.
 3. **Help matches the app.** The app is the source of truth. Compare what the app calls things with the website's help (`superhighfives.com/src/app/(markone)/mark-one/help/help-client.tsx`) and FAQ (`src/data/markone.ts`): settings names (`App/Views/SettingsView.swift`), menu window controls (`App/Views/MenuView.swift`), firmware window choices (`App/FirmwareView.swift`), and the welcome steps (`App/Views/WelcomeView.swift`). Fix the website to match and report what changed.
+4. **Screenshots on the website.** Every picture on superhighfives.com/mark-one is a screenshot of the app, so retake them for each release:
+   1. Retake the app's windows: `scripts/snapshot-app.sh` (a Debug build with a made-up camera, so no camera is needed). Windows flash up for a minute; tell the user to leave the mouse alone first. It fails while the screen is locked.
+   2. The panel (`01-panel`) and the call (`02-call`) are live shots of the camera's picture. If the panel or the call looks different since the last release (`git diff PREVIOUS..HEAD --stat -- mac/MarkOne/App/Views/MenuView.swift`, or ask), ask the user to connect the camera and retake them: `swift scripts/capture-screenshots.swift 01-panel 02-call`. It waits for Return before each, so the user runs it (`! swift scripts/capture-screenshots.swift 01-panel 02-call`). Otherwise keep the last ones.
+   3. Make the website's images: `scripts/website-screenshots.sh`. It lists the ones that changed, and any that changed size: change their `width` and `height` in `superhighfives.com/src/app/(markone)/mark-one/markone-client.tsx` to match, keeping the same scale as before (the panel and the call are shown at half size, the Updates tile at 0.8).
+   4. Look at every changed image (decode with `dwebp`, then Read it) and check it shows what its `alt` text in `markone-client.tsx` says. Show the user the changed ones.
+   5. Commit the retaken screenshots in this repo (`Mark One: Retake the app screenshots`) and push after confirming, so the release's tag includes them. In dry run mode, don't commit: the cleanup's reset discards them. The website's images go out with the changelog in Phase 5.
 
 ---
 
@@ -159,7 +166,7 @@ Confirm before each step. In dry run mode, make the GitHub release a draft and s
 3. **Website:**
    ```sh
    cd ~/Development/superhighfives.com
-   git add changelog/mark-one/VERSION.md src/data/markone.ts
+   git add changelog/mark-one/VERSION.md src/data/markone.ts public/assets/markone-*.webp "src/app/(markone)/mark-one/markone-client.tsx"
    git commit -m "Add changelog for Mark One VERSION"
    git push origin main
    ```
@@ -217,6 +224,7 @@ Confirm before each step. In dry run mode, make the GitHub release a draft and s
    - [ ] Homebrew cask bumped (tap pushed; local homebrew-cask branch updated)
    - [ ] Release filed in the releases repo, with its archive
    - [ ] Website help matches the app
+   - [ ] Website screenshots retaken (live shots: retaken / kept)
 
 ---
 
@@ -225,7 +233,7 @@ Confirm before each step. In dry run mode, make the GitHub release a draft and s
 Only in dry run mode.
 
 1. Undo the version bump commit (it wasn't pushed): `git reset --hard HEAD~1`, after checking that HEAD is that commit.
-2. Remove `superhighfives.com/changelog/mark-one/VERSION.md` if it was written.
+2. Remove `superhighfives.com/changelog/mark-one/VERSION.md` if it was written, and undo the screenshots there: `git checkout -- public/assets "src/app/(markone)/mark-one/markone-client.tsx"`.
 3. Delete the draft release: `gh release delete VERSION --repo superhighfives/mark-one --yes --cleanup-tag`.
 4. Leave `mac/MarkOne/build/release/` (gitignored) for inspection, or remove it if asked.
 
