@@ -356,22 +356,46 @@ enum Firmware {
     }
 
     static func isRecording(_ camera: Camera) throws -> Bool {
-        try camera.run(read32, 0, 0, sequence).0 == 0x10
+        try state(camera) == recording
+    }
+
+    /// Sequence states: idle, then 0xe and 0xf while a recording starts
+    /// (about 0.4 s), recording, and 0x12 while one stops (1 to 1.5 s). The
+    /// camera ignores REC until it's idle again.
+    static let idle = UInt32(1)
+    static let recording = UInt32(0x10)
+
+    static func state(_ camera: Camera) throws -> UInt32 {
+        try camera.run(read32, 0, 0, sequence).0
     }
 
     /// Presses and releases the REC button, then waits up to three seconds
-    /// for recording to start or stop. Tries up to three times.
+    /// for the camera to be recording, or idle again. Presses only once the
+    /// camera has settled, since it ignores REC in between. Tries up to
+    /// three times.
     static func setRecording(_ camera: Camera, _ on: Bool) throws {
+        let target = on ? recording : idle
+        // Waits up to three seconds for idle or recording.
+        func settle() throws -> UInt32 {
+            var value = try state(camera)
+            for _ in 0..<60 where value != idle && value != recording {
+                Thread.sleep(forTimeInterval: 0.05)
+                value = try state(camera)
+            }
+            return value
+        }
         for _ in 0..<3 {
-            if try isRecording(camera) == on { return }
+            if try settle() == target { return }
             try camera.run(keyStub, 0x0200_0000 | recordButton)
-            Thread.sleep(forTimeInterval: 0.5)
+            Thread.sleep(forTimeInterval: 0.15)
             try camera.run(keyStub, 0x0201_0000 | recordButton)
-            for _ in 0..<30 {
-                Thread.sleep(forTimeInterval: 0.1)
-                if try isRecording(camera) == on { return }
+            for _ in 0..<60 {
+                Thread.sleep(forTimeInterval: 0.05)
+                if try state(camera) == target { return }
             }
         }
+        // Not idle, but not recording either: stopped, as far as apps go.
+        if !on, try !isRecording(camera) { return }
         throw FirmwareError.recording(on)
     }
 }

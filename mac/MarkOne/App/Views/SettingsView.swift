@@ -198,7 +198,7 @@ private struct PictureSettings: View {
             } header: {
                 Text("Exposure")
             } footer: {
-                Text("A low f-number blurs the background. 1/50 or 1/100 s stops lights flickering on 50 Hz power, 1/60 or 1/125 s on 60 Hz. In Shutter priority the camera keeps the brightness the same; Manual sets it. Changes during a call pause the picture for about 5 seconds.")
+                Text("A low f-number blurs the background. 1/50 or 1/100 s stops lights flickering on 50 Hz power, 1/60 or 1/125 s on 60 Hz. In Shutter priority the camera keeps the brightness the same; Manual sets it. Changes during a call pause the picture for about 2 seconds.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

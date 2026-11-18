@@ -1462,6 +1462,16 @@ bad entries and one decode error, besides the restarts. On revision 2 a
   camera and logged nothing then, so frames reached Mark One on time;
   the hitch was between the camera extension and QuickTime.
 
+Why the recording check took 4.8 s (2026-11-18, traced every 50 ms):
+the sequence state goes 0x10, then 0x12 for 1 to 1.5 s while the
+recording stops, then 1 (idle). Starting goes 1, 0xe, 0xf, 0x10 in about
+0.4 s. Mark One counted anything but 0x10 as stopped and pressed REC at
+once, during 0x12; the camera ignored it, and the next try came after the
+3 s timeout. Waiting for idle before pressing, and holding REC for 0.15 s
+instead of 0.5 s, brought a restart down to about 2 s (1.95 to 2.4 s:
+stop 1.4 s, movie settings 0.6 s, start 0.5 s) and the first start to
+0.7 s (1.0.4).
+
 ### Apple's decoder on exact frames (2026-11-10)
 
 With frames cut by revision 3's list, VideoToolbox's hardware decoder

@@ -852,10 +852,10 @@ final class Pipeline: ObservableObject {
                 || (restartForTesting > 0 && recordedFor >= restartForTesting) {
                 let rate = Double(recordedBytes) * 8 / recordedFor / 1_000_000
                 log.notice("Restarting the recording after \(recordedFor / 60, format: .fixed(precision: 1), privacy: .public) minutes and \(Double(recordedBytes) / 1_073_741_824, format: .fixed(precision: 2), privacy: .public) GB (\(rate, format: .fixed(precision: 1), privacy: .public) Mbps).")
-                // The camera takes about 5 s to start recording again,
-                // longer than the extension fills in with the last picture.
-                // Its gray placeholder after that ends recordings in apps
-                // such as QuickTime.
+                // The camera takes about 2 s to start recording again, and
+                // could take longer. Past 3 s the extension shows its gray
+                // placeholder, which ends recordings in apps such as
+                // QuickTime, so hold the last picture meanwhile.
                 if let last { freeze = Freeze(last, to: sink, for: Pipeline.restartFreeze) }
                 try Firmware.setRecording(camera, false)
                 try Firmware.setRecording(camera, true)
