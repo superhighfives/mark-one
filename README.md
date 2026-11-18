@@ -108,6 +108,42 @@ uv run scripts/stream.py --raw | mac/viewer/viewer   # 1080p at 30 fps while rec
 
 Build the viewer once with `swiftc -O -o mac/viewer/viewer mac/viewer/main.swift` (needs Xcode or the command line tools).
 
+### Camera settings
+
+Every camera setting has an ID. The camera's own `setSetting` (0x7ead1020: d0 = ID, d1 = 0, a1 = value) and `getSetting` (0x7ead08aa: d0 = ID, a1 = where to write the value) change and read them, on the settings object at `*(0x602b2598)`. `ptp.py` does the same over USB (with usb-tools), and Mark One calls them from `App/Firmware.swift`:
+
+```sh
+uv run scripts/ptp.py setting 0x0b          # its allowed values and current value
+uv run scripts/ptp.py set 0x0b 6            # change it until the camera's switched off
+uv run scripts/ptp.py settings -o before.txt    # every setting; change one on the camera, then
+uv run scripts/ptp.py settings --since before.txt   # see which ID moved
+```
+
+The camera saves settings when it's switched off, so a value set over USB stays after that. Put back anything you change for a test. The known IDs, with the full story in `NOTES.md`:
+
+| ID | Setting | Values | Notes |
+|---|---|---|---|
+| 0x03 | Exposure compensation | 0x100 is +1 stop; thirds 0x55, 0xab; negative is two's complement | Works mid-recording. Mark One: Brightness |
+| 0x04 | Aperture | APEX × 256, rounded down (f = √2^Av): f/1.4 0x100, f/5.6 0x500 | Read when a recording starts. Mark One: Settings › Picture |
+| 0x05 | Shutter speed | APEX × 256 (1/2^Tv): 1/100 0x6aa, 1/250 0x800 | Slowest is 1/30 at 30 fps. Read when a recording starts |
+| 0x08 | ISO | 0 Auto, 2 (likely Low), then the ISO itself, 200 to 25600 in thirds | Read when a recording starts |
+| 0x0b | White balance | Auto 0, Incandescent 1, Fluorescent 3, Sunny 6, Cloudy 7, Shade 8, Custom 9, One-touch 13 and 14, Flash 17, Underwater 18 | Works at once |
+| 0x22, 0x24 | Follow the movie mode | | Writing them does nothing |
+| 0x2f | Sleep | 6 on this camera | Values not mapped |
+| 0x43 | Movie quality | Full HD Fine 0, Full HD Normal 1, HD Fine 2, HD Normal 3, AVI 4 and 5 | Read when a recording starts |
+| 0x76 | USB Mode | Auto 0xff, Webcam 7, MTP 4 and 5 | Stock firmware treats unknown values as Storage |
+| 0x79 | AF target | 1 to 35, by columns on the 7×5 grid; 18 is the center, 31 the top right | |
+| 0xac | Picture mode | Vivid 0, Natural 1, Muted 2, Monotone 3, Portrait 5, Custom 6, i-Enhance 7; art filters 8 to 18 (Pop Art to Key Line) | Works at once. Art filters stop the recording, and Diorama hung the camera |
+| 0xb2 | Auto power off | Minutes; 240 by default | |
+| 0xfe | Backlit LCD | | Values not mapped |
+| 0xff | Movie mode | P 76, A 77, S 89, M 90; art filters Soft Focus 78, Pop Art 79, Pale & Light Color 80, Light Tone 81, Pin Hole 82, Grainy Film 83, Cross Process 87, Diorama 88, Gentle Sepia 93, Dramatic Tone 97, Key Line 164 | Read when a recording starts. The look of an art filter comes from 0xac |
+| 0x136 | | Has the first six picture mode values | Not the picture mode |
+| 0x172 | Face priority | Off 0, faces 1, faces and eyes 2 to 4 | Works at once |
+| 0x1b2 | Movie AF mode | Single 0, continuous 1, manual 2 | Read when a recording starts |
+| 0x1b5 | Image stabilization | Off 0, IS1 (auto) 1, IS2 (vertical) 2, IS3 (horizontal) 3 | Read when a recording starts |
+
+"Read when a recording starts" means a change does nothing until the next recording. Mark One stops, writes and starts again for those, and writing them mid-recording made the camera restart itself when the recording stopped. Not found yet: contrast, sharpness, saturation and gradation, metering mode and AE lock.
+
 ## Reading the code
 
 The camera runs Panasonic MN103 processors. To disassemble it, build GNU binutils for that target into `toolchain/`:
