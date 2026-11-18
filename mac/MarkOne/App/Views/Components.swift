@@ -265,12 +265,10 @@ struct BrightnessControl: View {
 
 /// Open at login, kept in step with what macOS reports.
 struct OpenAtLoginToggle: View {
-    /// Extra space between a checkbox and its label.
-    var labelGap: CGFloat = 0
     @State private var on = SMAppService.mainApp.status == .enabled
 
     var body: some View {
-        Toggle(isOn: $on) { Text("Open at login").padding(.leading, labelGap) }
+        Toggle("Open at login", isOn: $on)
             .onChange(of: on) { _, wanted in
                 do {
                     try wanted ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister()
@@ -278,6 +276,34 @@ struct OpenAtLoginToggle: View {
                     on = SMAppService.mainApp.status == .enabled
                 }
             }
+    }
+}
+
+/// A setting in a card: an icon, a title and a caption, with its control on
+/// the right, all centered vertically, like the welcome window's other cards.
+struct SettingRow<Control: View>: View {
+    let icon: String
+    let title: String
+    let caption: String
+    @ViewBuilder let control: Control
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundStyle(.secondary)
+                .frame(width: 28)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                Text(caption)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            control
+        }
     }
 }
 

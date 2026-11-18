@@ -69,6 +69,15 @@ private struct GeneralSettings: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Section("Troubleshooting") {
+                Toggle(isOn: $preferences.detailedLogging) {
+                    Text("Detailed logging")
+                    Text("Logs what Mark One is doing once a minute, for tracking down problems such as the camera not coming back after the Mac sleeps.")
+                }
+                LabeledContent("Log") {
+                    Button("Save Log…") { Diagnostics.saveLog() }
+                }
+            }
         }
         .formStyle(.grouped)
         .fixedSize(horizontal: false, vertical: true)
@@ -125,6 +134,7 @@ private struct CameraSettings: View {
             // the menu bar panel.
             Section {
                 Toggle("Focus on faces", isOn: $pipeline.faceFocus)
+                Toggle("Focus when a call starts", isOn: $pipeline.focusOnStart)
                 KeyboardShortcuts.Recorder("Focus now", name: .focus)
             } header: {
                 Text("Picture")

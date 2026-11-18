@@ -33,6 +33,14 @@ final class Preferences: NSObject, ObservableObject {
         }
     }
 
+    /// Whether to log what Mark One is doing once a minute (see Diagnostics).
+    @Published var detailedLogging = UserDefaults.standard.bool(forKey: "DetailedLogging") {
+        didSet {
+            UserDefaults.standard.set(detailedLogging, forKey: "DetailedLogging")
+            Diagnostics.detailed.value = detailedLogging
+        }
+    }
+
     /// Set when macOS won't let Mark One post notifications.
     @Published private(set) var notificationsDenied = false
 
@@ -40,10 +48,12 @@ final class Preferences: NSObject, ObservableObject {
     /// Set between recording ending and the pipeline saying why.
     private var streamEnded = false
 
-    /// Applies the Dock setting and starts watching for the camera turning
-    /// off. Call once at launch.
+    /// Applies the Dock and logging settings and starts watching for the
+    /// camera turning off. Call once at launch.
     func start(_ pipeline: Pipeline) {
         applyDock()
+        Diagnostics.detailed.value = detailedLogging
+        Diagnostics.start()
         UNUserNotificationCenter.current().delegate = self
         if notifyWhenOff { askToNotify() }
         // Both publish before the value changes, so `pipeline.state` is

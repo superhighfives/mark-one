@@ -237,6 +237,15 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
 
 ## After launch
 
+- [ ] **Not recording after a night idle** (2026-11-17, 1.0.0): ready
+  from 20:20, the camera ignored REC at 08:01 though it still answered
+  over USB, until it was switched off and on. Not the camera's own sleep
+  (0x2f, 6) or auto power off (0xb2, 240 minutes): with auto power off at
+  1 minute, it still recorded after 3 minutes idle, both with Mark One
+  checking the battery and with Mark One paused (SIGSTOP), sending
+  nothing. Next: put the Mac to sleep for a few minutes with the camera
+  ready, which suspends USB, then ask for video. Mark One now logs sleep
+  and wake, and Detailed logging (Settings) adds a line a minute.
 - [ ] **A message after unplugging.** Unplugging mid-call leaves the
   screen dark for up to 10 seconds before the camera goes back to
   normal, which can look frozen. Show the camera's own "One Moment"
@@ -262,6 +271,26 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
   and skip frames more than about 0.2 s old. Changing the extension can
   need a restart to finish updating, so do it with the next extension
   change.
+- [ ] **More camera controls (future idea).** The panel has brightness
+  (exposure compensation), white balance, picture mode and autofocus;
+  Settings has face priority. Candidates for video, none tried yet:
+  - Exposure mode for movies (P, A, S, M), then aperture in A and M (for
+    a blurred background), shutter speed in S and M (1/50 or 1/60 to
+    match the room's lights and avoid flicker), and ISO.
+  - Image stabilization, and the 2x digital teleconverter as a zoom.
+  - Contrast, sharpness, saturation and gradation, the picture mode's
+    own adjustments.
+  - Metering mode, and AE lock.
+  First, find which the camera honours while recording a movie: find
+  each setting's ID by reading every setting before and after a change
+  on the camera (as for white balance, see "Setting IDs" in `NOTES.md`;
+  `scripts/ptp.py setting` reads one), then change it while recording.
+- [ ] **Center Stage (future idea).** Keep the person in frame as they
+  move, like Center Stage on Apple's cameras. macOS only offers Center
+  Stage for Apple's own cameras, so Mark One would do it itself: find
+  faces with Vision and crop and zoom smoothly within the 1080p frame,
+  with a checkbox in Settings to turn it on. Needs a look at how much
+  sharpness the crop costs and whether it fits in the 0.2 s delay.
 - [ ] **A sound when focusing (nice to have).** An optional click when
   Focus or its shortcut focuses the camera, with a checkbox in Settings
   to turn it on. Best would be the E-M5's own focus beep, recorded from

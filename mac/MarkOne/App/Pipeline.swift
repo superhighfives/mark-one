@@ -109,6 +109,16 @@ final class Pipeline: ObservableObject {
     }
     private let pictureModeWanted = Locked(PictureMode.natural.rawValue)
 
+    /// Whether the camera focuses once as soon as an app starts using it,
+    /// when autofocus is set to Once.
+    @Published var focusOnStart = UserDefaults.standard.object(forKey: "FocusOnStart") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(focusOnStart, forKey: "FocusOnStart")
+            focusOnStartWanted.value = focusOnStart
+        }
+    }
+    private let focusOnStartWanted = Flag()
+
     /// Whether autofocus looks for faces first.
     @Published var faceFocus = UserDefaults.standard.object(forKey: "FacePriority") as? Bool ?? true {
         didSet {
@@ -260,6 +270,7 @@ final class Pipeline: ObservableObject {
         whiteBalanceWanted.value = whiteBalance.rawValue
         pictureModeWanted.value = pictureMode.rawValue
         faceWanted.value = faceFocus
+        focusOnStartWanted.value = focusOnStart
         let thread = Thread { [weak self] in self?.loop() }
         thread.qualityOfService = .userInteractive
         thread.start()
@@ -316,7 +327,10 @@ final class Pipeline: ObservableObject {
             let camera = Camera()
             report("Waiting for the camera. Connect it by USB and switch it on.", .waiting)
             do {
-                try camera.connect { !self.stopRequested.value }
+                try camera.connect {
+                    Diagnostics.heartbeat("Looking for the camera on USB")
+                    return !self.stopRequested.value
+                }
                 note(nil)
                 let firmware = try Firmware.identify(camera)
                 Task { @MainActor in
@@ -388,7 +402,11 @@ final class Pipeline: ObservableObject {
                 // Wait for the camera to go away before trying it again, so a
                 // camera Mark One can't use doesn't get set up over and over.
                 if case CameraError.disconnected = error {} else {
-                    while camera.connected && !stopRequested.value { Thread.sleep(forTimeInterval: 0.5) }
+                    log.notice("Waiting for the camera to be switched off or unplugged before trying again")
+                    while camera.connected && !stopRequested.value {
+                        Diagnostics.heartbeat("Still waiting for the camera to be switched off or unplugged, after: \(error.localizedDescription)")
+                        Thread.sleep(forTimeInterval: 0.5)
+                    }
                 }
             }
             let closed = DispatchSemaphore(value: 0)
@@ -556,6 +574,7 @@ final class Pipeline: ObservableObject {
                 if installImage.value != nil { throw PipelineInterrupt.install }
                 if !camera.connected { throw CameraError.disconnected }
                 try updateControls(camera, &applied)
+                Diagnostics.heartbeat("Ready, and the camera answered \(Int(Date().timeIntervalSince(applied.batteryChecked))) s ago")
                 Thread.sleep(forTimeInterval: 0.25)
             }
             try stream(camera, to: sink, frameList: frameList, applied: &applied)
@@ -609,6 +628,11 @@ final class Pipeline: ObservableObject {
         try Firmware.setScreen(camera, true)
         try Firmware.setRecording(camera, true)
         var recordingSince = Date()
+        // Focus once the first picture is in: updateControls waits for it
+        // while "Starting the camera…" is up.
+        if focusOnStartWanted.value && !continuousWanted.value {
+            Task { @MainActor in if self.state == .streaming && !self.focusing { self.focus() } }
+        }
         defer {
             freeze?.stop()
             // Quitting keeps "Stopping the camera…" up until Mark One is gone.
