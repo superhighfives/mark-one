@@ -13,6 +13,8 @@ Set the camera's USB mode to MTP (Custom menu, USB Mode), connect it, then:
   uv run scripts/ptp.py versions                  # firmware versions (needs the webcam patch)
   uv run scripts/ptp.py setting 0x2f 0xb2         # a setting's allowed values (read only)
   uv run scripts/ptp.py set 0xb2 240              # change a setting until the camera's switched off
+  uv run scripts/ptp.py settings -o before.txt    # every setting's value (read only)
+  uv run scripts/ptp.py settings --since before.txt   # what's changed since
   uv run scripts/ptp.py update E0972300.BIN       # install firmware over USB
 
 `peek`, `poke` and `run` need the usb-tools patch (commands 0x9484-0x9486).
@@ -491,15 +493,19 @@ GET_SETTING = 0x7EAD08AA
 SETTING_OUT = 0x7EAAF5F0
 
 
-def find_setting(cam, wanted):
+def setting_descriptors(cam):
+    """Yields (id, descriptor) for every setting in the hash table."""
     for bucket in range(128):
         node = read32(cam, SETTING_BUCKETS + 4 * bucket)
         while node:
             descriptor = read32(cam, node)
-            if descriptor and read32(cam, descriptor) & 0xFFFF == wanted:
-                return descriptor
+            if descriptor:
+                yield read32(cam, descriptor) & 0xFFFF, descriptor
             node = read32(cam, node + 4)
-    return None
+
+
+def find_setting(cam, wanted):
+    return next((d for i, d in setting_descriptors(cam) if i == wanted), None)
 
 
 def setting(cam, ids):
@@ -524,6 +530,46 @@ def setting(cam, ids):
 
 
 SET_SETTING = 0x7EAD1020
+
+
+def all_settings(cam):
+    """Every setting ID in the table and its current value."""
+    install_helpers(cam)
+    settings = read32(cam, SETTINGS_OBJECT)
+    values = {}
+    for wanted in sorted({i for i, _ in setting_descriptors(cam)}):
+        call(cam, GET_SETTING, (wanted, 0, settings, SETTING_OUT))
+        values[wanted] = read32(cam, SETTING_OUT)
+    return values
+
+
+def dump_settings(cam, out, since):
+    """Saves every setting's value, and with `since`, prints the ones
+    that differ from an earlier dump. With neither, prints them all.
+    Reads only."""
+    # Read the earlier dump first: `out` may be the same file.
+    before = {}
+    if since:
+        with open(since) as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) == 2:
+                    before[int(parts[0], 16)] = int(parts[1], 16)
+    values = all_settings(cam)
+    if out:
+        with open(out, 'w') as f:
+            for wanted, value in values.items():
+                f.write(f'{wanted:#06x} {value:#x}\n')
+        print(f'wrote {len(values)} settings to {out}')
+    elif not since:
+        for wanted, value in values.items():
+            print(f'{wanted:#06x} {value:#x}')
+    if since:
+        changed = [k for k in values if before.get(k) != values[k]]
+        for k in changed:
+            old = before.get(k)
+            print(f'{k:#06x}: {"(new)" if old is None else f"{old:#x} ({old})"} -> {values[k]:#x} ({values[k]})')
+        print(f'{len(changed)} changed of {len(values)}')
 
 
 def set_setting(cam, wanted, value):
@@ -557,6 +603,9 @@ def main():
     sub.add_parser('versions', help='print the firmware versions the camera reports (read only)')
     st = sub.add_parser('setting', help="print settings' allowed and current values (read only)")
     st.add_argument('ids', nargs='+', type=lambda s: int(s, 0))
+    sa = sub.add_parser('settings', help="save every setting's value, or show what changed (read only)")
+    sa.add_argument('-o', '--out')
+    sa.add_argument('--since', help='an earlier dump to compare with')
     se = sub.add_parser('set', help="change a setting; the camera saves it when it's switched off")
     se.add_argument('id', type=lambda s: int(s, 0))
     se.add_argument('value', type=lambda s: int(s, 0))
@@ -589,6 +638,8 @@ def main():
             versions(cam)
         elif args.cmd == 'setting':
             setting(cam, args.ids)
+        elif args.cmd == 'settings':
+            dump_settings(cam, args.out, args.since)
         elif args.cmd == 'set':
             set_setting(cam, args.id, args.value)
         elif args.cmd == 'update':

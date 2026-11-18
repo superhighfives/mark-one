@@ -109,6 +109,160 @@ final class Pipeline: ObservableObject {
     }
     private let pictureModeWanted = Locked(PictureMode.natural.rawValue)
 
+    /// How the camera sets its exposure for movies, as values of setting
+    /// 0xff. The camera reads it, and the aperture, shutter speed and ISO,
+    /// only when a recording starts.
+    enum ExposureMode: UInt32, CaseIterable, Identifiable {
+        case auto = 76, aperture = 77, shutter = 89, manual = 90
+        var id: Self { self }
+        var label: String {
+            switch self {
+            case .auto: "Auto"
+            case .aperture: "Aperture priority"
+            case .shutter: "Shutter priority"
+            case .manual: "Manual"
+            }
+        }
+        var setsAperture: Bool { self == .aperture || self == .manual }
+        var setsShutter: Bool { self == .shutter || self == .manual }
+    }
+
+    /// Apertures in thirds of a stop (APEX Av × 3): f/1.4 is Av 1.
+    enum Aperture: Int, CaseIterable, Identifiable {
+        case f1_4 = 3, f2 = 6, f2_8 = 9, f4 = 12, f5_6 = 15, f8 = 18, f11 = 21, f16 = 24
+        var id: Self { self }
+        var label: String {
+            switch self {
+            case .f1_4: "f/1.4"
+            case .f2: "f/2"
+            case .f2_8: "f/2.8"
+            case .f4: "f/4"
+            case .f5_6: "f/5.6"
+            case .f8: "f/8"
+            case .f11: "f/11"
+            case .f16: "f/16"
+            }
+        }
+        /// Setting 0x04's value: APEX × 256, rounded down as the camera does.
+        var value: UInt32 { UInt32(rawValue * 256 / 3) }
+    }
+
+    /// Shutter speeds in thirds of a stop (APEX Tv × 3): 1/60 is Tv 6.
+    /// 1/50 and 1/100 match 50 Hz lights, 1/60 and 1/125 60 Hz ones.
+    enum ShutterSpeed: Int, CaseIterable, Identifiable {
+        case s30 = 15, s50 = 17, s60 = 18, s100 = 20, s125 = 21, s250 = 24, s500 = 27
+        var id: Self { self }
+        var label: String {
+            switch self {
+            case .s30: "1/30 s"
+            case .s50: "1/50 s"
+            case .s60: "1/60 s"
+            case .s100: "1/100 s"
+            case .s125: "1/125 s"
+            case .s250: "1/250 s"
+            case .s500: "1/500 s"
+            }
+        }
+        /// Setting 0x05's value: APEX × 256, rounded down as the camera does
+        /// (1/100 is 0x6aa).
+        var value: UInt32 { UInt32(rawValue * 256 / 3) }
+    }
+
+    /// ISO, as values of setting 0x08. Only Manual uses a fixed ISO.
+    enum ISO: UInt32, CaseIterable, Identifiable {
+        case auto = 0, iso200 = 200, iso400 = 400, iso800 = 800, iso1600 = 1600, iso3200 = 3200, iso6400 = 6400
+        var id: Self { self }
+        var label: String { self == .auto ? "Auto" : "\(rawValue)" }
+    }
+
+    /// Image stabilization, as values of setting 0x1b5: Auto, Vertical only
+    /// and Horizontal only are the camera's IS 1, IS 2 and IS 3.
+    enum Stabilization: UInt32, CaseIterable, Identifiable {
+        case off = 0, auto = 1, vertical = 2, horizontal = 3
+        var id: Self { self }
+        var label: String {
+            switch self {
+            case .off: "Off"
+            case .auto: "Auto"
+            case .vertical: "Vertical only"
+            case .horizontal: "Horizontal only"
+            }
+        }
+    }
+
+    /// The settings the camera reads only when a recording starts.
+    struct MovieSettings: Equatable {
+        var mode: ExposureMode, aperture: Aperture, shutter: ShutterSpeed, iso: ISO, stabilization: Stabilization
+
+        /// The settings to write, mode first: (setting, value).
+        var values: [(UInt32, UInt32)] {
+            var values = [(Firmware.movieMode, mode.rawValue)]
+            if mode.setsAperture { values.append((Firmware.aperture, aperture.value)) }
+            if mode.setsShutter { values.append((Firmware.shutterSpeed, shutter.value)) }
+            values.append((Firmware.iso, mode == .manual ? iso.rawValue : ISO.auto.rawValue))
+            values.append((Firmware.stabilization, stabilization.rawValue))
+            return values
+        }
+
+        /// Equal when they'd write the same values, so changing a setting
+        /// the mode doesn't use (the aperture in Auto) doesn't restart the
+        /// recording.
+        static func == (a: Self, b: Self) -> Bool { a.values.elementsEqual(b.values) { $0 == $1 } }
+
+        var description: String {
+            var parts = [mode.label]
+            if mode.setsAperture { parts.append(aperture.label) }
+            if mode.setsShutter { parts.append(shutter.label) }
+            if mode == .manual { parts.append("ISO \(iso.label)") }
+            parts.append("stabilization \(stabilization.label)")
+            return parts.joined(separator: ", ")
+        }
+    }
+
+    @Published var exposureMode = UInt32(exactly: UserDefaults.standard.integer(forKey: "ExposureMode")).flatMap { ExposureMode(rawValue: $0) } ?? .auto {
+        didSet {
+            UserDefaults.standard.set(Int(exposureMode.rawValue), forKey: "ExposureMode")
+            movieSettingsChanged()
+        }
+    }
+    @Published var aperture = Aperture(rawValue: UserDefaults.standard.integer(forKey: "Aperture")) ?? .f2_8 {
+        didSet {
+            UserDefaults.standard.set(aperture.rawValue, forKey: "Aperture")
+            movieSettingsChanged()
+        }
+    }
+    @Published var shutterSpeed = ShutterSpeed(rawValue: UserDefaults.standard.integer(forKey: "ShutterSpeed")) ?? .s60 {
+        didSet {
+            UserDefaults.standard.set(shutterSpeed.rawValue, forKey: "ShutterSpeed")
+            movieSettingsChanged()
+        }
+    }
+    @Published var iso = UInt32(exactly: UserDefaults.standard.integer(forKey: "ISO")).flatMap { ISO(rawValue: $0) } ?? .auto {
+        didSet {
+            UserDefaults.standard.set(Int(iso.rawValue), forKey: "ISO")
+            movieSettingsChanged()
+        }
+    }
+    @Published var stabilization = UInt32(exactly: UserDefaults.standard.object(forKey: "Stabilization") as? Int ?? 1)
+        .flatMap { Stabilization(rawValue: $0) } ?? .auto {
+        didSet {
+            UserDefaults.standard.set(Int(stabilization.rawValue), forKey: "Stabilization")
+            movieSettingsChanged()
+        }
+    }
+    private func movieSettingsChanged() {
+        movieWanted.value = movieSettings
+        movieChanged.value = Date()
+    }
+    private var movieSettings: MovieSettings {
+        MovieSettings(mode: exposureMode, aperture: aperture, shutter: shutterSpeed, iso: iso, stabilization: stabilization)
+    }
+    private let movieWanted = Locked(MovieSettings(mode: .auto, aperture: .f2_8, shutter: .s60, iso: .auto, stabilization: .auto))
+    /// When a movie setting last changed. During a call, Mark One waits for
+    /// them to settle, so picking a mode and then its aperture, shutter
+    /// speed and ISO restarts the recording once.
+    private let movieChanged = Locked(Date.distantPast)
+
     /// Whether the camera focuses once as soon as an app starts using it,
     /// when autofocus is set to Once.
     @Published var focusOnStart = UserDefaults.standard.object(forKey: "FocusOnStart") as? Bool ?? true {
@@ -269,6 +423,7 @@ final class Pipeline: ObservableObject {
         graceWanted.value = grace.rawValue
         whiteBalanceWanted.value = whiteBalance.rawValue
         pictureModeWanted.value = pictureMode.rawValue
+        movieWanted.value = movieSettings
         faceWanted.value = faceFocus
         focusOnStartWanted.value = focusOnStart
         let thread = Thread { [weak self] in self?.loop() }
@@ -468,6 +623,7 @@ final class Pipeline: ObservableObject {
         var continuous: Bool?
         var whiteBalance: UInt32?
         var pictureMode: UInt32?
+        var movie: MovieSettings?
         var face: Bool?
         var usbMode: UInt32?
         var batteryChecked = Date.distantPast
@@ -529,6 +685,10 @@ final class Pipeline: ObservableObject {
             try Firmware.writeSetting(camera, Firmware.facePriority, face ? 1 : 0)
             applied.face = face
         }
+        // Written while recording, these do nothing until the next
+        // recording, and the camera restarts when that one stops; `stream`
+        // stops the recording to change them.
+        if !recording { try applyMovieSettings(camera, &applied) }
         if Date().timeIntervalSince(applied.batteryChecked) >= 30 {
             applied.batteryChecked = Date()
             let level = try Firmware.battery(camera)
@@ -555,6 +715,18 @@ final class Pipeline: ObservableObject {
             try Firmware.endFocus(camera)
             Task { @MainActor in self.focusing = false }
         }
+    }
+
+    /// Writes the movie settings if they've changed. Only while the camera
+    /// isn't recording.
+    private nonisolated func applyMovieSettings(_ camera: Camera, _ applied: inout Applied) throws {
+        let movie = movieWanted.value
+        guard applied.movie != movie else { return }
+        for (setting, value) in movie.values {
+            try Firmware.writeSetting(camera, setting, value)
+        }
+        applied.movie = movie
+        log.notice("Movie settings: \(movie.description, privacy: .public)")
     }
 
     /// Whether anything wants video: an app using the Mark One camera, or
@@ -626,6 +798,7 @@ final class Pipeline: ObservableObject {
         report("Starting to record…", .streaming)
         setBusy("Starting the camera…")
         try Firmware.setScreen(camera, true)
+        try applyMovieSettings(camera, &applied)
         try Firmware.setRecording(camera, true)
         var recordingSince = Date()
         // Focus once the first picture is in: updateControls waits for it
@@ -700,6 +873,21 @@ final class Pipeline: ObservableObject {
                     recordingSince = Date()
                     recordedBytes = 0
                 }
+            }
+            // The camera reads the movie settings when a recording starts,
+            // so restart it, holding the last picture meanwhile.
+            if applied.movie != movieWanted.value, Date().timeIntervalSince(movieChanged.value) >= 2 {
+                log.notice("Restarting the recording to change the movie settings")
+                setBusy("Changing the camera’s settings…")
+                if let last {
+                    freeze?.stop()
+                    freeze = Freeze(last, to: sink, for: Pipeline.restartFreeze)
+                }
+                try Firmware.setRecording(camera, false)
+                try applyMovieSettings(camera, &applied)
+                try Firmware.setRecording(camera, true)
+                recordingSince = Date()
+                recordedBytes = 0
             }
             let checkedAt = Date()
             try updateControls(camera, &applied, recording: true)

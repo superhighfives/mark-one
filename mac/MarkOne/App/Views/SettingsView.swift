@@ -13,6 +13,8 @@ struct SettingsView: View {
                 .tabItem { Label("General", systemImage: "gearshape") }
             CameraSettings(installer: installer, pipeline: pipeline)
                 .tabItem { Label("Camera", systemImage: "camera") }
+            PictureSettings(pipeline: pipeline)
+                .tabItem { Label("Picture", systemImage: "camera.aperture") }
             AboutSettings()
                 .tabItem { Label("About", systemImage: "info.circle") }
         }
@@ -130,20 +132,6 @@ private struct CameraSettings: View {
                     }
                 }
             }
-            // Brightness, white balance, picture mode and autofocus are in
-            // the menu bar panel.
-            Section {
-                Toggle("Focus on faces", isOn: $pipeline.faceFocus)
-                Toggle("Focus when a call starts", isOn: $pipeline.focusOnStart)
-                KeyboardShortcuts.Recorder("Focus now", name: .focus)
-            } header: {
-                Text("Picture")
-            } footer: {
-                Text("The shortcut works from any app while a video app uses the camera. If Focus is set to Always, it switches to Once first, and the picture pauses for a second.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
             Section {
                 Toggle("Lock camera controls", isOn: $pipeline.lockControls)
             } footer: {
@@ -163,6 +151,61 @@ private struct CameraSettings: View {
         } message: {
             Text("Video apps stop listing Mark One until you reinstall it.")
         }
+    }
+}
+
+private struct PictureSettings: View {
+    @ObservedObject var pipeline: Pipeline
+
+    var body: some View {
+        Form {
+            // Brightness, white balance, picture mode and autofocus are in
+            // the menu bar panel.
+            Section {
+                Toggle("Focus on faces", isOn: $pipeline.faceFocus)
+                Toggle("Focus when a call starts", isOn: $pipeline.focusOnStart)
+                KeyboardShortcuts.Recorder("Focus now", name: .focus)
+            } header: {
+                Text("Focus")
+            } footer: {
+                Text("The shortcut works from any app while a video app uses the camera. If Focus is set to Always, it switches to Once first, and the picture pauses for a second.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Section {
+                Picker("Mode", selection: $pipeline.exposureMode) {
+                    ForEach(Pipeline.ExposureMode.allCases) { Text($0.label).tag($0) }
+                }
+                if pipeline.exposureMode.setsAperture {
+                    Picker("Aperture", selection: $pipeline.aperture) {
+                        ForEach(Pipeline.Aperture.allCases) { Text($0.label).tag($0) }
+                    }
+                }
+                if pipeline.exposureMode.setsShutter {
+                    Picker("Shutter speed", selection: $pipeline.shutterSpeed) {
+                        ForEach(Pipeline.ShutterSpeed.allCases) { Text($0.label).tag($0) }
+                    }
+                }
+                if pipeline.exposureMode == .manual {
+                    Picker("ISO", selection: $pipeline.iso) {
+                        ForEach(Pipeline.ISO.allCases) { Text($0.label).tag($0) }
+                    }
+                }
+                Picker("Stabilization", selection: $pipeline.stabilization) {
+                    ForEach(Pipeline.Stabilization.allCases) { Text($0.label).tag($0) }
+                }
+            } header: {
+                Text("Exposure")
+            } footer: {
+                Text("A low f-number blurs the background. 1/50 or 1/100 s stops lights flickering on 50 Hz power, 1/60 or 1/125 s on 60 Hz. In Shutter priority the camera keeps the brightness the same; Manual sets it. Changes during a call pause the picture for about 5 seconds.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .formStyle(.grouped)
+        .fixedSize(horizontal: false, vertical: true)
     }
 }
 

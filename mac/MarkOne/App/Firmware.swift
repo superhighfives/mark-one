@@ -157,6 +157,13 @@ enum Firmware {
     /// 0 Full HD Fine, 1 Full HD Normal, 2 HD Fine, 3 HD Normal, 4-5 AVI.
     static let movieQuality = UInt32(0x43)
     static let fullHDFine = UInt32(0)
+    /// The movie settings (see Pipeline.MovieSettings). The camera reads
+    /// them when a recording starts.
+    static let movieMode = UInt32(0xFF)
+    static let aperture = UInt32(0x04)
+    static let shutterSpeed = UInt32(0x05)
+    static let iso = UInt32(0x08)
+    static let stabilization = UInt32(0x1B5)
 
     /// Camera settings Mark One changes and puts back afterwards.
     struct Saved: Codable {
@@ -165,6 +172,12 @@ enum Firmware {
         var pictureMode: UInt32
         var facePriority: UInt32
         var movieQuality: UInt32
+        /// Missing from settings saved by 1.0.2 and earlier.
+        var movieMode: UInt32?
+        var aperture: UInt32?
+        var shutterSpeed: UInt32?
+        var iso: UInt32?
+        var stabilization: UInt32?
     }
 
     /// Remembered on the Mac until they're back on the camera.
@@ -225,11 +238,18 @@ enum Firmware {
         // If the camera went off while Mark One had it (switched off or
         // unplugged), it kept Mark One's settings, so the camera's own are the ones
         // saved last time.
-        let saved = try Saved.pending ?? Saved(movieAFMode: readSetting(camera, movieAFMode),
+        var saved = try Saved.pending ?? Saved(movieAFMode: readSetting(camera, movieAFMode),
                                                whiteBalance: readSetting(camera, whiteBalance),
                                                pictureMode: readSetting(camera, pictureMode),
                                                facePriority: readSetting(camera, facePriority),
                                                movieQuality: readSetting(camera, movieQuality))
+        if saved.movieMode == nil {
+            saved.movieMode = try readSetting(camera, movieMode)
+            saved.aperture = try readSetting(camera, aperture)
+            saved.shutterSpeed = try readSetting(camera, shutterSpeed)
+            saved.iso = try readSetting(camera, iso)
+        }
+        if saved.stabilization == nil { saved.stabilization = try readSetting(camera, stabilization) }
         Saved.pending = saved
         // The stream Mark One decodes is 1080p; the camera reads this when a
         // recording starts.
@@ -258,6 +278,11 @@ enum Firmware {
         try writeSetting(camera, pictureMode, saved.pictureMode)
         try writeSetting(camera, facePriority, saved.facePriority)
         try writeSetting(camera, movieQuality, saved.movieQuality)
+        // The mode first: it decides which of the others the camera uses.
+        for (setting, value) in [(movieMode, saved.movieMode), (aperture, saved.aperture),
+                                 (shutterSpeed, saved.shutterSpeed), (iso, saved.iso), (stabilization, saved.stabilization)] {
+            if let value { try writeSetting(camera, setting, value) }
+        }
         Saved.pending = nil
         let word = try camera.run(read32, 0, 0, dialOverride).0
         try camera.run(write32, word & 0xFFFF_0000, 0, dialOverride)
