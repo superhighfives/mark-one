@@ -493,15 +493,19 @@ GET_SETTING = 0x7EAD08AA
 SETTING_OUT = 0x7EAAF5F0
 
 
-def find_setting(cam, wanted):
+def setting_descriptors(cam):
+    """Yields (id, descriptor) for every setting in the hash table."""
     for bucket in range(128):
         node = read32(cam, SETTING_BUCKETS + 4 * bucket)
         while node:
             descriptor = read32(cam, node)
-            if descriptor and read32(cam, descriptor) & 0xFFFF == wanted:
-                return descriptor
+            if descriptor:
+                yield read32(cam, descriptor) & 0xFFFF, descriptor
             node = read32(cam, node + 4)
-    return None
+
+
+def find_setting(cam, wanted):
+    return next((d for i, d in setting_descriptors(cam) if i == wanted), None)
 
 
 def setting(cam, ids):
@@ -532,16 +536,8 @@ def all_settings(cam):
     """Every setting ID in the table and its current value."""
     install_helpers(cam)
     settings = read32(cam, SETTINGS_OBJECT)
-    ids = []
-    for bucket in range(128):
-        node = read32(cam, SETTING_BUCKETS + 4 * bucket)
-        while node:
-            descriptor = read32(cam, node)
-            if descriptor:
-                ids.append(read32(cam, descriptor) & 0xFFFF)
-            node = read32(cam, node + 4)
     values = {}
-    for wanted in sorted(set(ids)):
+    for wanted in sorted({i for i, _ in setting_descriptors(cam)}):
         call(cam, GET_SETTING, (wanted, 0, settings, SETTING_OUT))
         values[wanted] = read32(cam, SETTING_OUT)
     return values
@@ -549,18 +545,26 @@ def all_settings(cam):
 
 def dump_settings(cam, out, since):
     """Saves every setting's value, and with `since`, prints the ones
-    that differ from an earlier dump. Reads only."""
+    that differ from an earlier dump. With neither, prints them all.
+    Reads only."""
+    # Read the earlier dump first: `out` may be the same file.
+    before = {}
+    if since:
+        with open(since) as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) == 2:
+                    before[int(parts[0], 16)] = int(parts[1], 16)
     values = all_settings(cam)
     if out:
         with open(out, 'w') as f:
             for wanted, value in values.items():
                 f.write(f'{wanted:#06x} {value:#x}\n')
         print(f'wrote {len(values)} settings to {out}')
+    elif not since:
+        for wanted, value in values.items():
+            print(f'{wanted:#06x} {value:#x}')
     if since:
-        before = {}
-        for line in open(since):
-            key, value = line.split()
-            before[int(key, 16)] = int(value, 16)
         changed = [k for k in values if before.get(k) != values[k]]
         for k in changed:
             old = before.get(k)

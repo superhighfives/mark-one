@@ -204,6 +204,11 @@ final class Pipeline: ObservableObject {
             return values
         }
 
+        /// Equal when they'd write the same values, so changing a setting
+        /// the mode doesn't use (the aperture in Auto) doesn't restart the
+        /// recording.
+        static func == (a: Self, b: Self) -> Bool { a.values.elementsEqual(b.values) { $0 == $1 } }
+
         var description: String {
             var parts = [mode.label]
             if mode.setsAperture { parts.append(aperture.label) }
@@ -217,38 +222,46 @@ final class Pipeline: ObservableObject {
     @Published var exposureMode = UInt32(exactly: UserDefaults.standard.integer(forKey: "ExposureMode")).flatMap { ExposureMode(rawValue: $0) } ?? .auto {
         didSet {
             UserDefaults.standard.set(Int(exposureMode.rawValue), forKey: "ExposureMode")
-            movieWanted.value = movieSettings
+            movieSettingsChanged()
         }
     }
     @Published var aperture = Aperture(rawValue: UserDefaults.standard.integer(forKey: "Aperture")) ?? .f2_8 {
         didSet {
             UserDefaults.standard.set(aperture.rawValue, forKey: "Aperture")
-            movieWanted.value = movieSettings
+            movieSettingsChanged()
         }
     }
     @Published var shutterSpeed = ShutterSpeed(rawValue: UserDefaults.standard.integer(forKey: "ShutterSpeed")) ?? .s60 {
         didSet {
             UserDefaults.standard.set(shutterSpeed.rawValue, forKey: "ShutterSpeed")
-            movieWanted.value = movieSettings
+            movieSettingsChanged()
         }
     }
     @Published var iso = UInt32(exactly: UserDefaults.standard.integer(forKey: "ISO")).flatMap { ISO(rawValue: $0) } ?? .auto {
         didSet {
             UserDefaults.standard.set(Int(iso.rawValue), forKey: "ISO")
-            movieWanted.value = movieSettings
+            movieSettingsChanged()
         }
     }
     @Published var stabilization = UInt32(exactly: UserDefaults.standard.object(forKey: "Stabilization") as? Int ?? 1)
         .flatMap { Stabilization(rawValue: $0) } ?? .auto {
         didSet {
             UserDefaults.standard.set(Int(stabilization.rawValue), forKey: "Stabilization")
-            movieWanted.value = movieSettings
+            movieSettingsChanged()
         }
+    }
+    private func movieSettingsChanged() {
+        movieWanted.value = movieSettings
+        movieChanged.value = Date()
     }
     private var movieSettings: MovieSettings {
         MovieSettings(mode: exposureMode, aperture: aperture, shutter: shutterSpeed, iso: iso, stabilization: stabilization)
     }
     private let movieWanted = Locked(MovieSettings(mode: .auto, aperture: .f2_8, shutter: .s60, iso: .auto, stabilization: .auto))
+    /// When a movie setting last changed. During a call, Mark One waits for
+    /// them to settle, so picking a mode and then its aperture, shutter
+    /// speed and ISO restarts the recording once.
+    private let movieChanged = Locked(Date.distantPast)
 
     /// Whether the camera focuses once as soon as an app starts using it,
     /// when autofocus is set to Once.
@@ -863,7 +876,7 @@ final class Pipeline: ObservableObject {
             }
             // The camera reads the movie settings when a recording starts,
             // so restart it, holding the last picture meanwhile.
-            if applied.movie != movieWanted.value {
+            if applied.movie != movieWanted.value, Date().timeIntervalSince(movieChanged.value) >= 2 {
                 log.notice("Restarting the recording to change the movie settings")
                 setBusy("Changing the camera’s settings…")
                 if let last {
