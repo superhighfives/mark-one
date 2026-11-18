@@ -432,17 +432,15 @@ struct WelcomeView: View {
                 .frame(maxWidth: 440, alignment: .leading)
             Card(padding: 14) {
                 VStack(alignment: .leading, spacing: 12) {
-                    OpenAtLoginToggle(caption: "So the camera is ready whenever you plug it in.")
+                    SettingRow(icon: "power", title: "Open at login",
+                               caption: "So the camera is ready whenever you plug it in.") {
+                        OpenAtLoginToggle()
+                            .toggleStyle(.switch)
+                            .labelsHidden()
+                    }
                     Divider()
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Focus shortcut")
-                            Text("Focuses the camera from any app, and sets Focus to Once.")
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        Spacer(minLength: 0)
+                    SettingRow(icon: "scope", title: "Focus shortcut",
+                               caption: "Focuses the camera from any app, and sets Focus to Once.") {
                         KeyboardShortcuts.Recorder(for: .focus)
                     }
                 }
