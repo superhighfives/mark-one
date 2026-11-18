@@ -233,12 +233,14 @@ extension ExtensionInstaller {
 
     /// Asks macOS about the extension every 2 seconds until it's on and
     /// Mark One can use it, then every 10, to follow it being switched on
-    /// and off in System Settings.
+    /// and off in System Settings. Every 10 too once it needs a restart:
+    /// each check then runs a fresh process, and only a restart helps.
     private func watch() {
         guard watching == nil else { return }
         watching = Task { @MainActor in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(installed && !needsRestart && !needsReopen ? 10 : 2))
+                let settled = (installed && !needsReopen) || needsRestart
+                try? await Task.sleep(for: .seconds(settled ? 10 : 2))
                 await refresh()
             }
         }
