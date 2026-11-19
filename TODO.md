@@ -58,6 +58,7 @@ does the rest.
 ```
 /mark-one                       product page, Download
 /mark-one/download              redirects to the latest DMG on GitHub
+/mark-one/changelog             release notes, from changelog/mark-one/
 /releases/mark-one/feed         Sparkle appcast, from changelog/mark-one/
 github.com/superhighfives/mark-one/releases   DMGs and deltas
 ```

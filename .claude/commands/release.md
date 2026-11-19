@@ -1,8 +1,9 @@
 # Release
 
 Cut a new release of Mark One: version bump, notarized build, DMG and deltas
-(releasecast), GitHub release, website changelog (which is the Sparkle feed),
-and deploy. Modelled on Pika's `/release` in `~/Development/pika-workspace`.
+(releasecast), GitHub release, website changelog (which is both the Sparkle
+feed and the changelog page), and deploy. Modelled on Pika's `/release` in
+`~/Development/pika-workspace`.
 
 Supports flags via `$ARGUMENTS`:
 - `--dry` — dry run: build and check everything, but skip notarizing the DMG,
@@ -32,6 +33,7 @@ Run `/pre-release` first if it hasn't been run since the last change.
 | releasecast | `npx releasecast@0.0.13` (needs `--account` and `--profile`; this Mac's npm skips packages less than a day old) |
 | Website | `~/Development/superhighfives.com`, `changelog/mark-one/VERSION.md` |
 | Feed | https://superhighfives.com/releases/mark-one/feed (skips `beta: true`) |
+| Changelog page | https://superhighfives.com/mark-one/changelog, from the same files; the product page's "Release notes" link goes to the latest entry |
 | GitHub | `superhighfives/mark-one`, tag `VERSION`, assets `Mark-One-VERSION.dmg` and `Mark-OneBUILD-FROM.delta` |
 | Homebrew | `superhighfives/homebrew-tools` (local clone: `$(brew --repo superhighfives/tools)`), `Casks/mark-one.rb`; and the unsubmitted `mark-one` branch of `$(brew --repo homebrew/cask)` |
 
@@ -143,6 +145,11 @@ The slow part is done; pause for the user.
       ```
    3. `### New features`: bullets, each starting with a bold label.
    4. `### Updates and bug fixes`: the same.
+   The changelog page splits the notes itself. It shows the overview (everything
+   before "As always,"). Under each `###` heading it keeps only lines that start
+   with `- `, so each bullet has to be one line: a bullet wrapped onto a second
+   line loses that line on the page. Inline Markdown is limited to bold, `code`
+   and links.
    Mention a new firmware revision when there is one (the camera offers the update over USB).
    If `MarkOneCamera`'s build number in `project.yml` went up since the last release tag, the notes must say the Mac may need a restart before the camera appears: Sparkle replaces only the app, and the new extension replaces the old one when Mark One next opens (NOTES.md, "Camera extension updates"). Don't go on to step 2 without that line.
 2. Show the draft and ask the user to edit or approve it. The user writes the framing; don't publish notes they haven't seen.
@@ -175,6 +182,7 @@ Confirm before each step. In dry run mode, make the GitHub release a draft and s
    - https://superhighfives.com/releases/mark-one/feed lists VERSION, with the GitHub URLs for the DMG and delta.
    - The DMG and delta URLs answer 200 (`curl -sIL`).
    - https://superhighfives.com/mark-one/download redirects to the DMG (once `available` is on).
+   - https://superhighfives.com/mark-one/changelog shows VERSION first, marked Latest, with every bullet from the notes.
 5. **Homebrew** (live only). Nothing bumps the tap's cask by itself, so new
    installs would get the old version until it's updated. Check the
    published DMG's checksum matches the local one, then:
@@ -228,7 +236,7 @@ Confirm before each step. In dry run mode, make the GitHub release a draft and s
    - [ ] Delta made (or first release)
    - [ ] GitHub release and tag
    - [ ] Changelog on the website, deployed
-   - [ ] Feed, DMG and download checked
+   - [ ] Feed, DMG, download and changelog page checked
    - [ ] Homebrew cask bumped (tap pushed; local homebrew-cask branch updated)
    - [ ] Release filed in the releases repo, with its archive
    - [ ] Website help matches the app
