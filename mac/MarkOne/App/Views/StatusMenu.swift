@@ -38,6 +38,7 @@ enum StatusMenu {
         }
         menu.addItem(.separator())
         menu.addItem(Item("Mark One Help") {
+            // A constant, valid URL, so it can't be nil.
             NSWorkspace.shared.open(URL(string: "https://superhighfives.com/mark-one/help")!)
         })
         menu.addItem(.separator())

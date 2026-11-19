@@ -748,9 +748,10 @@ final class Pipeline: ObservableObject {
                 if !camera.connected { throw CameraError.disconnected }
                 try updateControls(camera, &applied)
                 // The camera turns its screen back on by itself while it
-                // waits, so keep turning it off.
+                // waits, so keep turning it off. A lit screen isn't worth
+                // giving up the camera over, so a failure here doesn't throw.
                 if Date().timeIntervalSince(screenOff) >= 5 {
-                    try Firmware.setScreen(camera, false)
+                    try? Firmware.setScreen(camera, false)
                     screenOff = Date()
                 }
                 Diagnostics.heartbeat("Ready, and the camera answered \(Int(Date().timeIntervalSince(applied.batteryChecked))) s ago")
