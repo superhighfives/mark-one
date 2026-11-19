@@ -48,7 +48,7 @@ enum ScreenshotRequests {
     }
 
     /// The menu bar icon's button, which opens and closes the panel.
-    private static var statusButton: NSButton? {
+    static var statusButton: NSButton? {
         NSApp.windows
             .first { String(describing: type(of: $0)).contains("StatusBarWindow") }?
             .contentView.flatMap(findButton)
@@ -65,7 +65,8 @@ enum ScreenshotRequests {
     }
 }
 
-/// The menu bar icon. It's always on screen, so it starts the listener.
+/// The menu bar icon. It's always on screen, so it starts the listener and
+/// the right-click menu.
 struct MenuBarLabel: View {
     let recording: Bool
     let focusing: Bool
@@ -134,6 +135,7 @@ struct MenuBarLabel: View {
             }
             .onAppear {
                 ScreenshotRequests.start(openWindow: openWindow, openSettings: openSettings)
+                StatusMenu.start(openWindow: openWindow, openSettings: openSettings)
                 #if DEBUG
                 Snapshots.run(openSettings: openSettings)
                 #endif
