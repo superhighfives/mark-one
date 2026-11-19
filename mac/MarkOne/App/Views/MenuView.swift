@@ -12,11 +12,12 @@ struct MenuView: View {
     private static let width: CGFloat = 320
     private static let padding: CGFloat = 14
 
-    private enum Mode { case install, updating, waiting, photos, off, noCard, firmware, connected }
+    private enum Mode { case install, updating, reopen, waiting, photos, off, noCard, firmware, connected }
 
     private var mode: Mode {
         if !installer.installed && (installer.needsApproval || installer.failed) { return .install }
         if pipeline.updating { return .updating }
+        if installer.needsReopen { return .reopen }
         switch pipeline.state {
         case .ready, .streaming: return .connected
         case .waiting:
@@ -36,6 +37,7 @@ struct MenuView: View {
         switch mode {
         case .install: installer.needsRestart ? "Needs a restart" : "Needs your OK"
         case .updating: "Updating the camera"
+        case .reopen: "Needs restarting"
         case .waiting: "No camera yet"
         case .photos: "Connected for photos"
         case .off: "Camera off"
@@ -51,6 +53,7 @@ struct MenuView: View {
             switch mode {
             case .install: install
             case .updating: updating
+            case .reopen: reopen
             case .waiting: waiting
             case .photos: photos
             case .off: off
@@ -120,6 +123,17 @@ struct MenuView: View {
                     .controlSize(.large)
                     .frame(maxWidth: .infinity)
             }
+        }
+    }
+
+    private var reopen: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            message("Restart Mark One",
+                    Text("Video apps can’t get the camera’s picture until Mark One restarts. This can happen after its USB connection changes, such as when you unplug a display it’s connected through."))
+            Button("Restart Mark One") { WelcomeWindow.reopen() }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .frame(maxWidth: .infinity)
         }
     }
 
