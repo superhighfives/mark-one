@@ -738,28 +738,51 @@ final class Pipeline: ObservableObject {
     /// Records while an app uses the Mark One camera, until the camera goes away.
     private nonisolated func serve(_ camera: Camera, to sink: CameraSink, frameList: Bool) throws {
         var applied = Applied()
+        // Counting the camera's key events tells when someone is using its
+        // own buttons and dials. Without it, the screen just goes off.
+        let countsKeys = (try? Firmware.countKeys(camera)) ?? false
+        if !countsKeys { log.notice("Can't count the camera's key events; its screen goes off every 30 s regardless") }
         while !stopRequested.value {
             report("Ready. Pick “Mark One” as the camera in a video app.", .ready)
             try Firmware.setScreen(camera, false)
-            var screenOff = Date()
+            var screenChecked = Date(), keysChecked = Date(), lastKey = Date.distantPast
+            var screenOn = false
+            var keys = countsKeys ? try? Firmware.keyEvents(camera) : nil
             while !wanted() {
                 if stopRequested.value { return }
                 if installImage.value != nil { throw PipelineInterrupt.install }
                 if !camera.connected { throw CameraError.disconnected }
                 try updateControls(camera, &applied)
-                // The camera turns its screen back on by itself while it
-                // waits, so keep turning it off: every 30 seconds, so someone
-                // using the camera's own menus has time to. A lit screen
-                // isn't worth giving up the camera over, so a failure here
-                // doesn't throw.
-                if Date().timeIntervalSince(screenOff) >= 30 {
+                // A button or dial turns the screen on, since the camera
+                // doesn't while Mark One has it off, so someone can use the
+                // camera's own menus.
+                if countsKeys && Date().timeIntervalSince(keysChecked) >= 0.5 {
+                    keysChecked = Date()
+                    if let now = try? Firmware.keyEvents(camera), now != keys {
+                        keys = now
+                        lastKey = Date()
+                        if !screenOn {
+                            try? Firmware.setScreen(camera, true)
+                            screenOn = true
+                        }
+                    }
+                }
+                // The camera also turns its screen back on by itself while
+                // it waits, so keep turning it off every 30 seconds, once
+                // nothing's been pressed for 30 seconds. A lit screen isn't
+                // worth giving up the camera over, so a failure here doesn't
+                // throw.
+                if Date().timeIntervalSince(screenChecked) >= 30 && Date().timeIntervalSince(lastKey) >= 30 {
+                    screenChecked = Date()
                     try? Firmware.setScreen(camera, false)
-                    screenOff = Date()
+                    screenOn = false
                 }
                 Diagnostics.heartbeat("Ready, and the camera answered \(Int(Date().timeIntervalSince(applied.batteryChecked))) s ago")
                 Thread.sleep(forTimeInterval: 0.25)
             }
-            try stream(camera, to: sink, frameList: frameList, applied: &applied)
+            // Someone used the camera's buttons, and may have left one of
+            // its menus open, where it ignores REC.
+            try stream(camera, to: sink, frameList: frameList, closeMenus: lastKey != .distantPast, applied: &applied)
         }
     }
 
@@ -771,7 +794,7 @@ final class Pipeline: ObservableObject {
     nonisolated static let restartFreeze: TimeInterval = 30
 
     /// Records and streams until nothing has wanted video for `grace`.
-    private nonisolated func stream(_ camera: Camera, to sink: CameraSink, frameList: Bool, applied: inout Applied) throws {
+    private nonisolated func stream(_ camera: Camera, to sink: CameraSink, frameList: Bool, closeMenus: Bool, applied: inout Applied) throws {
         // Apple's hardware decoder needs revision 3's exact frames.
         let decoder: VideoDecoder = (frameList ? HardwareDecoder() : nil) ?? FrameDecoder()
         log.notice("Decoding with \(decoder is HardwareDecoder ? "Apple's hardware decoder" : "libavcodec", privacy: .public)")
@@ -808,6 +831,7 @@ final class Pipeline: ObservableObject {
         report("Starting to record…", .streaming)
         setBusy("Starting the camera…")
         try Firmware.setScreen(camera, true)
+        if closeMenus { try Firmware.closeMenus(camera) }
         try applyMovieSettings(camera, &applied)
         try Firmware.setRecording(camera, true)
         var recordingSince = Date()
