@@ -1,14 +1,14 @@
 # Counts the camera's key events, so Mark One can tell when someone is
 # using the camera's own buttons and dials, and leave its screen on.
 #
-# The key task sends every event (presses, releases, held keys, the dials
-# and the shutter button, locked or not) through 0x7e9df69d, which starts
-# with `call 0x7e751c42,[d2,d3,a2,a3],36`. Mark One points that call here
-# instead, by changing only its 32-bit displacement, which sits in one
-# 16-byte cache line (0x7e9df6a0), so the CPU sees either the old call or
-# the new. The call has already saved d2 and a2 and set up the frame, so
-# the stub can use them, adds one to the count and jumps on to 0x7e751c42
-# with the event untouched in d0, d1, a0 and a1.
+# The key task sends events (presses, releases, held keys, the dials and
+# the shutter button; not keys Mark One has locked) through 0x7e9df69d,
+# which starts with `call 0x7e751c42,[d2,d3,a2,a3],36`. Mark One points
+# that call here instead, by changing only its 32-bit displacement, which
+# sits in one 16-byte cache line (0x7e9df6a0), so the CPU sees either the
+# old call or the new. The call has already saved d2 and a2 and set up the
+# frame, so the stub can use them, adds one to the count and jumps on to
+# 0x7e751c42 with the event untouched in d0, d1, a0 and a1.
 #
 # Other events come through here too, with nobody touching the camera
 # (2026-11-18/19; what sends them isn't known). Once Mark One has used the

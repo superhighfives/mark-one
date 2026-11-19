@@ -394,7 +394,8 @@ KEY_KINDS = {0x0200: 'press', 0x0201: 'release', 0x0202: 'held'}
 def keys(cam, seconds):
     """Count the camera's key events and print each new count with the last event.
 
-    Every press, release, held key and dial turn counts, locked or not.
+    Every press, release, held key and dial turn counts, except keys Mark One
+    has locked, which don't reach the hook.
     Other events (not 0x02xxxxxx), which come by themselves, only go in the
     ignored count. Stays until the camera restarts.
     """

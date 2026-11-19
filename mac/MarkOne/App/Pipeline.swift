@@ -743,7 +743,7 @@ final class Pipeline: ObservableObject {
         var countsKeys = false
         do {
             countsKeys = try Firmware.countKeys(camera)
-            if !countsKeys { log.notice("Can't count the camera's key events (unexpected code); its screen goes off every 30 s regardless") }
+            if !countsKeys { log.notice("Can't count the camera's key events (unexpected code, or an older version's counter until the camera's switched off and on); its screen goes off every 30 s regardless") }
         } catch {
             log.notice("Can't count the camera's key events (\(error.localizedDescription, privacy: .public)); its screen goes off every 30 s regardless")
         }
