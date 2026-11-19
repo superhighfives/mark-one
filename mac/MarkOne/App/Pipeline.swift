@@ -740,8 +740,13 @@ final class Pipeline: ObservableObject {
         var applied = Applied()
         // Counting the camera's key events tells when someone is using its
         // own buttons and dials. Without it, the screen just goes off.
-        let countsKeys = (try? Firmware.countKeys(camera)) ?? false
-        if !countsKeys { log.notice("Can't count the camera's key events; its screen goes off every 30 s regardless") }
+        var countsKeys = false
+        do {
+            countsKeys = try Firmware.countKeys(camera)
+            if !countsKeys { log.notice("Can't count the camera's key events (unexpected code); its screen goes off every 30 s regardless") }
+        } catch {
+            log.notice("Can't count the camera's key events (\(error.localizedDescription, privacy: .public)); its screen goes off every 30 s regardless")
+        }
         while !stopRequested.value {
             report("Ready. Pick “Mark One” as the camera in a video app.", .ready)
             try Firmware.setScreen(camera, false)
@@ -752,19 +757,26 @@ final class Pipeline: ObservableObject {
                 if stopRequested.value { return }
                 if installImage.value != nil { throw PipelineInterrupt.install }
                 if !camera.connected { throw CameraError.disconnected }
+                let focusing = applied.focus.active
                 try updateControls(camera, &applied)
+                // Mark One's own half press counts too, such as letting go
+                // of one when a call ended mid-focus: start counting after it.
+                if countsKeys && applied.focus.active != focusing { keys = try? Firmware.keyEvents(camera) }
                 // A button or dial turns the screen on, since the camera
                 // doesn't while Mark One has it off, so someone can use the
                 // camera's own menus.
                 if countsKeys && Date().timeIntervalSince(keysChecked) >= 0.5 {
                     keysChecked = Date()
-                    if let now = try? Firmware.keyEvents(camera), now != keys {
-                        keys = now
-                        lastKey = Date()
-                        if !screenOn {
-                            try? Firmware.setScreen(camera, true)
-                            screenOn = true
+                    // Until a read works, the first one is only the starting point.
+                    if let now = try? Firmware.keyEvents(camera) {
+                        if let before = keys, now != before {
+                            lastKey = Date()
+                            if !screenOn {
+                                try? Firmware.setScreen(camera, true)
+                                screenOn = true
+                            }
                         }
+                        keys = now
                     }
                 }
                 // The camera also turns its screen back on by itself while
