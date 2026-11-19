@@ -92,12 +92,6 @@ github.com/superhighfives/mark-one/releases   DMGs and deltas
     frame rate.
   - Contrast, sharpness, saturation and gradation; metering mode; AE
     lock. Find each ID as for the others (`scripts/ptp.py settings`).
-- [ ] **Center Stage (future idea).** Keep the person in frame as they
-  move, like Center Stage on Apple's cameras. macOS only offers Center
-  Stage for Apple's own cameras, so Mark One would do it itself: find
-  faces with Vision and crop and zoom smoothly within the 1080p frame,
-  with a checkbox in Settings to turn it on. Needs a look at how much
-  sharpness the crop costs and whether it fits in the 0.2 s delay.
 - [ ] **A sound when focusing (nice to have).** An optional click when
   Focus or its shortcut focuses the camera, with a checkbox in Settings
   to turn it on. Best would be the E-M5's own focus beep, recorded from
