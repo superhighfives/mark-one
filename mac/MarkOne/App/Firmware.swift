@@ -111,6 +111,18 @@ enum Firmware {
     /// function, the way a real button press arrives.
     static let buttonStub = UInt32(0x7EAA_F5E0)
     static let buttonCode = Data(hex: "f8fef8ddba00f3ffc00cdf0008cb")
+    /// asm/keys.s: counts the key task's events, so Mark One can tell when
+    /// someone is using the camera's buttons or dials. The count, then the
+    /// stub, over console-only code after asm/trace.s's ring.
+    static let keyCount = UInt32(0x7EAB_04A0)
+    static let keysCode = Data(hex: "fcdea004abbe7a2a016adc9417caffcb")
+    /// The key task's send function (0x7e9df69d) starts with
+    /// `call 0x7e751c42`; pointing it at the stub counts every event. Only
+    /// the call's displacement changes; its first and last bytes come
+    /// along, since writes have to be even.
+    static let keyCall = UInt32(0x7E9D_F6A0)
+    static let keyCallStock = Data(hex: "dda225d7fff0")
+    static let keyCallHooked = Data(hex: "dd040e0d00f0")
     /// The REC button ("Cut2" in the firmware's key table).
     static let recordButton = UInt32(0x1209)
     /// The shooting API's sequence state: 0x10 while a movie records.
@@ -299,6 +311,24 @@ enum Firmware {
         try camera.run(setSetting, exposureCompensation, 0, settings, UInt32(bitPattern: value))
     }
 
+    /// Starts counting the camera's key events (asm/keys.s), until it's
+    /// switched off. Returns false, and changes nothing, if the key task's
+    /// code isn't what Mark One expects.
+    static func countKeys(_ camera: Camera) throws -> Bool {
+        let call = try camera.peek(keyCall, keyCallStock.count)
+        // Installed earlier in this power-on: the stub went in first.
+        if call == keyCallHooked { return true }
+        guard call == keyCallStock else { return false }
+        try camera.poke(keyCount, Data(count: 4) + keysCode)
+        try camera.poke(keyCall, keyCallHooked)
+        return true
+    }
+
+    /// How many key events the camera has had since countKeys started.
+    static func keyEvents(_ camera: Camera) throws -> UInt32 {
+        try camera.peek(keyCount, 4).le(UInt32.self, at: 0)
+    }
+
     /// Turns the rear screen on at full brightness, or off.
     static func setScreen(_ camera: Camera, _ on: Bool) throws {
         let common = try camera.run(read32, 0, 0, commonObject).0
@@ -325,6 +355,15 @@ enum Firmware {
         let state = try camera.run(read32, 0, 0, shutterState).0
         try camera.run(write32, state | halfPressHeld, 0, shutterState)
         try camera.run(buttonStub, 0x0200_0000 | halfPressKey)
+    }
+
+    /// Closes the camera's menus, which ignore REC, with a half press of
+    /// the shutter button, as on the camera. It focuses too.
+    static func closeMenus(_ camera: Camera) throws {
+        try startFocus(camera)
+        Thread.sleep(forTimeInterval: 0.1)
+        try endFocus(camera)
+        Thread.sleep(forTimeInterval: 0.5)
     }
 
     /// Switches movie autofocus between continuous and single (Focus only).

@@ -10,6 +10,7 @@ Set the camera's USB mode to MTP (Custom menu, USB Mode), connect it, then:
   uv run scripts/ptp.py shoot                     # live view with USB connected
   uv run scripts/ptp.py output evf                # 800x600 live view instead of 568x480
   uv run scripts/ptp.py trace                     # print what the mode manager logs
+  uv run scripts/ptp.py keys                      # count key events, as Mark One does
   uv run scripts/ptp.py versions                  # firmware versions (needs the webcam patch)
   uv run scripts/ptp.py setting 0x2f 0xb2         # a setting's allowed values (read only)
   uv run scripts/ptp.py set 0xb2 240              # change a setting until the camera's switched off
@@ -377,6 +378,36 @@ def install_trace(cam):
     return struct.unpack('<I', cam.transact(PEEK, (uncached(TRACE_COUNT), 4))[2])[0]
 
 
+# asm/keys.s: counts the key task's events. KEYS_HOOK points the key task's
+# first call at the stub, as (stock bytes, patched bytes); see Firmware.swift.
+KEYS_COUNT = 0x7EAB04A0
+KEYS_CODE = bytes.fromhex('fcdea004abbe7a2a016adc9417caffcb')
+KEYS_HOOK = 0x7E9DF6A0
+KEYS_STOCK, KEYS_PATCHED = bytes.fromhex('dda225d7fff0'), bytes.fromhex('dd040e0d00f0')
+
+
+def keys(cam, seconds):
+    """Count the camera's key events and print the count when it changes.
+
+    Every press, release, held key and dial turn counts, locked or not.
+    Stays until the camera restarts.
+    """
+    call = cam.transact(PEEK, (uncached(KEYS_HOOK), len(KEYS_STOCK)))[2]
+    if call == KEYS_STOCK:
+        poke(cam, KEYS_COUNT, bytes(4) + KEYS_CODE, quiet=True)
+        poke(cam, KEYS_HOOK, KEYS_PATCHED, quiet=True)
+    elif call != KEYS_PATCHED:
+        sys.exit(f'unexpected code at {KEYS_HOOK:#010x}: {call.hex()}')
+    seen = None
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        now = struct.unpack('<I', cam.transact(PEEK, (uncached(KEYS_COUNT), 4))[2])[0]
+        if now != seen:
+            print(f'{time.strftime("%H:%M:%S")}  {now} key events')
+            seen = now
+        time.sleep(0.2)
+
+
 def trace(cam, seconds, since=None):
     """Print the mode manager's log messages as they happen.
 
@@ -600,6 +631,8 @@ def main():
     out.add_argument('name', choices=sorted(OUTPUTS))
     tr = sub.add_parser('trace', help="print the mode manager's log messages")
     tr.add_argument('seconds', type=float, nargs='?', default=120)
+    ke = sub.add_parser('keys', help="count the camera's key events")
+    ke.add_argument('seconds', type=float, nargs='?', default=120)
     sub.add_parser('versions', help='print the firmware versions the camera reports (read only)')
     st = sub.add_parser('setting', help="print settings' allowed and current values (read only)")
     st.add_argument('ids', nargs='+', type=lambda s: int(s, 0))
@@ -632,6 +665,8 @@ def main():
             shoot(cam)
         elif args.cmd == 'trace':
             trace(cam, args.seconds)
+        elif args.cmd == 'keys':
+            keys(cam, args.seconds)
         elif args.cmd == 'output':
             output(cam, args.name)
         elif args.cmd == 'versions':

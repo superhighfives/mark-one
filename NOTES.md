@@ -704,6 +704,34 @@ $T/mn10300-elf-ld -Ttext=0x7eaaf5e0 --defsym key_task_send=0x7e9df69d \
 $T/mn10300-elf-objcopy -O binary asm/button.elf asm/button.bin
 ```
 
+### The screen on standby (2026-11-18)
+
+Mark One turns the rear screen off when the camera is ready (backlight
+0x7eaa6ebc with d0 = 0), but the camera turns it back on by itself after
+a while; what does it isn't known. A camera left plugged in stayed lit
+all day. Mark One now turns it off again every 30 seconds on standby.
+
+While the backlight is off, pressing a button doesn't turn it back on, so
+Mark One watches the buttons itself. `asm/keys.s` counts the key task's
+events: the send function 0x7e9df69d starts with `call
+0x7e751c42,[d2,d3,a2,a3],36` (`dd a2 25 d7 ff f0 24` at 0x7e9df6a0, all in
+one cache line), and Mark One changes only the call's displacement to
+reach the stub at 0x7eab04a4. The call has saved d2 and a2 and set up
+the frame, so the stub adds one to the count at 0x7eab04a0 (through
+0xbeab04a0) and jumps on to 0x7e751c42. Locked keys count too: the lock's
+filter comes after. `ptp.py keys` installs it and prints the count. On
+the camera (2026-11-18): presses and dial turns count, and the count
+stays still with nobody touching the camera.
+
+Mark One reads the count every half second on standby. When it moves,
+the screen goes on, and it goes off once nothing's been pressed for 30
+seconds. The camera ignores REC while one of its menus is open, which
+left Mark One at "The camera didn't start recording", so when any key
+was pressed since the last recording, Mark One first sends a half press
+(through `asm/button.s`, as Focus does), which closes the menus and
+goes back to shooting. Tried with the menu open, then opening the panel:
+the menu closed and the picture came up.
+
 ## Webcam USB choice (working)
 
 Flashed 2026-11-08 at version 2.3. Custom menu > USB Mode lists Webcam
