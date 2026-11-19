@@ -741,11 +741,18 @@ final class Pipeline: ObservableObject {
         while !stopRequested.value {
             report("Ready. Pick “Mark One” as the camera in a video app.", .ready)
             try Firmware.setScreen(camera, false)
+            var screenOff = Date()
             while !wanted() {
                 if stopRequested.value { return }
                 if installImage.value != nil { throw PipelineInterrupt.install }
                 if !camera.connected { throw CameraError.disconnected }
                 try updateControls(camera, &applied)
+                // The camera turns its screen back on by itself while it
+                // waits, so keep turning it off.
+                if Date().timeIntervalSince(screenOff) >= 5 {
+                    try Firmware.setScreen(camera, false)
+                    screenOff = Date()
+                }
                 Diagnostics.heartbeat("Ready, and the camera answered \(Int(Date().timeIntervalSince(applied.batteryChecked))) s ago")
                 Thread.sleep(forTimeInterval: 0.25)
             }
