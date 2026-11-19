@@ -718,10 +718,9 @@ events: the send function 0x7e9df69d starts with `call
 one cache line), and Mark One changes only the call's displacement to
 reach the stub at 0x7eab04a4. The call has saved d2 and a2 and set up
 the frame, so the stub adds one to the count at 0x7eab04a0 (through
-0xbeab04a0) and jumps on to 0x7e751c42. Locked keys count too: the lock's
-filter comes after. `ptp.py keys` installs it and prints the count. On
-the camera (2026-11-18): presses and dial turns count, and the count
-stays still with nobody touching the camera.
+0xbeab04a0) and jumps on to 0x7e751c42. `ptp.py keys` installs it and
+prints the count. On the camera (2026-11-18): presses and dial turns
+count, and the count stays still with nobody touching the camera.
 
 Mark One reads the count every half second on standby. When it moves,
 the screen goes on, and it goes off once nothing's been pressed for 30
@@ -731,6 +730,48 @@ was pressed since the last recording, Mark One first sends a half press
 (through `asm/button.s`, as Focus does), which closes the menus and
 goes back to shooting. Tried with the menu open, then opening the panel:
 the menu closed and the picture came up.
+
+### Events that come by themselves (2026-11-19)
+
+In 1.0.6 the screen stayed on all the time on standby. That test of the
+count ran `ptp.py keys` on a camera Mark One hadn't used since it was
+switched on. Once Mark One has used it, the key task also sends events
+nobody makes, which the count took for presses. The stub now also keeps
+the last event and its parameter at 0xbeab04e8 and 0xbeab04ec (a person's
+are all 0x02xxxxxx):
+
+| Event | Seen |
+|---|---|
+| 0x04030020 | About 4 a second once Mark One has used the camera, still after it quits; faster while a dial turns |
+| 0x0301xxxx | Now and then: 0x03010032, then 0x03010033 53 s later |
+| 0x0407xxxx, 0x040dxxxx | Now and then (0x04070100, 0x040d00b6) |
+| 0x02000004, 0x02010004 | Menu, press and release |
+| 0x02021901 | Rear dial, one a click |
+| 0x02022301 | Front dial (by elimination: turned in one run with the others), param 1 or 2, probably the direction |
+| 0x02031902, 0x02031903 | Mode dial |
+
+What sends the others isn't known. After the camera is switched on, with
+Mark One not opened, nothing comes for two minutes. Once, with Mark One
+closed, 61 events came in 30 s and then stopped; the last was
+0x040d00b6.
+
+`asm/keys.s` now counts only 0x02xxxxxx events and puts the rest in a
+count of their own at 0xbeab04e4. The mode dial's 0x0203 is why it
+checks the top byte rather than press, release and held. Tried on the
+camera: hands off, the key count stays still while the other count
+climbs; a dial on standby turns the screen on, and it goes off again.
+
+Locked keys don't count. With Mark One's lock on, Menu doesn't wake the
+screen; with it off, it does. So locked keys don't reach the hooked
+call; why isn't known. (1.0.6's notes said they counted, since the lock's
+filter comes after the call; that wasn't tried with the lock on.) The
+dials and the half press aren't locked, so they still wake the screen.
+Locked buttons do nothing while locked, so that's left as it is.
+
+A camera still running 1.0.6's stub from this power-on keeps it: the
+key task may be running it, so swapping it isn't safe. Mark One then
+turns the screen off every 30 seconds without watching the buttons, as
+when the count can't be read.
 
 ## Webcam USB choice (working)
 

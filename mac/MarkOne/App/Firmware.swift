@@ -113,9 +113,14 @@ enum Firmware {
     static let buttonCode = Data(hex: "f8fef8ddba00f3ffc00cdf0008cb")
     /// asm/keys.s: counts the key task's events, so Mark One can tell when
     /// someone is using the camera's buttons or dials. The count, then the
-    /// stub, over console-only code after asm/trace.s's ring.
+    /// stub, over console-only code after asm/trace.s's ring. Only presses,
+    /// releases and held keys (0x02xxxxxx) count; other events come by
+    /// themselves, so they go in a count of their own instead, before the
+    /// last counted event and its parameter.
     static let keyCount = UInt32(0x7EAB_04A0)
-    static let keysCode = Data(hex: "fcdea004abbe7a2a016adc9417caffcb")
+    static let keysCode = Data(hex: "fcdea004abbe82f8c618aa02c80ff80a442a01f81a44dc8817caff"
+                                  + "7a2a016af81248f8164cdc7917caff")
+    static let keyExtra = UInt32(0x7EAB_04E4)
     /// The key task's send function (0x7e9df69d) starts with
     /// `call 0x7e751c42`; pointing it at the stub counts every event. Only
     /// the call's displacement changes; its first and last bytes come
@@ -316,10 +321,14 @@ enum Firmware {
     /// code isn't what Mark One expects.
     static func countKeys(_ camera: Camera) throws -> Bool {
         let call = try camera.peek(keyCall, keyCallStock.count)
-        // Installed earlier in this power-on: the stub went in first.
-        if call == keyCallHooked { return true }
+        // Installed earlier in this power-on: the stub went in first. An
+        // older stub counts events that come by themselves, so its count never
+        // stays still; it can't be swapped while the key task may be running
+        // it, so it stays until the camera's switched off.
+        if call == keyCallHooked { return try camera.peek(keyCount + 4, keysCode.count) == keysCode }
         guard call == keyCallStock else { return false }
         try camera.poke(keyCount, Data(count: 4) + keysCode)
+        try camera.poke(keyExtra, Data(count: 12))
         try camera.poke(keyCall, keyCallHooked)
         return true
     }

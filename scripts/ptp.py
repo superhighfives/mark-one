@@ -381,31 +381,50 @@ def install_trace(cam):
 # asm/keys.s: counts the key task's events. KEYS_HOOK points the key task's
 # first call at the stub, as (stock bytes, patched bytes); see Firmware.swift.
 KEYS_COUNT = 0x7EAB04A0
-KEYS_CODE = bytes.fromhex('fcdea004abbe7a2a016adc9417caffcb')
+KEYS_CODE = bytes.fromhex(
+    'fcdea004abbe82f8c618aa02c80ff80a442a01f81a44dc8817caff'
+    '7a2a016af81248f8164cdc7917caff')
+# The count of ignored (not 0x02xxxxxx) events, then the last counted event and its parameter.
+KEYS_EXTRA = 0x7EAB04E4
 KEYS_HOOK = 0x7E9DF6A0
 KEYS_STOCK, KEYS_PATCHED = bytes.fromhex('dda225d7fff0'), bytes.fromhex('dd040e0d00f0')
+KEY_KINDS = {0x0200: 'press', 0x0201: 'release', 0x0202: 'held'}
 
 
 def keys(cam, seconds):
-    """Count the camera's key events and print the count when it changes.
+    """Count the camera's key events and print each new count with the last event.
 
     Every press, release, held key and dial turn counts, locked or not.
-    Stays until the camera restarts.
+    Other events (not 0x02xxxxxx), which come by themselves, only go in the
+    ignored count. Stays until the camera restarts.
     """
+    stub = uncached(KEYS_COUNT + 4)
     call = cam.transact(PEEK, (uncached(KEYS_HOOK), len(KEYS_STOCK)))[2]
     if call == KEYS_STOCK:
         poke(cam, KEYS_COUNT, bytes(4) + KEYS_CODE, quiet=True)
+        poke(cam, KEYS_EXTRA, bytes(12), quiet=True)
         poke(cam, KEYS_HOOK, KEYS_PATCHED, quiet=True)
     elif call != KEYS_PATCHED:
         sys.exit(f'unexpected code at {KEYS_HOOK:#010x}: {call.hex()}')
+    elif cam.transact(PEEK, (stub, len(KEYS_CODE)))[2] != KEYS_CODE:
+        # Rewriting a stub the key task is running could run half of each.
+        sys.exit('An older key counter is running. Switch the camera off and on, '
+                 'then run this before opening Mark One.')
     seen = None
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
         now = struct.unpack('<I', cam.transact(PEEK, (uncached(KEYS_COUNT), 4))[2])[0]
         if now != seen:
-            print(f'{time.strftime("%H:%M:%S")}  {now} key events')
+            # Read after the count, so it can be a newer event than the count shows.
+            ignored, event, param = struct.unpack(
+                '<III', cam.transact(PEEK, (uncached(KEYS_EXTRA), 12))[2])
+            kind = KEY_KINDS.get(event >> 16, 'other')
+            print(f'{time.strftime("%H:%M:%S")}  {now} key events, last {event:#010x} '
+                  f'({kind}, key {event & 0xFFFF:#06x}), param {param:#010x}; {ignored} ignored')
             seen = now
         time.sleep(0.2)
+    ignored = struct.unpack('<I', cam.transact(PEEK, (uncached(KEYS_EXTRA), 4))[2])[0]
+    print(f'{time.strftime("%H:%M:%S")}  {seen} key events; {ignored} ignored')
 
 
 def trace(cam, seconds, since=None):
