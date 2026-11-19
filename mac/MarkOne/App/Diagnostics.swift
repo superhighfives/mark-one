@@ -4,8 +4,8 @@
 // sleep and wake, a once-a-minute line about what Mark One is waiting for
 // (with Detailed logging on, in Settings), and saving the log to a file.
 //
-// From Terminal, the same log:
-//   log show --last 1d --predicate 'subsystem BEGINSWITH "com.superhighfives.markone"'
+// From Terminal, the same log (the full path, since zsh has a `log` of its own):
+//   /usr/bin/log show --last 1d --predicate 'subsystem BEGINSWITH "com.superhighfives.markone"'
 
 import AppKit
 import os.log
