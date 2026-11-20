@@ -21,8 +21,9 @@ final class ExtensionInstaller: NSObject, ObservableObject, OSSystemExtensionReq
     /// Whether macOS installed the extension but didn't start it, which
     /// only a restart fixes. Also sets `failed`.
     @Published var needsRestart = false
-    /// Whether the extension was switched on after Mark One opened, so Mark
-    /// One has to be reopened to use the camera.
+    /// Whether the extension was switched on after Mark One opened, or its
+    /// camera went away while Mark One ran, so Mark One has to be reopened
+    /// to use the camera.
     @Published var needsReopen = false
     /// Whether Check Again is waiting for macOS, which keeps the restart
     /// message up meanwhile.
@@ -209,11 +210,17 @@ extension ExtensionInstaller {
         }
     }
 
-    /// The extension is on. `reopen` says Mark One started before it was, so
-    /// it can't see its own camera until it's reopened, and FaceTime's video
-    /// service can't either until it restarts.
+    /// The extension is on. `reopen` says Mark One can't see its own camera
+    /// until it's reopened: it started before the extension was on, or the
+    /// camera went away while it ran. FaceTime's video service can't see it
+    /// either until it restarts.
     private func allowed(reopen: Bool) {
         let newly = !installed
+        // Likely what kept Mark One waiting for its camera for hours after a
+        // display the camera's USB went through was unplugged (2026-11-18).
+        if !newly && reopen && !needsReopen {
+            log.notice("The Mark One camera went away while Mark One was open; Mark One needs reopening to use it")
+        }
         enabledSince = nil
         status = "Installed"
         installed = true

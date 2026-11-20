@@ -83,6 +83,7 @@ enum Snapshots {
             ("11-in-a-call", { pipeline.pretend(.streaming, status: "Recording", firmware: latest, battery: 100,
                                                 framesPerSecond: 30, activeApp: "FaceTime") }),
             ("12-low-battery-and-update", { pipeline.pretend(.ready, status: readyStatus, firmware: .markOne(FirmwareImage.bundledRevision - 1), battery: 50) }),
+            ("13-needs-restarting", { allow(installed: true, needsReopen: true); pipeline.pretend(status: "Waiting for the Mark One camera to start…") }),
         ]
         // The first panel shown draws its blue button grey, as if inactive,
         // so one is shown and thrown away first.

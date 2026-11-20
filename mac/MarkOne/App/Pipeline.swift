@@ -468,6 +468,7 @@ final class Pipeline: ObservableObject {
             }
             for _ in 0..<4 {
                 if !camera.connected || stopRequested.value { throw CameraError.disconnected }
+                Diagnostics.heartbeat("Waiting for the Mark One camera to start")
                 Thread.sleep(forTimeInterval: 0.5)
             }
         }
