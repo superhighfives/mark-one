@@ -216,8 +216,8 @@ extension ExtensionInstaller {
     /// either until it restarts.
     private func allowed(reopen: Bool) {
         let newly = !installed
-        // Likely what kept Mark One waiting for its camera for hours after a
-        // display the camera's USB went through was unplugged (2026-11-18).
+        // A running process doesn't see the camera come back (see NOTES.md),
+        // so say when it goes: otherwise the log only shows Mark One waiting.
         if !newly && reopen && !needsReopen {
             log.notice("The Mark One camera went away while Mark One was open; Mark One needs reopening to use it")
         }
