@@ -108,12 +108,12 @@ Report the mode (live or dry run).
    scripts/build-release.sh
    ```
    In dry run mode, notarizing the app still runs (it's what lets the DMG's app open); only the DMG's notarization is skipped.
-2. Copy the previous release's DMG for a delta (skip for the first release). It's in the releases repo:
+2. Download the previous release's DMG for a delta (skip for the first release):
    ```sh
    mkdir -p mac/MarkOne/build/release/VERSION/previous
-   cp ~/Development/pika-workspace/releases/"Mark One"/PREVIOUS/Mark-One-PREVIOUS.dmg mac/MarkOne/build/release/VERSION/previous/
+   gh release download PREVIOUS --repo superhighfives/mark-one --pattern 'Mark-One-*.dmg' --dir mac/MarkOne/build/release/VERSION/previous
    ```
-   If it's missing there, download it from the GitHub release instead (`gh release download PREVIOUS --repo superhighfives/mark-one --pattern 'Mark-One-*.dmg' --dir …`).
+   Check its size matches `size:` in the previous changelog's front matter. The releases repo has it too, but its checkout is sparse (top-level files only), so `Mark One/` isn't on disk.
 3. Run releasecast from the export folder:
    ```sh
    export PATH="$PWD/mac/MarkOne/build/SourcePackages/artifacts/sparkle/Sparkle/bin:$PATH"
@@ -225,8 +225,10 @@ Confirm before each step. In dry run mode, make the GitHub release a draft and s
    cp mac/MarkOne/build/release/VERSION/*.delta "$R"/ 2>/dev/null || true
    ditto -c -k --keepParent mac/MarkOne/build/release/MarkOne.xcarchive "$R/MarkOne-VERSION.xcarchive.zip"
    cd ~/Development/pika-workspace/releases
-   git add "Mark One/VERSION" && git commit -m "Add release artifacts for Mark One VERSION" && git push origin main
+   git add --sparse "Mark One/VERSION" && git commit -m "Add release artifacts for Mark One VERSION" && git push origin main
+   git sparse-checkout reapply
    ```
+   The checkout is sparse, so `git add` needs `--sparse`, and `reapply` takes the new folder off disk again.
    The archive has the debug symbols for reading crash reports from this build; the next build wipes `mac/MarkOne/build/release/`.
 3. Add a dated line to `TODO.md` or `NOTES.md` only if something about the process changed or went wrong.
 4. Summary checklist:
