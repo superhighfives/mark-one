@@ -26,10 +26,9 @@ final class StatusCard: @unchecked Sendable {
         // tick. Every 0.1 s keeps that short; it's the same buffer each time.
         timer.schedule(deadline: .now(), repeating: 0.1)
         self.timer = timer
-        timer.setEventHandler { [unowned self] in
-            guard enabled.value, let sink, let text else { return }
-            if frame == nil { frame = StatusCard.draw(text) }
-            if let frame { sink.send(frame) }
+        timer.setEventHandler { [weak self] in
+            guard let self, enabled.value, let sink, let frame else { return }
+            sink.send(frame)
         }
         timer.resume()
     }
@@ -43,10 +42,18 @@ final class StatusCard: @unchecked Sendable {
     /// the old text goes out, so the camera's first frame can follow a
     /// `show(nil)` with nothing in between.
     func show(_ text: String?) {
-        queue.sync {
-            guard text != self.text else { return }
+        let changed = queue.sync {
+            guard text != self.text else { return false }
             self.text = text
             frame = nil
+            return true
+        }
+        guard changed, let text else { return }
+        // Drawn on the main thread, since it uses AppKit. If drawing fails,
+        // nothing goes out for this text and it isn't tried again.
+        DispatchQueue.main.async {
+            let frame = StatusCard.draw(text)
+            self.queue.async { if self.text == text { self.frame = frame } }
         }
     }
 

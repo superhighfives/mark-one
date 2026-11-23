@@ -166,7 +166,7 @@ final class Camera: NSObject, ICDeviceBrowserDelegate, ICCameraDeviceDelegate {
     /// sleep, ImageCaptureCore didn't report the camera again for an hour,
     /// and this tells whether it was on USB meanwhile.
     static func onUSB() -> Bool {
-        let matching = IOServiceMatching("IOUSBHostDevice") as NSMutableDictionary
+        guard let matching = IOServiceMatching("IOUSBHostDevice") as NSMutableDictionary? else { return false }
         // A top-level idVendor key matches nothing here; property values
         // in the registry have to go under IOPropertyMatch.
         matching[kIOPropertyMatchKey] = ["idVendor": olympusVendorID]

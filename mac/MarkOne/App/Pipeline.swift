@@ -495,8 +495,9 @@ final class Pipeline: ObservableObject {
     private nonisolated func loop() {
         while !stopRequested.value {
             let camera = Camera()
-            // Opened before the camera connects, for the status card. If the
-            // extension isn't running yet, openSink waits for it later.
+            // Opened before the camera connects, for the status card. The
+            // error doesn't matter here: if this fails, openSink tries again
+            // once the camera connects, and reports why.
             var sink = CameraSink.available ? try? CameraSink() : nil
             card.attach(sink)
             report("Waiting for the camera. Connect it by USB and switch it on.", .waiting,
