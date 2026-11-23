@@ -9,6 +9,16 @@ Mark One.
 
 ## Next
 
+- [ ] **A gap above "Nothing is saved to the card" (#17).** While the
+  camera is live, the panel's bold line reads "In use by QuickTime
+  Player", but until Mark One knows the app it's blank, and leaves a gap
+  (seen in the issue's first screenshot, while focusing at 21 fps).
+  `MenuView.swift` hides the line with `opacity(0)` while
+  `pipeline.activeApp` is nil. That's both before the extension reports a
+  client (`showClient`, from the "clnt" property) and when macOS gives the
+  process no name (`Pipeline.activeApp`). Show a line that's always true
+  while live instead, such as "Ready to use" or "In use", and the app's
+  name once it's known.
 - [ ] **Not recording after a night idle** (2026-11-17, 1.0.0, work
   laptop): ready from 20:20, the camera ignored REC at 08:01 though it
   still answered over USB, until it was switched off and on. Not
