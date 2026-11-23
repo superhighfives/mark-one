@@ -557,7 +557,8 @@ final class Pipeline: ObservableObject {
                 }
                 // Wait for the camera to go away before trying it again, so a
                 // camera Mark One can't use doesn't get set up over and over.
-                if case CameraError.disconnected = error {} else {
+                // Not when stopping: connect throws notFound then.
+                if case CameraError.disconnected = error {} else if !stopRequested.value {
                     log.notice("Waiting for the camera to be switched off or unplugged before trying again")
                     while camera.connected && !stopRequested.value {
                         Diagnostics.heartbeat("Still waiting for the camera to be switched off or unplugged, after: \(error.localizedDescription)")
