@@ -8,6 +8,7 @@
 
 import Foundation
 import ImageCaptureCore
+import IOKit
 import os.log
 
 private let log = Logger(subsystem: "com.superhighfives.markone", category: "camera")
@@ -158,6 +159,24 @@ final class Camera: NSObject, ICDeviceBrowserDelegate, ICCameraDeviceDelegate {
         offset += 4
         guard info.count >= offset + 2 * count else { return [] }
         return (0..<count).map { info.le(UInt16.self, at: offset + 2 * $0) }
+    }
+
+    /// Whether the Mac lists an Olympus device on USB, asked of IOKit
+    /// directly rather than ImageCaptureCore. For the log: after a night's
+    /// sleep, ImageCaptureCore didn't report the camera again for an hour,
+    /// and this tells whether it was on USB meanwhile.
+    static func onUSB() -> Bool {
+        let matching = IOServiceMatching("IOUSBHostDevice") as NSMutableDictionary
+        // A top-level idVendor key matches nothing here; property values
+        // in the registry have to go under IOPropertyMatch.
+        matching[kIOPropertyMatchKey] = ["idVendor": olympusVendorID]
+        var iterator: io_iterator_t = 0
+        guard IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator) == KERN_SUCCESS else { return false }
+        defer { IOObjectRelease(iterator) }
+        let service = IOIteratorNext(iterator)
+        guard service != 0 else { return false }
+        IOObjectRelease(service)
+        return true
     }
 
     /// USB transfers only reach the uncached view of RAM, 0x40000000 above the cached one.

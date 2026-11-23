@@ -484,7 +484,7 @@ final class Pipeline: ObservableObject {
             report("Waiting for the camera. Connect it by USB and switch it on.", .waiting)
             do {
                 try camera.connect {
-                    Diagnostics.heartbeat("Looking for the camera on USB")
+                    Diagnostics.heartbeat("Looking for the camera on USB (\(Camera.onUSB() ? "the Mac lists it on USB" : "not on USB"))")
                     return !self.stopRequested.value
                 }
                 note(nil)
