@@ -273,6 +273,16 @@ final class Pipeline: ObservableObject {
     }
     private let focusOnStartWanted = Flag()
 
+    /// Whether video apps get a frame saying why there's no picture, while
+    /// the camera isn't ready.
+    @Published var showStatusCard = UserDefaults.standard.object(forKey: "ShowStatusCard") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(showStatusCard, forKey: "ShowStatusCard")
+            card.enabled.value = showStatusCard
+        }
+    }
+    private let card = StatusCard()
+
     /// Whether autofocus looks for faces first.
     @Published var faceFocus = UserDefaults.standard.object(forKey: "FacePriority") as? Bool ?? true {
         didSet {
@@ -426,6 +436,7 @@ final class Pipeline: ObservableObject {
         movieWanted.value = movieSettings
         faceWanted.value = faceFocus
         focusOnStartWanted.value = focusOnStart
+        card.enabled.value = showStatusCard
         let thread = Thread { [weak self] in self?.loop() }
         thread.qualityOfService = .userInteractive
         thread.start()
@@ -445,8 +456,11 @@ final class Pipeline: ObservableObject {
         }
     }
 
-    private nonisolated func report(_ text: String, _ state: State? = nil) {
+    /// Shows `text` as the status, and `card` to video apps (see
+    /// StatusCard) when given.
+    private nonisolated func report(_ text: String, _ state: State? = nil, card: String? = nil) {
         log.notice("\(text, privacy: .public)")
+        if let card { self.card.show(card) }
         Task { @MainActor in
             self.status = text
             if let state { self.state = state }
@@ -481,7 +495,12 @@ final class Pipeline: ObservableObject {
     private nonisolated func loop() {
         while !stopRequested.value {
             let camera = Camera()
-            report("Waiting for the camera. Connect it by USB and switch it on.", .waiting)
+            // Opened before the camera connects, for the status card. If the
+            // extension isn't running yet, openSink waits for it later.
+            var sink = CameraSink.available ? try? CameraSink() : nil
+            card.attach(sink)
+            report("Waiting for the camera. Connect it by USB and switch it on.", .waiting,
+                   card: "Connect your E-M5 (Mark I) by USB and switch it on")
             do {
                 try camera.connect {
                     Diagnostics.heartbeat("Looking for the camera on USB (\(Camera.onUSB() ? "the Mac lists it on USB" : "not on USB"))")
@@ -498,7 +517,8 @@ final class Pipeline: ObservableObject {
                     }
                 }
                 if firmware == .stock {
-                    report("This camera still has Olympus's firmware. Choose Set Up Camera to add Mark One's.", .waiting)
+                    report("This camera still has Olympus's firmware. Choose Set Up Camera to add Mark One's.", .waiting,
+                           card: "Set up the camera in Mark One")
                     while camera.connected && !stopRequested.value { Thread.sleep(forTimeInterval: 0.5) }
                     throw CameraError.disconnected
                 }
@@ -508,7 +528,8 @@ final class Pipeline: ObservableObject {
                 // and firmware updates.
                 if case .markOne(let revision) = firmware, revision >= 1,
                    try Firmware.connectionType(camera) != Firmware.webcamConnection {
-                    report("Connected for photos (MTP). To use the camera as a webcam, choose Webcam on its screen when you connect it.", .waiting)
+                    report("Connected for photos (MTP). To use the camera as a webcam, choose Webcam on its screen when you connect it.", .waiting,
+                           card: "Choose Webcam on the camera's screen")
                     note(.connectedForPhotos)
                     while camera.connected && !stopRequested.value {
                         if installImage.value != nil { try installIfRequested(camera) }
@@ -525,7 +546,8 @@ final class Pipeline: ObservableObject {
                 // Revision 3 lists each frame's address and size.
                 let frameList = revision >= 3
                 if !cardless, try !Firmware.hasCard(camera) {
-                    report("There's no card in the camera. It needs one to record, though Mark One doesn't save anything to it. Updating the camera's firmware removes the need for one.", .waiting)
+                    report("There's no card in the camera. It needs one to record, though Mark One doesn't save anything to it. Updating the camera's firmware removes the need for one.", .waiting,
+                           card: "Put a card in the camera")
                     note(.noCard)
                     while try !Firmware.hasCard(camera) {
                         if !camera.connected || stopRequested.value { throw CameraError.disconnected }
@@ -534,16 +556,18 @@ final class Pipeline: ObservableObject {
                     }
                     note(nil)
                 }
-                report("Setting up the camera…")
+                report("Setting up the camera…", card: "Starting the camera…")
                 // Open the camera extension first: setting up locks the
                 // camera's buttons and dial, and nothing unlocks them if
                 // the extension turns out to be missing.
-                let sink = try openSink(camera)
+                let ready = try sink ?? openSink(camera)
+                sink = ready
+                card.attach(ready)
                 try Firmware.prepare(camera, revision: revision)
                 Thread.sleep(forTimeInterval: 1)
                 let saved = try Firmware.applyPresets(camera)
                 defer { if camera.connected { try? Firmware.releasePresets(camera, saved) } }
-                try serve(camera, to: sink, frameList: frameList)
+                try serve(camera, to: ready, frameList: frameList)
             } catch PipelineInterrupt.install {
                 // Recording has stopped and the camera's settings are back.
                 // Installing from here, in the shooting mode Mark One set
@@ -560,6 +584,7 @@ final class Pipeline: ObservableObject {
                 // Not when stopping: connect throws notFound then.
                 if case CameraError.disconnected = error {} else if !stopRequested.value {
                     log.notice("Waiting for the camera to be switched off or unplugged before trying again")
+                    card.show("Switch the camera off and on")
                     while camera.connected && !stopRequested.value {
                         Diagnostics.heartbeat("Still waiting for the camera to be switched off or unplugged, after: \(error.localizedDescription)")
                         Thread.sleep(forTimeInterval: 0.5)
@@ -569,12 +594,14 @@ final class Pipeline: ObservableObject {
             let closed = DispatchSemaphore(value: 0)
             camera.disconnect { closed.signal() }
             closed.wait()
+            card.attach(nil)
             Task { @MainActor in
                 self.firmware = nil
                 self.battery = nil
                 self.reportsOlderVersion = false
             }
         }
+        card.show(nil)
         Task { @MainActor in
             self.thread = nil
             self.onStopped.forEach { $0() }
@@ -593,12 +620,12 @@ final class Pipeline: ObservableObject {
         if image.revision == 0, try Firmware.readSetting(camera, Firmware.usbMode) == Firmware.usbWebcam {
             try Firmware.writeSetting(camera, Firmware.usbMode, Firmware.usbAuto)
             installProgress(InstallProgress(text: "", fraction: 0, phase: .switchOffFirst))
-            report("Switch the camera off and on to carry on.", .waiting)
+            report("Switch the camera off and on to carry on.", .waiting, card: "Switch the camera off and on")
             while camera.connected && !stopRequested.value { Thread.sleep(forTimeInterval: 0.5) }
             throw CameraError.disconnected
         }
         installImage.value = nil
-        report("Installing Mark One's firmware…", .waiting)
+        report("Installing Mark One's firmware…", .waiting, card: "Installing the camera's firmware…")
         let restarts: Bool
         do {
             restarts = try FirmwareInstall.overUSB(camera, image) { text, fraction in
@@ -750,7 +777,7 @@ final class Pipeline: ObservableObject {
             log.notice("Can't count the camera's key events (\(error.localizedDescription, privacy: .public)); its screen goes off every 30 s regardless")
         }
         while !stopRequested.value {
-            report("Ready. Pick “Mark One” as the camera in a video app.", .ready)
+            report("Ready. Pick “Mark One” as the camera in a video app.", .ready, card: "Starting the camera…")
             try Firmware.setScreen(camera, false)
             var screenChecked = Date(), keysChecked = Date(), lastKey = Date.distantPast
             var screenOn = false
@@ -825,6 +852,8 @@ final class Pipeline: ObservableObject {
                 freeze = nil
             }
             focus.measure(buffer)
+            // The camera's picture replaces the status card from here.
+            if shown == 0 { self?.card.show(nil) }
             sink.send(buffer)
             Preview.shared.show(buffer)
             last = buffer

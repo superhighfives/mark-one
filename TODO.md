@@ -9,34 +9,6 @@ Mark One.
 
 ## Next
 
-- [ ] **Say why there's no picture (1.0.9).** With no E-M5, apps get
-  the extension's dark gray placeholder (`Provider.swift`,
-  `makePlaceholder`, luma 0x20), and Google Meet reads it as "Camera
-  might be blocked. Check your camera's privacy switch". Seen
-  2026-11-20 (1.0.8, this Mac): the camera's power board had come
-  unplugged overnight, so it was off USB, and Meet blamed the lens.
-  Instead, show what Mark One is waiting for, in words. Plan:
-  - Draw it in the app, not the extension: a new placeholder means a
-    new extension build, which can lose the camera until a restart
-    (Extension updates, above). The app also knows the reason, such as
-    no camera on USB, connected for photos (MTP) or no card.
-  - While waiting, keep a `CameraSink` open and, while an app is using
-    the camera (`CameraSink.inUse()`), send a 1920x1080 frame about
-    once a second: the extension repeats the last frame for up to 3 s,
-    then falls back to the gray. Today `loop()` in `Pipeline.swift` only
-    opens the sink once the camera has connected (`openSink`), so open
-    it before `camera.connect` and hand the same sink to `serve`.
-  - The text is the short form of `status`, e.g. "Connect your E-M5
-    (Mark I) by USB and switch it on", on a background light enough that
-    Meet doesn't call it blocked. Check in Meet, FaceTime and Zoom, and
-    that the first camera frame replaces it with no gray in between.
-  - The extension's gray stays for when Mark One isn't running.
-- [ ] **A wrong log line on quitting (1.0.9).** Quitting while Mark One
-  waits for the camera logs "Waiting for the camera to be switched off
-  or unplugged before trying again" (seen 2026-11-20): `connect` throws
-  `.notFound` once `stopRequested` is set, and the `catch` in `loop()`
-  (`Pipeline.swift`, near line 560) only skips that wait for
-  `.disconnected`. Skip it when `stopRequested.value` is set too.
 - [ ] **Not recording after a night idle** (2026-11-17, 1.0.0, work
   laptop): ready from 20:20, the camera ignored REC at 08:01 though it
   still answered over USB, until it was switched off and on. Not

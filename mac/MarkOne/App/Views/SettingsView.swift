@@ -47,6 +47,10 @@ private struct GeneralSettings: View {
                     Text("A short wait lets you switch apps without the camera restarting.")
                 }
                 Toggle("Mirror the preview", isOn: $preferences.mirrorPreview)
+                Toggle(isOn: $pipeline.showStatusCard) {
+                    Text("Say why there’s no picture")
+                    Text("Until the camera is ready, video apps show what it’s waiting for, such as “Connect your E-M5 (Mark I) by USB and switch it on”.")
+                }
             }
             Section("Camera") {
                 Toggle(isOn: $pipeline.connectAsWebcam) {
